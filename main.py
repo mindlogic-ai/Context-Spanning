@@ -1,0 +1,103 @@
+"""Context Spanning — single entry point.
+
+  python main.py infer   --input-wav q.wav --output-wav out.wav [--voice voices/f0.pt]
+  python main.py prepare --in-dir data/raw --out-dir data/prepared
+  python main.py train   --data-dir data/prepared --out-dir runs/ft [--checkpoint ckpt.pt]
+
+Backends (OpenAI-compatible servers) are set with CS_LLM_URL / CS_LLM_MODEL and
+CS_ASR_URL / CS_ASR_MODEL.
+"""
+import argparse
+import json
+import sys
+
+import numpy as np
+import soundfile as sf
+
+
+def transcript(spm, toks):
+    from contextspan.spans import RET_TOKEN_ID, SPAN_TOKEN_ID, TEXT_PAD
+    out, run = [], []
+    for t in toks:
+        if t is None or t <= 2 or t == TEXT_PAD:
+            continue
+        if t in (RET_TOKEN_ID, SPAN_TOKEN_ID):
+            if run:
+                out.append(spm.decode(run)); run = []
+            out.append("<ret>" if t == RET_TOKEN_ID else "<span>")
+        else:
+            run.append(int(t))
+    if run:
+        out.append(spm.decode(run))
+    return " ".join(out)
+
+
+def infer(a):
+    from contextspan.backend import ASR, LLMReferenceBackend
+    from contextspan.model import Engine, load_voice
+    from contextspan.stream import run_stream
+    eng = Engine(a.checkpoint, temp=a.temp, temp_text=a.temp_text, cpu_offload=a.cpu_offload)
+    eng.set_persona(a.text_prompt, load_voice(a.voice) if a.voice else None)
+    pcm, sr = sf.read(a.input_wav, dtype="float32")
+    if pcm.ndim == 2:
+        pcm = pcm[:, 0]
+    want = int(eng.mimi.sample_rate)
+    if sr != want:
+        import librosa
+        pcm = librosa.resample(pcm, orig_sr=sr, target_sr=want)
+    pcm = np.concatenate([np.zeros(int(a.lead_silence * want), np.float32), pcm,
+                          np.zeros(int(a.tail_silence * want), np.float32)])
+    res = run_stream(eng, LLMReferenceBackend(), ASR(), pcm, debounce_s=a.debounce, reroute_s=a.reroute)
+    n = min(len(pcm), len(res["agent"]))
+    sf.write(a.output_wav, np.stack([pcm[:n], res["agent"][:n]], 1), want)      # L=user, R=agent
+    text = transcript(eng.spm, res["tokens"])
+    print(text)
+    if a.output_text:
+        json.dump({"transcript": text, "events": res["events"]}, open(a.output_text, "w"), indent=1)
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+
+    p = sub.add_parser("infer", help="stream a user wav through the model")
+    p.add_argument("--input-wav", required=True)
+    p.add_argument("--output-wav", default="output.wav")
+    p.add_argument("--output-text", default=None)
+    p.add_argument("--checkpoint", default=None, help="local .pt; default downloads the released weights")
+    p.add_argument("--voice", default=None, help="voice prompt .pt (agent-voice Mimi codes)")
+    p.add_argument("--text-prompt", default="You are a helpful and friendly voice assistant.")
+    p.add_argument("--lead-silence", type=float, default=4.0)
+    p.add_argument("--tail-silence", type=float, default=8.0)
+    p.add_argument("--debounce", type=float, default=0.5)
+    p.add_argument("--reroute", type=float, default=1.5)
+    p.add_argument("--temp", type=float, default=0.8)
+    p.add_argument("--temp-text", type=float, default=0.7)
+    p.add_argument("--cpu-offload", action="store_true")
+    p.set_defaults(fn=infer)
+
+    p = sub.add_parser("prepare", help="encode dialogues (json + stereo wav) into training tensors")
+    p.add_argument("--in-dir", required=True)
+    p.add_argument("--out-dir", required=True)
+    p.set_defaults(fn=lambda a: __import__("contextspan.train", fromlist=["prepare"]).prepare(a.in_dir, a.out_dir))
+
+    p = sub.add_parser("train", help="fine-tune on prepared tensors")
+    p.add_argument("--data-dir", required=True)
+    p.add_argument("--out-dir", required=True)
+    p.add_argument("--checkpoint", default=None, help="start from a local .pt (default: PersonaPlex base)")
+    p.add_argument("--steps", type=int, default=1000)
+    p.add_argument("--lr", type=float, default=2e-6)
+    p.add_argument("--accum", type=int, default=8)
+    p.add_argument("--context", type=int, default=3000)
+    p.add_argument("--ckpt-every", type=int, default=250)
+    p.add_argument("--w-ret", type=float, default=5.0)
+    p.add_argument("--seed", type=int, default=0)
+    p.set_defaults(fn=lambda a: __import__("contextspan.train", fromlist=["train"]).train(
+        a.data_dir, a.out_dir, a.checkpoint, a.steps, a.lr, a.accum, a.context, a.ckpt_every, a.w_ret, a.seed))
+
+    a = ap.parse_args(argv)
+    a.fn(a)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

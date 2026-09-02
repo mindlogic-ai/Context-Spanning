@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "contextspan"
+version = "1.0.0"
+description = "Context Spanning: a communication framework for full-duplex speech models and external LLM backends"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = [
+  "torch>=2.2", "numpy", "soundfile", "librosa", "requests", "sentencepiece", "huggingface_hub",
+]
+
+[tool.setuptools]
+packages = ["contextspan"]

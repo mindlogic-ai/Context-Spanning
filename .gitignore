@@ -1,0 +1,7 @@
+__pycache__/
+*.pt
+*.npz
+*.wav
+!assets/**/*.wav
+runs/
+data/
