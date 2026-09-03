@@ -2,7 +2,7 @@
 
 Official code for **Context Spanning: A Communication Framework for Full-Duplex Speech Models and External LLM Backends**.
 
-Context Spanning lets a full-duplex speech model ([PersonaPlex](https://github.com/NVIDIA/personaplex) / Moshi architecture) call an external backend while it keeps listening and talking: the model emits a `<ret>` token when it needs outside knowledge, the backend answers, and the answer is written into the model's context stream as a masked *Context Span* at whatever frame it arrives. Training and inference share one sequence convention, so anything an LLM, a tool, or a search engine returns can be spoken grounded, in real time.
+Context Spanning lets a full-duplex speech model call an external backend while it keeps listening and talking: The external information are written into the model's context stream as a masked *Context Span* at whatever frame it arrives. Training and inference share one sequence convention, so anything an LLM, a tool, or a search engine returns can be spoken grounded, in real time.
 
 <p align="center"><img src="assets/architecture.png" alt="Context Spanning overview" width="720"></p>
 
