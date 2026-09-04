@@ -4,7 +4,6 @@ Official code for **Context Spanning: A Communication Framework for Full-Duplex 
 
 Context Spanning lets a full-duplex speech model call an external backend while it keeps listening and talking: The external information are written into the model's context stream as a masked *Context Span* at whatever frame it arrives. Training and inference share one sequence convention, so anything an LLM, a tool, or a search engine returns can be spoken grounded, in real time.
 
-<p align="center"><img src="assets/architecture.png" alt="Context Spanning overview" width="720"></p>
 
 Weights: [mindlogicinc/context-spanning-7b](https://huggingface.co/mindlogicinc/context-spanning-7b) (fine-tuned from `nvidia/personaplex-7b-v1`).
 
