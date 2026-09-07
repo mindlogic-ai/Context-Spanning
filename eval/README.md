@@ -13,6 +13,23 @@ benchmark's official scorers run on the outputs unchanged. Nothing is scored on 
 | Full-Duplex-Bench v2 | examiner (GPT Realtime) multi-turn conversation | `eval/fdb/v2/go.sh` + `ours_adapter.js` | the benchmark's scorers |
 | Full-Duplex-Bench v3 | tool calling under disfluency: tool selection, argument accuracy, pass rate | `eval.fdb.v3_run` | `eval/fdb/v3_score.sh` (official) |
 
+## Run conditions (every benchmark)
+
+Span latency is part of what is measured, so the machine state is part of the protocol:
+
+- **Warm.** Every model is loaded and has served at least one request before the first scored item:
+  the speech engine, the router / RAG LLM, the ASR, the tool servers. The runners prewarm the backend
+  and the ASR themselves (`eval/common.py`); start the LLM server well before the run and send it one
+  request. A cold first item is a measurement of loading time, not of the system.
+- **No parallelism.** One benchmark process at a time, one item at a time, one engine. No sharding
+  across GPUs, no concurrent runs of another suite, no other inference job on the GPUs the run uses.
+  The router LLM and the ASR each sit alone on their GPU(s). Contention shows up as span latency and
+  the numbers are then about the hardware, not the model.
+- **Lowest-latency mode.** The servers run with the settings in `scripts/backends.sh` (JSON-mode router
+  replies, speculative decoding, prefix caching, bounded decode); the engine steps at the 1.0x frame
+  clock; retrieval is never delayed or batched to make a span "arrive on time". The system is measured
+  as it is deployed.
+
 Servers: the same router / RAG / ASR servers as the runtime (see the top-level README) plus a judge LLM
 for the RAG suite (`JUDGE_LLM_URL`, `JUDGE_LLM_MODEL`; `scripts/env.sh` points it at the router server unless
 `JUDGE_MODEL` is set — the paper's RAG-suite judge was google/gemma-4-31B-it on its own server).
