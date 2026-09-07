@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import sys
 import threading
 from concurrent.futures import Future
@@ -56,6 +57,46 @@ _LLM_MODEL = os.environ.get("MCP_ROUTER_LLM_MODEL", "llama3.2:3b")
 # prompt-embedded catalog + JSON reply, because vLLM without --tool-call-parser rejects the
 # native tools API. Default stays ollama /api/chat.
 _LLM_API = os.environ.get("MCP_ROUTER_LLM_API", "ollama").lower()
+
+
+# ── English-only speech model: tool results are anglicized before they become a span ──────────
+# DuetaSpan working tree (2026-08-27; adopted here 2026-09-07 with the owner's explicit approval as
+# the one change to the vendored runtime): Hangul/CJK inside a span is tokenized into byte pieces the
+# speech model never saw, and the model then invents or avoids the names (ContextSpanning #11).
+_NONLATIN_RE = re.compile(r"[\u1100-\u11ff\u3130-\u318f\uac00-\ud7af\u3040-\u30ff\u4e00-\u9fff]")
+
+
+def anglicize_reference(text: str) -> str:
+    """Rewrite a tool result into spoken English before it becomes a Context Span.
+
+    Numbers, distances and prices are kept verbatim; proper nouns are romanized (Revised
+    Romanization) by the router LLM. No-op when the text is already Latin-script; on any failure the
+    original text is returned. Exchange tickers ("(005930.KS)", "(AAPL)") are print-only notation the
+    speech model reads as garbage, so the parenthetical is dropped."""
+    text = re.sub(r"\s*\((?:[A-Z]{1,5}|\d{4,6})(?:\.[A-Z]{1,3})?\)", "", text or "")
+    if not text or not _NONLATIN_RE.search(text):
+        return text
+    payload = {"model": _LLM_MODEL, "temperature": 0.0,
+               "max_tokens": int(os.environ.get("MCP_ROUTER_MAX_TOKENS", "120")),
+               "messages": [
+                   {"role": "system", "content":
+                    "Rewrite the given tool result as ONE plain English line for a voice assistant to read aloud. "
+                    "Keep every number, unit, distance and price exactly. Write Korean/Japanese/Chinese proper nouns "
+                    "in Latin letters (Korean: Revised Romanization, e.g. 스파게티가있는풍경 -> Spaghetti-ga-inneun Punggyeong). "
+                    "Do not add, drop or reorder facts. Output only the line, no quotes."},
+                   {"role": "user", "content": text}]}
+    headers = {"Authorization": "Bearer " + _LLM_KEY} if _LLM_KEY else None
+    try:
+        resp = requests.post(f"{_LLM_URL}/v1/chat/completions", json=payload, headers=headers, timeout=20)
+        out = (resp.json()["choices"][0]["message"]["content"] or "").strip().strip("`")
+    except Exception as exc:
+        logger.warning("anglicize_reference failed: %s", exc)
+        return text
+    if not out or _NONLATIN_RE.search(out):
+        return text
+    if text.startswith("(tool result)") and not out.startswith("(tool result)"):
+        out = "(tool result) " + out
+    return out
 # gpt-5.x / o-series (e.g. gpt-5.6-luna) reject max_tokens + temperature!=1 and need a bearer key.
 import re as _re
 _rz = os.environ.get("MCP_ROUTER_LLM_REASONING", "").strip().lower()
@@ -922,6 +963,7 @@ class MCPRouter:
             return None
         if not reference:
             return None
+        reference = anglicize_reference(reference)          # EN-only speech model
         return {
             "reference": reference,
             "tool": name,
