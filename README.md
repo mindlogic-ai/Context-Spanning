@@ -62,7 +62,11 @@ The vLLM flags matter for latency and are explained in the script: `--max-model-
 prompt carries the tool catalogue, ~2.9k-3.5k tokens, plus the conversation), n-gram speculative decoding
 (the router's replies repeat the prompt, which cut its round trip by ~40% at temperature 0), prefix
 caching (every call shares the 10k-character system prompt). `ROUTER_GPUS` / `ROUTER_TP` / `ASR_GPU`
-select GPUs. Any OpenAI-compatible server and any `POST /transcribe -> {"text"}` ASR (a Whisper endpoint,
+select GPUs; `ROUTER_MEM` (0.58) sizes the router's share of its GPU (~56 GB of 96 GB, leaving room for
+the ASR and the speech model on the same card). The router server also answers the RAG fallback and is the
+eval judge; set `RAG_MODEL` (and `RAG_GPUS`) to put those two on a separate server so a smaller model can
+take the tool pick — the acceptance test for a smaller router is FDB v3 tool-selection / argument accuracy
+(`eval/`), which is exactly the job it would do. Any OpenAI-compatible server and any `POST /transcribe -> {"text"}` ASR (a Whisper endpoint,
 for instance) can replace them; a hosted LLM API takes `MCP_ROUTER_LLM_KEY` / `MOSHICP_RAG_LLM_KEY`.
 Tool results and the SQLite world live under `contextspan/datasets/` (override with `DUETASPAN_DATA`).
 
