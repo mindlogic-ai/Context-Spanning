@@ -71,7 +71,9 @@ canvas { width: 100%; height: 46px; display: block; }
   border-left: 3px solid var(--mint); background: var(--mint-soft);
   border-radius: 0; padding: 9px 11px; font-size: 13px; animation: slide .3s ease;
 }
-.span.question { opacity: .75; }
+.you { margin: 6px 0; padding: 4px 8px; border-left: 3px solid var(--dim); color: var(--dim); font-size: 12.5px; }
+.you b { color: inherit; font-weight: 600; }
+.aside { margin: 4px 0; color: var(--dim); font-size: 11.5px; font-style: italic; }
 .span .meta { color: var(--dim); font-size: 11.5px; margin-bottom: 3px;
               display: flex; justify-content: space-between; gap: 10px; }
 @keyframes slide { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
@@ -104,7 +106,8 @@ canvas { width: 100%; height: 46px; display: block; }
   <span class="tag">full-duplex speech &middot; knowledge injected mid-stream</span>
 </header>
 <p class="lede">Speak normally. When the model needs a fact it retrieves one without stopping, and the
-reference lands in the stream it is already speaking.</p>
+reference lands in the stream it is already speaking. To hear it in your own voice, clone it first
+(12 seconds of reading), then start talking.</p>
 
 <div class="bar">
   <button id="go" class="primary">Start talking</button>
@@ -143,6 +146,7 @@ reference lands in the stream it is already speaking.</p>
 <script>
 const $ = (id) => document.getElementById(id);
 let ws, ctx, node, stream, playAt = 0, running = false;
+let micOn = false, mode = "talk", fmt = null;   // fmt = {sampleRate, frameSize} from the server's `ready`
 let geo = null;                          // {lat, lon} once the user allowed it
 let rec = null;                          // {user: [Float32Array], agent: [...], events: [], sr}
 const now = () => (rec ? (performance.now() - rec.t0) / 1000 : 0);
@@ -229,7 +233,16 @@ async function start() {
     return;
   }
   notice("");
-  $("go").disabled = true; status("connecting", "busy");
+  mode = "talk";
+  $("go").disabled = true; $("clone").disabled = true; status("connecting", "busy");
+  if (ws && ws.readyState === WebSocket.OPEN && fmt) {   // the connection the voice was cloned on
+    sendContext(); openMic(fmt.sampleRate, fmt.frameSize);
+    return;
+  }
+  connect();
+}
+
+function connect() {
   const scheme = location.protocol === "https:" ? "wss" : "ws";
   // The page's own query string rides along, so `?token=...` reaches the server's --token check.
   ws = new WebSocket(`${scheme}://${location.host}/ws${location.search}`);
@@ -249,7 +262,9 @@ async function start() {
     if (m.type === "ready") {
       serverPersona = m.persona || "";
       if (stored("persona") === null) $("persona").value = serverPersona;
-      sendContext(); openMic(m.sample_rate, m.frame_size);
+      fmt = { sampleRate: m.sample_rate, frameSize: m.frame_size };
+      if (mode === "clone") { openMic(fmt.sampleRate, fmt.frameSize, true); }
+      else { sendContext(); openMic(fmt.sampleRate, fmt.frameSize); }
     }
     else if (m.type === "busy") {
       notice("Another conversation is already running on this server.");
@@ -257,14 +272,16 @@ async function start() {
     }
     else if (m.type === "text") { recEvent("text", { delta: m.delta }); appendText(m.delta); }
     else if (m.type === "ret") { recEvent("ret"); status("retrieving", "busy"); }
-    else if (m.type === "question") { recEvent("question", { text: m.text, ms: m.ms }); addQuestion(m); }
-    else if (m.type === "no_span") { recEvent("no_span", { question: m.question }); status("listening", "live"); }
+    else if (m.type === "question") { recEvent("question", { text: m.text, ms: m.ms }); appendYou(m.text); }
+    else if (m.type === "no_span") { recEvent("no_span", { question: m.question }); appendAside("nothing to look up"); status("listening", "live"); }
     else if (m.type === "span") { recEvent("span", { text: m.text, question: m.question, frames: m.frames }); addSpan(m); }
     else if (m.type === "error") { recEvent("error", { stage: m.stage, message: m.message }); notice(`${m.stage}: ${m.message}`); status("listening", "live"); }
     else if (m.type === "cloned") {
       cloning = false;
-      status(`voice cloned from ${m.seconds}s`, "live");
-      $("clone").textContent = "Clone my voice"; $("clone").disabled = false;
+      closeMic();                                   // the connection stays open, the voice on it
+      status(`voice cloned from ${m.seconds}s — press Start talking`, null);
+      $("clone").textContent = "Voice cloned (record again)"; $("clone").disabled = false;
+      $("go").disabled = false;
     }
   };
   ws.onclose = (e) => stop(e.wasClean ? "idle" : "connection closed");
@@ -283,22 +300,29 @@ function appendText(delta) {
   el.scrollTop = el.scrollHeight;
 }
 
-function addQuestion(m) {
-  // What the ASR heard, shown as soon as it is known so a wrong span can be traced to a misheard
-  // (or cut-off) question rather than to the router.
-  const box = $("spans");
-  if (box.querySelector(".empty")) box.textContent = "";
+function appendYou(text) {
+  // What the ASR heard, in the conversation where it happened, so a wrong span can be traced to a
+  // misheard (or cut-off) question rather than to the router.
+  const el = $("said");
+  if (el.querySelector(".empty")) el.textContent = "";
+  const c = el.querySelector(".cursor");
+  if (c) c.remove();
   const d = document.createElement("div");
-  d.className = "span question";
-  const meta = document.createElement("div");
-  meta.className = "meta";
-  const left = document.createElement("span"); left.textContent = "heard";
-  const right = document.createElement("span"); right.textContent = `asr ${m.ms} ms`;
-  meta.append(left, right);
-  const t = document.createElement("div");
-  t.textContent = m.text;
-  d.append(meta, t);
-  box.prepend(d);
+  d.className = "you";
+  const b = document.createElement("b"); b.textContent = "You: ";
+  d.append(b, document.createTextNode(text));
+  el.append(d);
+  el.scrollTop = el.scrollHeight;
+}
+
+function appendAside(text) {
+  const el = $("said");
+  const c = el.querySelector(".cursor");
+  if (c) c.remove();
+  const d = document.createElement("div");
+  d.className = "aside"; d.textContent = text;
+  el.append(d);
+  el.scrollTop = el.scrollHeight;
 }
 
 function addSpan(m) {
@@ -308,7 +332,9 @@ function addSpan(m) {
   d.className = "span";
   const meta = document.createElement("div");
   meta.className = "meta";
-  const left = document.createElement("span"); left.textContent = "injected";
+  const src = m.source || "";
+  const left = document.createElement("span");
+  left.textContent = src.startsWith("mcp:") ? `tool ${src.slice(4)}` : (src ? `span (${src})` : "span");
   const right = document.createElement("span"); right.textContent = `${m.frames} frames · ${m.seconds}s`;
   meta.append(left, right);
   const t = document.createElement("div");
@@ -319,7 +345,7 @@ function addSpan(m) {
   status("listening", "live");
 }
 
-async function openMic(sampleRate, frameSize) {
+async function openMic(sampleRate, frameSize, forClone = false) {
   try {
     ctx = new AudioContext({ sampleRate });
     const raw = new URLSearchParams(location.search).get("raw") === "1";
@@ -336,12 +362,14 @@ async function openMic(sampleRate, frameSize) {
   const src = ctx.createMediaStreamSource(stream);
   node = new AudioWorkletNode(ctx, "mic-frames", { processorOptions: { frameSize } });
   node.port.onmessage = (e) => {
-    if (!running) return;
+    if (!micOn) return;
     const f = new Float32Array(e.data);
     push("u", rms(f));
-    if (cloning) clip.push(f); else { if (rec) rec.user.push(f); ws.send(f.buffer); }
+    if (cloning) clip.push(f); else if (running) { if (rec) rec.user.push(f); ws.send(f.buffer); }
   };
   src.connect(node);
+  micOn = true;
+  if (forClone) { recordVoice(); return; }
   rec = { user: [], agent: [], events: [], sr: sampleRate, t0: performance.now(),
           context: context() };
   $("rec").hidden = true;
@@ -349,6 +377,32 @@ async function openMic(sampleRate, frameSize) {
   status("listening", "live");
   $("go").textContent = "Stop"; $("go").disabled = false;
   $("go").onclick = () => stop("idle");
+}
+
+function closeMic() {
+  micOn = false;
+  if (stream) stream.getTracks().forEach((t) => t.stop());
+  if (node) node.disconnect();
+  if (ctx) { try { ctx.close(); } catch (e) {} }
+  stream = node = ctx = null;
+}
+
+async function recordVoice() {
+  // 12 s of the user's speech; the model conditions on timbre, not on the words.
+  cloning = true; clip = [];
+  for (let left = 12; left > 0; left--) {
+    $("clone").textContent = `Recording ${left}s`;
+    status("read a sentence or two out loud", "busy");
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  const total = clip.reduce((n, f) => n + f.length, 0);
+  const pcm = new Float32Array(total);
+  let o = 0; for (const f of clip) { pcm.set(f, o); o += f.length; }
+  clip = [];
+  $("clone").textContent = "Encoding";
+  status("encoding voice", "busy");
+  ws.send(JSON.stringify({ type: "clone" }));
+  ws.send(pcm.buffer);
 }
 
 function play(pcm) {
@@ -397,34 +451,25 @@ function offerRecording() {
 function stop(msg) {
   running = false;
   try { offerRecording(); } catch (e) { console.warn("recording", e); }
-  if (stream) stream.getTracks().forEach((t) => t.stop());
-  if (node) node.disconnect();
+  closeMic();
   if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+  fmt = null;
   lvl.u.fill(0); lvl.a.fill(0);
   status(msg, null);
   $("go").textContent = "Start talking"; $("go").disabled = false;
   $("go").onclick = start;
+  $("clone").textContent = "Clone my voice"; $("clone").disabled = false;
 }
 
-$("clone").onclick = async () => {
-  if (!running) { notice("Press Start talking first — cloning records through the same microphone."); return; }
+$("clone").onclick = () => {
+  // Cloning happens before the conversation: the voice is set on the connection, then Start talks with it.
+  if (running) { notice("Stop the conversation first, then clone; the next conversation starts in that voice."); return; }
+  if (!window.isSecureContext) { notice("Browsers allow microphone access only over https or on localhost."); return; }
   notice("");
-  cloning = true; clip = [];
-  $("clone").disabled = true;
-  for (let left = 12; left > 0; left--) {
-    $("clone").textContent = `Recording ${left}s`;
-    status("read a sentence or two out loud", "busy");
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-  // The model conditions on timbre, not on the words, so any speech of this length works.
-  const total = clip.reduce((n, f) => n + f.length, 0);
-  const pcm = new Float32Array(total);
-  let o = 0; for (const f of clip) { pcm.set(f, o); o += f.length; }
-  clip = [];
-  $("clone").textContent = "Encoding";
-  status("encoding voice", "busy");
-  ws.send(JSON.stringify({ type: "clone" }));
-  ws.send(pcm.buffer);
+  mode = "clone";
+  $("clone").disabled = true; $("go").disabled = true; status("connecting", "busy");
+  if (ws && ws.readyState === WebSocket.OPEN && fmt) { openMic(fmt.sampleRate, fmt.frameSize, true); return; }
+  connect();
 };
 
 $("go").onclick = start;

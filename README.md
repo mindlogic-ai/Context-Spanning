@@ -47,25 +47,24 @@ weather, prices, web search, places and routes, SGD-seeded bookings) and its res
 Of DuetaSpan's 125-tool bank this package uses the **60 tools whose result is something a voice
 assistant says to the listener**; browser automation, filesystem, web crawling, PayPal back-office,
 coordinate/IP/elevation and app deep-link tools are excluded — the list and the reasoning are in
-[`contextspan/datasets/moshicp/TOOLS.md`](contextspan/datasets/moshicp/TOOLS.md). Three servers are
-needed; any OpenAI-compatible LLM server works (vLLM shown).
+[`contextspan/datasets/moshicp/TOOLS.md`](contextspan/datasets/moshicp/TOOLS.md).
+
+Two servers are needed. `scripts/backends.sh` starts them with the settings every number in this
+repository was measured with, so a fresh machine gets the same span latency without tuning:
 
 ```bash
-# router + RAG LLM (one server serves both). The router's prompt carries the tool catalogue: ~2.9k tokens
-# for the first-stage pick and ~3.5k for the largest tool group, plus the conversation, so the server
-# needs a context of at least 8192 tokens.
-vllm serve google/gemma-3-27b-it --port 8004 --max-model-len 8192
-export MCP_ROUTER_LLM_API=openai MCP_ROUTER_LLM_URL=http://localhost:8004 MCP_ROUTER_LLM_MODEL=google/gemma-3-27b-it
-export MOSHICP_RAG_LLM_URL=http://localhost:8004/v1/chat/completions MOSHICP_RAG_LLM_MODEL=google/gemma-3-27b-it
-# ASR: any server that answers POST /transcribe (multipart `file` = wav) with {"text": ...}; the vendored
-# Qwen3-ASR server below is one, a Whisper endpoint with the same contract works as well.
-pip install -e '.[asr-server]' && python -m contextspan.duetaspan.runtime.asr_server   # :8990
-export MOSHICP_ASR_URL=http://localhost:8990/transcribe
+pip install -e '.[asr-server]' vllm
+bash scripts/backends.sh start        # router LLM: vLLM Gemma-3-27B on GPUs 1,3 (TP=2); ASR: Qwen3-ASR on GPU 0
+source scripts/env.sh                 # MCP_ROUTER_* / MOSHICP_RAG_LLM_* / MOSHICP_ASR_URL / JUDGE_LLM_*
 ```
 
-A hosted API works the same way (`MCP_ROUTER_LLM_URL=https://api.openai.com`, `MCP_ROUTER_LLM_KEY`,
-`MOSHICP_RAG_LLM_KEY`). Tool results and the SQLite world live under `contextspan/datasets/` (override
-with `DUETASPAN_DATA`).
+The vLLM flags matter for latency and are explained in the script: `--max-model-len 8192` (the router
+prompt carries the tool catalogue, ~2.9k-3.5k tokens, plus the conversation), n-gram speculative decoding
+(the router's replies repeat the prompt, which cut its round trip by ~40% at temperature 0), prefix
+caching (every call shares the 10k-character system prompt). `ROUTER_GPUS` / `ROUTER_TP` / `ASR_GPU`
+select GPUs. Any OpenAI-compatible server and any `POST /transcribe -> {"text"}` ASR (a Whisper endpoint,
+for instance) can replace them; a hosted LLM API takes `MCP_ROUTER_LLM_KEY` / `MOSHICP_RAG_LLM_KEY`.
+Tool results and the SQLite world live under `contextspan/datasets/` (override with `DUETASPAN_DATA`).
 
 ## Inference
 
@@ -86,7 +85,7 @@ python main.py serve --voice f0 --host 0.0.0.0 --port 8080 --token <value>
 Browsers open the microphone only over https or on localhost. The page shows the agent's text and
 each injected span as it lands; name, location and timezone are the Context DB profile, the **Knowledge** field its notes;
 the router sees the profile, the user's turns and every tool result (call and value). Stop offers the conversation as a stereo wav and a
-JSON transcript (`ret` / `question` / `span` / `no_span` / `text` events with timing; `question` is what the ASR heard, so a wrong span can be traced to the ASR or to the backend). "Clone my voice" records 12 s and speaks with that voice.
+JSON transcript (`ret` / `question` / `span` / `no_span` / `text` events with timing; `question` is what the ASR heard, so a wrong span can be traced to the ASR or to the backend). "Clone my voice" is done before a conversation: it records 12 s of your speech on the connection, and Start then talks in that voice (the transcript shows what the ASR heard as **You:** lines, each span with the tool or source it came from).
 
 ## Evaluation
 
