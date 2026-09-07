@@ -15,6 +15,7 @@ Weights: [mindlogicinc/context-spanning-7b](https://huggingface.co/mindlogicinc/
 | `contextspan/inject.py` | the Context Span block, read in one batched forward |
 | `contextspan/spans.py` | the sequence conventions shared by training and inference |
 | `contextspan/backend.py` | the router (the DuetaSpan router prompt, one OpenAI-compatible LLM call) and the ASR client |
+| `contextspan/tools.py` | the tool bank: the values the router cannot know, fetched and rendered as one span sentence |
 | `contextspan/stream.py` | frame-clock loop for a wav file |
 | `contextspan/serve.py` | WebSocket server + browser page |
 | `contextspan/train.py` | data preparation and fine-tuning |
@@ -51,6 +52,32 @@ export CS_ASR_URL=http://localhost:8901/v1/audio/transcriptions CS_ASR_MODEL=qwe
 A hosted API works the same way (`CS_LLM_URL=https://api.openai.com/v1/chat/completions`,
 `CS_LLM_MODEL`, `CS_LLM_API_KEY`). `retrieve(question, context) -> str` in `contextspan/backend.py`
 is the only contract: replace `LLMReferenceBackend` to change where the knowledge comes from.
+
+### Tools
+
+The router prompt forbids answering the current time, the current weather or a live value from the
+model's own knowledge: those must come from a tool. `contextspan/tools.py` is that catalog. Its
+schemas are put in front of the router, a routed call is executed, and the result comes back as one
+sentence in the same shape a reference has, because that is what is spliced into the stream.
+
+| tool | provider | needs a key |
+|---|---|---|
+| `get_time` | `zoneinfo`, local | no network at all |
+| `get_weather` | `CS_WEATHER_URL` (default wttr.in) | no |
+| `find_places` | `CS_PLACES_URL` (default OpenStreetMap Nominatim) | no |
+| `web_search` | `CS_SEARCH_URL` (default Wikipedia) | no |
+
+A tool whose provider is set to an empty string is dropped from the catalog rather than offered and
+then failing, so the router can only pick something that can actually run; `CS_TOOLS=get_time,get_weather`
+restricts it further. `CS_TOOL_TIMEOUT` (default 6 s) is a hard ceiling, because a span that misses
+the response delay is worse than no span. A tool never raises: a dead endpoint means no span and the
+conversation continues.
+
+Missing arguments are filled from the user profile the page supplies, so "what time is it" and
+"somewhere to eat near me" work without the user naming a city. `find_places` only returns names the
+model can pronounce (`CS_PLACES_LANG`, default `en`) and declines otherwise, which means that in
+cities where OpenStreetMap carries no English names it will find nothing — point `CS_PLACES_URL` at a
+provider with better local coverage if that matters.
 
 ## Inference
 
