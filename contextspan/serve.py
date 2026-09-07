@@ -5,7 +5,8 @@
 The browser sends one 80 ms frame of float32 PCM at a time and gets one frame back, so the wire
 carries the clock the model runs on. When the model emits `<ret>`, the recent user audio is
 transcribed, the backend is asked, and the reference is injected on the first frame after it
-returns; the stream never stops to wait for it. One engine, one conversation at a time.
+returns; a turn that needs no external knowledge injects nothing (`no_span`). The stream never
+stops to wait for any of it. One engine, one conversation at a time.
 """
 import asyncio
 import hmac
@@ -79,6 +80,9 @@ async def ws_handler(request):
                 r = pending.result(); pending = None
                 if r.get("error"):
                     await ws.send_json({"type": "error", "stage": r["error"], "message": r["message"]})
+                elif r["inject"] is None:      # nothing to ground on: no span, and not a failure
+                    events.append(r)
+                    await ws.send_json({"type": "no_span", "question": r["question"]})
                 else:
                     n = eng.inject_context_span(r["inject"])
                     events.append(r)

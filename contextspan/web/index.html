@@ -258,6 +258,7 @@ async function start() {
     else if (m.type === "text") { recEvent("text", { delta: m.delta }); appendText(m.delta); }
     else if (m.type === "ret") { recEvent("ret"); status("retrieving", "busy"); }
     else if (m.type === "question") { recEvent("question", { text: m.text, ms: m.ms }); addQuestion(m); }
+    else if (m.type === "no_span") { recEvent("no_span", { question: m.question }); status("listening", "live"); }
     else if (m.type === "span") { recEvent("span", { text: m.text, question: m.question, frames: m.frames }); addSpan(m); }
     else if (m.type === "error") { recEvent("error", { stage: m.stage, message: m.message }); notice(`${m.stage}: ${m.message}`); status("listening", "live"); }
     else if (m.type === "cloned") {

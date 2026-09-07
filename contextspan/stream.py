@@ -4,8 +4,8 @@ The `<ret>` handling is the DuetaSpan live runtime's (duetaspan/runtime/live_ser
 recent user audio is transcribed; the backend is asked with the user's profile, what the agent has
 already said, the requests already answered and the Context DB working text; a tool result or a
 direct answer is injected as a Context Span; a `<ret>` with no transcript, or a router "nothing to
-do" that no tool produced, is closed with an EMPTY marker pair (the surface the model was trained
-on for "issued, nothing arrived"). The frame clock never waits for any of it.
+do" that no tool produced, injects NOTHING (the benchmark harness's gate: an abstain span exists in
+training only when a real tool ran and came back empty). The frame clock never waits for any of it.
 """
 import json
 import threading
@@ -19,13 +19,13 @@ from .duetaspan.runtime.backend.context_db import ContextDB, ContextProfile
 def retrieve_for_ret(backend, asr, clip, sample_rate, ctx, db, said_text, events, on_question=None):
     """One `<ret>`: transcribe -> ask the backend -> decide what is injected.
 
-    Returns dict(question, reference, inject, src, args): `inject` is the text to put in the span
-    ("" = empty marker pair), `reference` the backend's raw answer (None when nothing was asked)."""
+    Returns dict(question, reference, inject, src, args): `inject` is the span text, or None when
+    nothing is injected; `reference` is the backend's raw answer (None when nothing was asked)."""
     question = asr.transcribe(clip, sample_rate) or ""
     if on_question is not None:
         on_question(question)
     if not question.strip():
-        return {"question": "", "reference": None, "inject": "", "src": None, "args": None}
+        return {"question": "", "reference": None, "inject": None, "src": None, "args": None}
     if db is not None and question != db.last_user_text():
         db.add_user_turn(question)
     answered = [f"{e['question']!r} -> {e['src'] or 'no tool'}" for e in events if e.get("reference") is not None]
@@ -34,9 +34,9 @@ def retrieve_for_ret(backend, asr, clip, sample_rate, ctx, db, said_text, events
                            convo=convo)
     src, args = backend.last_source, getattr(backend, "last_args", None)
     if ref and "no information found" in str(ref).lower() and not (src or "").startswith("mcp:"):
-        inject = ""                       # router had nothing to do: no tool ran, nothing to ground on
+        inject = None                     # router had nothing to do: no tool ran, nothing to ground on
     else:
-        inject = ref or ""
+        inject = ref or None
         if db is not None and (src or "").startswith("mcp:"):
             db.add_tool_turn(f"{src[4:]}({json.dumps(args or {}, ensure_ascii=False)}) => {str(ref or '')[:240]}",
                              tool=src[4:], args=args)
@@ -68,11 +68,11 @@ def run_stream(eng, backend, asr, pcm, ctx=None, asr_window_s=12.0, realtime=Tru
             ready = queue.pop(0) if queue else None
         if ready is not None:
             ready["t_inj"] = i / eng.frame_rate
-            ready["frames"] = eng.inject_context_span(ready["inject"])
+            ready["frames"] = eng.inject_context_span(ready["inject"]) if ready["inject"] else 0
             events.append(ready)
             if verbose:
                 print(f"[span @{ready['t_inj']:.1f}s] q={ready['question']!r} src={ready['src']} "
-                      f"-> {ready['inject'][:100]!r}", flush=True)
+                      f"-> {'(no span)' if ready['inject'] is None else ready['inject'][:100]!r}", flush=True)
         o = eng.step(pcm[i * fs:(i + 1) * fs])
         out.append(o["agent_pcm"] if o["agent_pcm"] is not None else np.zeros(fs, np.float32))
         tokens.append(o["text_token"])
