@@ -4,9 +4,11 @@
 
 The browser sends one 80 ms frame of float32 PCM at a time and gets one frame back, so the wire
 carries the clock the model runs on. When the model emits `<ret>`, the recent user audio is
-transcribed, the backend is asked, and the reference is injected on the first frame after it
-returns; a turn that needs no external knowledge injects nothing (`no_span`). The stream never
-stops to wait for any of it. One engine, one conversation at a time.
+The user's speech is transcribed continuously by utterance (`user_text` events, partial and final); on
+`<ret>` the fresh transcript is the question, a sentence still running is waited for (bounded), the
+backend is asked, and the reference is injected on the first frame after it returns; a turn that needs
+no external knowledge injects nothing (`no_span`). The stream never stops to wait for any of it. One
+engine, one conversation at a time.
 """
 import asyncio
 import hmac
@@ -19,7 +21,7 @@ import numpy as np
 from aiohttp import WSMsgType, web
 
 from .duetaspan.runtime.backend.context_db import ContextDB, ContextProfile
-from .stream import RET_DEADLINE_S, retrieve_for_ret
+from .stream import RET_DEADLINE_S, RET_UTT_WAIT_S, UTT_CACHE_S, Utterances, retrieve_for_ret
 
 WEB = Path(__file__).parent / "web"
 log = logging.getLogger(__name__)
@@ -46,6 +48,34 @@ async def ws_handler(request):
         heard, keep = [], int(request.app["listen_s"] * eng.frame_rate)
         said, shown, user, cloning, stepped = [], "", {}, False, 0
         db, events = ContextDB(ContextProfile(persona=persona)), []
+        # continuous utterance ASR (DuetaSpan live server): `heard` is indexed by absolute frame via `base`
+        utts, base, cache, ret_wait, t_ret = Utterances(), 0, {"text": None, "t": -1e9}, None, 0.0
+        sr = int(eng.mimi.sample_rate)
+
+        def uslice(f0, f1):
+            lo, hi = max(0, f0 - base), max(0, f1 + 1 - base)
+            return np.concatenate(heard[lo:hi]) if hi > lo else np.zeros(0, np.float32)
+
+        def kick(i, question=None):
+            nonlocal pending, t_ret
+            t_ret = time.monotonic()
+            notify = lambda ev: asyncio.run_coroutine_threadsafe(ws.send_json(ev), loop)
+            pending = loop.run_in_executor(None, _retrieve, request.app, uslice(max(0, i + 1 - keep), i), sr,
+                                           dict(user), db, shown, list(events), notify, question)
+
+        async def transcribe_utt(kind, u0, u1):
+            nonlocal ret_wait
+            text = await loop.run_in_executor(None, lambda: app_asr.transcribe(uslice(u0, u1), sr) or "")
+            if text.strip():
+                cache.update(text=text, t=u1 / eng.frame_rate)
+                if kind == "final" and text != db.last_user_text():
+                    db.add_user_turn(text)
+                await ws.send_json({"type": "user_text", "utt": int(u0), "final": kind == "final",
+                                    "t": round(u1 / eng.frame_rate, 2), "text": text})
+            if kind == "final" and ret_wait is not None:
+                waiting, ret_wait = ret_wait, None
+                kick(waiting, text.strip() or None)
+        app_asr = request.app["asr"]
         async for msg in ws:
             if msg.type == WSMsgType.TEXT:
                 m = json.loads(msg.data)
@@ -95,8 +125,13 @@ async def ws_handler(request):
                                         "source": r["src"], "frames": n, "seconds": round(n / eng.frame_rate, 2)})
             frame = np.frombuffer(msg.data, dtype=np.float32).copy()
             heard.append(frame)
-            if len(heard) > keep:
-                del heard[:-keep]
+            if len(heard) > 2 * keep:
+                del heard[:keep]; base += keep
+            for kind, u0, u1 in utts.feed(stepped, frame):
+                asyncio.ensure_future(transcribe_utt(kind, u0, u1))
+            if ret_wait is not None and (stepped - ret_wait) / eng.frame_rate >= RET_UTT_WAIT_S:
+                waiting, ret_wait = ret_wait, None
+                kick(waiting)                           # the sentence did not end in time: transcribe the window
             out = eng.step(frame)
             stepped += 1
             if out["agent_pcm"] is not None:
@@ -106,16 +141,19 @@ async def ws_handler(request):
                 full = eng.decode_text(said)
                 if full != shown:
                     await ws.send_json({"type": "text", "delta": full[len(shown):]}); shown = full
-            if out["is_ret"] and pending is None:
+            if out["is_ret"] and pending is None and ret_wait is None:
                 await ws.send_json({"type": "ret"})
-                t_ret = time.monotonic()
-                notify = lambda ev: asyncio.run_coroutine_threadsafe(ws.send_json(ev), loop)
-                pending = loop.run_in_executor(None, _retrieve, request.app, np.concatenate(heard),
-                                               int(eng.mimi.sample_rate), dict(user), db, shown, list(events), notify)
+                i = stepped - 1
+                if cache["text"] and (i / eng.frame_rate - cache["t"]) < UTT_CACHE_S and not utts.speaking:
+                    kick(i, cache["text"])              # the sentence just ended: its transcript is the question
+                elif utts.speaking:
+                    ret_wait = i                        # mid-sentence: wait for the utterance to end (bounded)
+                else:
+                    kick(i)                             # no utterance around: the fixed window
     return ws
 
 
-def _retrieve(app, clip, sample_rate, user, db, said_text, events, notify):
+def _retrieve(app, clip, sample_rate, user, db, said_text, events, notify, question=None):
     """One `<ret>` off the frame clock: the DuetaSpan handler (stream.retrieve_for_ret) with the page
     told what the ASR heard as soon as it is known, and question/reference logged once per `<ret>`."""
     t0 = time.monotonic()
@@ -128,7 +166,7 @@ def _retrieve(app, clip, sample_rate, user, db, said_text, events, notify):
             notify({"type": "question", "text": q, "ms": timing["asr_ms"]})
     try:
         r = retrieve_for_ret(app["backend"], app["asr"], clip, sample_rate, user, db, said_text, events,
-                             on_question=on_question)
+                             on_question=on_question, question=question)
     except Exception as e:
         log.exception("retrieval failed")
         return {"error": "retrieval", "message": str(e)}

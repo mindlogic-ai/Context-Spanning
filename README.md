@@ -92,7 +92,10 @@ python main.py infer --input-wav assets/test/question.wav --output-wav out.wav -
 python main.py serve --voice f0 --host 0.0.0.0 --port 8080 --token <value>
 ```
 
-Browsers open the microphone only over https or on localhost. The page shows the agent's text and
+Your speech is transcribed continuously, one utterance at a time (a **You:** line updates while you speak
+and freezes when you stop); on `<ret>` the transcript of the sentence you just finished is the question
+sent to the router, a sentence still in progress is waited for (at most `CS_RET_UTT_WAIT_S`, 1 s), and the
+line that was routed is marked. Browsers open the microphone only over https or on localhost. The page shows the agent's text and
 each injected span as it lands; name, location and timezone are the Context DB profile, the **Knowledge** field its notes;
 the router sees the profile, the user's turns and every tool result (call and value). Stop offers the conversation as a stereo wav and a
 JSON transcript (`ret` / `question` / `span` / `no_span` / `text` events with timing; `question` is what the ASR heard, so a wrong span can be traced to the ASR or to the backend). "Clone my voice" is done before a conversation: it records 12 s of your speech on the connection, and Start then talks in that voice (the transcript shows what the ASR heard as **You:** lines, each span with the tool or source it came from).
