@@ -11,10 +11,11 @@ requires-python = ">=3.10"
 license = {text = "MIT"}
 dependencies = [
   "torch>=2.2", "numpy", "soundfile", "librosa", "requests", "sentencepiece", "huggingface_hub", "aiohttp",
+  "safetensors", "einops", "sphn",
 ]
 
-[tool.setuptools]
-packages = ["contextspan"]
+[tool.setuptools.packages.find]
+include = ["contextspan*"]
 
 [tool.setuptools.package-data]
-contextspan = ["web/*"]
+contextspan = ["web/*", "moshi/LICENSE.*"]

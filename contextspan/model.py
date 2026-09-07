@@ -4,7 +4,7 @@ import numpy as np
 import sentencepiece
 import torch
 from huggingface_hub import hf_hub_download
-from moshi.models import LMGen, loaders
+from .moshi.models import LMGen, loaders
 
 from . import inject as inject_mod
 from .spans import (N_AUDIO_CB, RET_TOKEN_ID, SILENCE_TOKENS, SINE_TOKENS, SPAN_TOKEN_ID, TEXT_PAD,

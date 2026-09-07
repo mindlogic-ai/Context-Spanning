@@ -24,10 +24,13 @@ Weights: [mindlogicinc/context-spanning-7b](https://huggingface.co/mindlogicinc/
 
 ```bash
 pip install torch --index-url https://download.pytorch.org/whl/cu128
-pip install --no-deps "git+https://github.com/NVIDIA/personaplex.git#subdirectory=moshi"
 pip install -e .
 export HF_TOKEN=<token with access to nvidia/personaplex-7b-v1 and the weights repo>
 ```
+
+Everything the model needs is in this repository: `contextspan/moshi/` is the PersonaPlex fork of
+Kyutai's `moshi` package (MIT; license files alongside). Nothing is fetched from another code
+repository; only the weights come from the Hub.
 
 `CS_BASE_DIR` / `CS_WEIGHTS_DIR` point at local copies of the PersonaPlex base and of the weights
 repo (`context_spanning_7b.pt`, `voices/*.pt`) instead of downloading them.
