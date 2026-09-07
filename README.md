@@ -14,7 +14,9 @@ Weights: [mindlogicinc/context-spanning-7b](https://huggingface.co/mindlogicinc/
 | `contextspan/model.py` | model loading, the streaming `Engine`: persona prefix, `step`, `inject_context_span`, `clone_voice` |
 | `contextspan/inject.py` | the Context Span block, read in one batched forward |
 | `contextspan/spans.py` | the sequence conventions shared by training and inference |
-| `contextspan/backend.py` | the router (the DuetaSpan router prompt, one OpenAI-compatible LLM call) and the ASR client |
+| `contextspan/duetaspan/` | the DuetaSpan runtime backend, unchanged: tool router, tool bank + MCP servers, LLM-RAG, Context DB, ASR client |
+| `contextspan/datasets/` | the shipped tool bank (60 tools, see `TOOLS.md`), the SGD-seeded world and the geo index |
+| `eval/` | the benchmark harness (MoshiRAG RAG suite, Full-Duplex-Bench v1/v1.5/v2/v3), separate from the runtime |
 | `contextspan/stream.py` | frame-clock loop for a wav file |
 | `contextspan/serve.py` | WebSocket server + browser page |
 | `contextspan/train.py` | data preparation and fine-tuning |
@@ -49,11 +51,14 @@ coordinate/IP/elevation and app deep-link tools are excluded — the list and th
 needed; any OpenAI-compatible LLM server works (vLLM shown).
 
 ```bash
-# router + RAG LLM (one server serves both)
-vllm serve google/gemma-3-27b-it --port 8004
+# router + RAG LLM (one server serves both). The router's prompt carries the tool catalogue: ~2.9k tokens
+# for the first-stage pick and ~3.5k for the largest tool group, plus the conversation, so the server
+# needs a context of at least 8192 tokens.
+vllm serve google/gemma-3-27b-it --port 8004 --max-model-len 8192
 export MCP_ROUTER_LLM_API=openai MCP_ROUTER_LLM_URL=http://localhost:8004 MCP_ROUTER_LLM_MODEL=google/gemma-3-27b-it
 export MOSHICP_RAG_LLM_URL=http://localhost:8004/v1/chat/completions MOSHICP_RAG_LLM_MODEL=google/gemma-3-27b-it
-# ASR (Qwen3-ASR; POST /transcribe with a wav -> {"text": ...})
+# ASR: any server that answers POST /transcribe (multipart `file` = wav) with {"text": ...}; the vendored
+# Qwen3-ASR server below is one, a Whisper endpoint with the same contract works as well.
 pip install -e '.[asr-server]' && python -m contextspan.duetaspan.runtime.asr_server   # :8990
 export MOSHICP_ASR_URL=http://localhost:8990/transcribe
 ```
