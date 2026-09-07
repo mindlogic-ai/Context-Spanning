@@ -25,6 +25,11 @@ Two named protocols, so a number is never quoted without its scale.
 | **full** | HaluEvalAudio 1000, LlamaQuestions 300, WebQuestions 1000, TriviaQA 1000 | 100 | all clips (v1 727 + v1.5 overlap set) | 200 tasks | 100 scenarios |
 | **semi** | first 120 items of each set (deterministic order) | 100 | — | — | 100 scenarios |
 
+The tool universe differs by benchmark and is part of the protocol: the RAG suite and FDB v1/v1.5/v2 run
+with the shipped 60-tool bank plus the four MCP servers; FDB v3 runs with **only** the benchmark's 12
+official mock APIs (`MOSHICP_TOOLPACK_ONLY=1`), the product bank being unmounted for the run, because
+v3 scores tool names and arguments against exactly those twelve.
+
 `semi` is the checkpoint-comparison protocol: it runs in about an hour per RAG set on one GPU and is
 what the checkpoint tables in this repository's history use (`--limit 120`). `full` is the reporting
 protocol. Items are taken in dataset order, so a `semi` run is a prefix of the corresponding `full`
