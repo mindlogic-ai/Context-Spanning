@@ -14,6 +14,7 @@ import asyncio
 import hmac
 import json
 import logging
+import re
 import time
 from pathlib import Path
 
@@ -21,6 +22,7 @@ import numpy as np
 from aiohttp import WSMsgType, web
 
 from .duetaspan.runtime.backend.context_db import ContextDB, ContextProfile
+from .model import load_voice
 from .stream import RET_DEADLINE_S, RET_UTT_WAIT_S, UTT_CACHE_S, Utterances, retrieve_for_ret
 
 WEB = Path(__file__).parent / "web"
@@ -84,6 +86,20 @@ async def ws_handler(request):
                     db, events = ContextDB(ContextProfile(persona=persona, **user)), []
                 elif m.get("type") == "clone":          # the next binary message is the recording
                     cloning = True
+                elif m.get("type") == "voice":          # one of the released voices, before the conversation
+                    if stepped:
+                        await ws.send_json({"type": "error", "stage": "voice",
+                                            "message": "already talking; press Stop, then choose the voice"})
+                    else:
+                        name = str(m.get("name") or "f0")
+                        if not re.fullmatch(r"[A-Za-z0-9_-]{1,32}", name):      # a released voice name, never a path
+                            await ws.send_json({"type": "error", "stage": "voice", "message": "unknown voice"}); continue
+                        try:
+                            voice = load_voice(name)
+                            eng.reset(); eng.set_persona(persona, voice)
+                            await ws.send_json({"type": "voice", "name": m.get("name"), "frames": int(voice.shape[1])})
+                        except Exception as e:
+                            await ws.send_json({"type": "error", "stage": "voice", "message": str(e)})
                 elif m.get("type") == "context":
                     # page fields -> Context DB profile (duetaspan ContextProfile): the "Knowledge" text
                     # is the profile's notes, so the router sees it in the working text.

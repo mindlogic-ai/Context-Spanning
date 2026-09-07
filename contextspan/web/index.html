@@ -114,6 +114,9 @@ reference lands in the stream it is already speaking. To hear it in your own voi
 <div class="bar">
   <button id="go" class="primary">Start talking</button>
   <button id="clone">Clone my voice</button>
+  <select id="voicesel" title="One of the released voices"><option value="">Voice: default (f0)</option><option value="f1">Voice: f1</option><option value="f2">Voice: f2</option></select>
+  <button id="voicefile-btn" type="button" title="A recording of the voice to speak with (any audio file, a few seconds or more)">Use a voice file</button>
+  <input type="file" id="voicefile" accept="audio/*" hidden>
   <span class="status"><span class="dot" id="dot"></span><span id="state">idle</span></span>
 </div>
 
@@ -149,6 +152,7 @@ reference lands in the stream it is already speaking. To hear it in your own voi
 const $ = (id) => document.getElementById(id);
 let ws, ctx, node, stream, playAt = 0, running = false;
 let micOn = false, mode = "talk", fmt = null;   // fmt = {sampleRate, frameSize} from the server's `ready`
+let queuedVoice = null;                          // {name} or {pcm} to apply once the connection is ready
 let geo = null;                          // {lat, lon} once the user allowed it
 let rec = null;                          // {user: [Float32Array], agent: [...], events: [], sr}
 const now = () => (rec ? (performance.now() - rec.t0) / 1000 : 0);
@@ -266,6 +270,7 @@ function connect() {
       if (stored("persona") === null) $("persona").value = serverPersona;
       fmt = { sampleRate: m.sample_rate, frameSize: m.frame_size };
       if (mode === "clone") { openMic(fmt.sampleRate, fmt.frameSize, true); }
+      else if (mode === "voice") { applyVoice(); }
       else { sendContext(); openMic(fmt.sampleRate, fmt.frameSize); }
     }
     else if (m.type === "busy") {
@@ -285,7 +290,11 @@ function connect() {
       closeMic();                                   // the connection stays open, the voice on it
       status(`voice cloned from ${m.seconds}s — press Start talking`, null);
       $("clone").textContent = "Voice cloned (record again)"; $("clone").disabled = false;
-      $("go").disabled = false;
+      $("voicefile-btn").disabled = false; $("go").disabled = false;
+    }
+    else if (m.type === "voice") {
+      status(`voice ${m.name || "f0"} ready — press Start talking`, null);
+      $("go").disabled = false; $("clone").disabled = false; $("voicefile-btn").disabled = false;
     }
   };
   ws.onclose = (e) => stop(e.wasClean ? "idle" : "connection closed");
@@ -485,8 +494,38 @@ function stop(msg) {
   status(msg, null);
   $("go").textContent = "Start talking"; $("go").disabled = false;
   $("go").onclick = start;
-  $("clone").textContent = "Clone my voice"; $("clone").disabled = false;
+  $("clone").textContent = "Clone my voice"; $("clone").disabled = false; $("voicefile-btn").disabled = false;
 }
+
+// A voice chosen before the conversation: one of the released voices by name, or any audio file, which is
+// decoded in the browser to the engine's sample rate and sent down the same path as a microphone clone.
+function applyVoice() {
+  const v = queuedVoice; queuedVoice = null;
+  if (!v || !ws || ws.readyState !== WebSocket.OPEN) return;
+  if (v.name !== undefined) ws.send(JSON.stringify({ type: "voice", name: v.name }));
+  else { ws.send(JSON.stringify({ type: "clone" })); ws.send(v.pcm.buffer); }
+}
+function chooseVoice(v) {
+  if (running) { notice("Stop the conversation first; the next one starts in the chosen voice."); return; }
+  notice(""); queuedVoice = v; mode = "voice";
+  $("go").disabled = true; $("clone").disabled = true; $("voicefile-btn").disabled = true; status("setting the voice", "busy");
+  if (ws && ws.readyState === WebSocket.OPEN && fmt) applyVoice(); else connect();
+}
+$("voicesel").onchange = () => chooseVoice({ name: $("voicesel").value || "f0" });
+$("voicefile-btn").onclick = () => $("voicefile").click();
+$("voicefile").onchange = async () => {
+  const f = $("voicefile").files[0]; if (!f) return;
+  try {
+    const sr = (fmt && fmt.sampleRate) || 24000;
+    const ac = new OfflineAudioContext(1, 1, sr);
+    const buf = await ac.decodeAudioData(await f.arrayBuffer());   // decoded and resampled to `sr`, mixed to mono below
+    const n = buf.length, pcm = new Float32Array(n);
+    for (let c = 0; c < buf.numberOfChannels; c++) { const d = buf.getChannelData(c); for (let i = 0; i < n; i++) pcm[i] += d[i] / buf.numberOfChannels; }
+    if (n < sr * 2) { notice("That file is shorter than 2 seconds; a few seconds of speech are needed."); return; }
+    chooseVoice({ pcm: pcm.subarray(0, Math.min(n, sr * 30)) });
+  } catch (e) { notice("Could not decode that file: " + (e && e.message ? e.message : e)); }
+  $("voicefile").value = "";
+};
 
 $("clone").onclick = () => {
   // Cloning happens before the conversation: the voice is set on the connection, then Start talks with it.
