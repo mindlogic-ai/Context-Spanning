@@ -16,11 +16,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-browser = ["playwright"]          # the 32 browser tools of the bank; run `playwright install chromium`
 asr-server = ["qwen-asr"]         # python -m contextspan.duetaspan.runtime.asr_server (Qwen3-ASR)
 
 [tool.setuptools.packages.find]
 include = ["contextspan*"]
 
 [tool.setuptools.package-data]
-contextspan = ["web/*", "moshi/LICENSE.*", "datasets/moshicp/mcp_tool_bank.json", "datasets/moshicp/*.sqlite"]
+contextspan = ["web/*", "moshi/LICENSE.*", "datasets/moshicp/mcp_tool_bank.json", "datasets/moshicp/TOOLS.md", "datasets/moshicp/*.sqlite"]

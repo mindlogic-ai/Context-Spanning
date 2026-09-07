@@ -37,11 +37,16 @@ repo (`context_spanning_7b.pt`, `voices/*.pt`) instead of downloading them.
 
 ## Backends
 
-The backend is the DuetaSpan runtime, vendored unchanged in `contextspan/duetaspan/` (router,
-125-tool bank with its SQLite world, MCP tool servers, LLM-RAG fallback, Context DB, ASR client).
-On `<ret>` the router LLM picks ONE tool from the bank (or answers a knowledge question directly);
-the tool runs for real (time, weather, prices, web search, maps, browser, SGD-seeded bookings) and
-its result is the span. Three servers are needed; any OpenAI-compatible LLM server works (vLLM shown).
+The backend is the DuetaSpan runtime, vendored unchanged in `contextspan/duetaspan/` (router, tool
+bank with its SQLite world, MCP tool servers, LLM-RAG fallback, Context DB, ASR client). On `<ret>` the
+router LLM picks ONE tool (or answers a knowledge question directly); the tool runs for real (time,
+weather, prices, web search, places and routes, SGD-seeded bookings) and its result is the span.
+
+Of DuetaSpan's 125-tool bank this package uses the **60 tools whose result is something a voice
+assistant says to the listener**; browser automation, filesystem, web crawling, PayPal back-office,
+coordinate/IP/elevation and app deep-link tools are excluded — the list and the reasoning are in
+[`contextspan/datasets/moshicp/TOOLS.md`](contextspan/datasets/moshicp/TOOLS.md). Three servers are
+needed; any OpenAI-compatible LLM server works (vLLM shown).
 
 ```bash
 # router + RAG LLM (one server serves both)
@@ -54,9 +59,8 @@ export MOSHICP_ASR_URL=http://localhost:8990/transcribe
 ```
 
 A hosted API works the same way (`MCP_ROUTER_LLM_URL=https://api.openai.com`, `MCP_ROUTER_LLM_KEY`,
-`MOSHICP_RAG_LLM_KEY`). The 32 browser tools need `pip install -e '.[browser]' && playwright install
-chromium`; without them the bank reports 93 tools. Tool results and the SQLite world live under
-`contextspan/datasets/` (override with `DUETASPAN_DATA`).
+`MOSHICP_RAG_LLM_KEY`). Tool results and the SQLite world live under `contextspan/datasets/` (override
+with `DUETASPAN_DATA`).
 
 ## Inference
 
@@ -78,6 +82,11 @@ Browsers open the microphone only over https or on localhost. The page shows the
 each injected span as it lands; name, location and timezone are the Context DB profile, the **Knowledge** field its notes;
 the router sees the profile, the user's turns and every tool result (call and value). Stop offers the conversation as a stereo wav and a
 JSON transcript (`ret` / `question` / `span` / `no_span` / `text` events with timing; `question` is what the ASR heard, so a wrong span can be traced to the ASR or to the backend). "Clone my voice" records 12 s and speaks with that voice.
+
+## Evaluation
+
+The benchmark harness (MoshiRAG RAG suite, Full-Duplex-Bench v1/v1.5/v2/v3) lives in [`eval/`](eval/README.md),
+separate from the runtime, and runs the same stack a user talks to.
 
 ## Training
 

@@ -8,18 +8,18 @@ with exactly the keys the official evaluators (evaluate_tool_calls.py / evaluate
 The tool universe is the benchmark's own 12 tools (fdb_v3_toolpack.py) and nothing else.
 
     export FDB_V3_DIR=<Full-Duplex-Bench clone>/v3
-    python -m contextspan.eval.fdb_v3_run <data_root> [--checkpoint ckpt.pt] [--limit N] [--provider ours]
+    python -m eval.fdb.v3_run <data_root> [--checkpoint ckpt.pt] [--limit N] [--provider ours]
 """
 import argparse
 import glob
-import hashlib
 import json
 import os
 import re
 import sys
 
 import numpy as np
-import soundfile as sf
+
+from eval.common import Stack, load_mono, transcript
 
 # The official agent's system prompt (v3/lk_agent_tool.py VoiceAgent.instructions), verbatim.
 PERSONA = (
@@ -34,7 +34,6 @@ V3_TOOLS = {"search_flights", "book_flight", "update_identity_doc", "get_card_be
             "get_exchange_rate", "modify_autopay", "search_apartments", "calculate_commute",
             "update_search_filter", "track_order", "search_products", "add_to_cart"}
 _FOLDER_RE = re.compile(r"^(.+)_([0-9a-f]{24})$")
-VOICES = ("f0", "f1", "f2")
 
 
 def main(argv=None):
@@ -50,26 +49,16 @@ def main(argv=None):
     if not os.environ.get("FDB_V3_DIR"):
         sys.exit("set FDB_V3_DIR to the Full-Duplex-Bench clone's v3/ directory")
     # the router's tool universe is exactly the benchmark's 12 tools
-    os.environ["MOSHICP_EXTRA_TOOLPACK"] = os.path.join(os.path.dirname(__file__), "fdb_v3_toolpack.py")
+    os.environ["MOSHICP_EXTRA_TOOLPACK"] = os.path.join(os.path.dirname(os.path.abspath(__file__)), "v3_toolpack.py")
     os.environ["MOSHICP_TOOLPACK_ONLY"] = "1"
     os.environ.setdefault("MOSHICP_MCP", "1")
-
-    from contextspan.duetaspan.align.asr import ASR, _resample
-    from contextspan.duetaspan.runtime.backend.realtime import RealtimeBackend
-    from contextspan.model import Engine, load_voice
-    from contextspan.stream import run_stream
-    from main import transcript
 
     samples = sorted(os.path.dirname(p) for p in glob.glob(f"{a.data_root}/**/input.wav", recursive=True)
                      if "MACOSX" not in p)
     if a.limit:
         samples = samples[: a.limit]
     print(f"[fdbv3] {len(samples)} samples under {a.data_root}", flush=True)
-    eng = Engine(a.checkpoint, temp=a.temp, temp_text=a.temp_text)
-    backend, asr = RealtimeBackend(cache=False), ASR()
-    voices = {v: load_voice(v) for v in VOICES}
-    want, fs = int(eng.mimi.sample_rate), eng.frame_size
-    ctx = {"city": "Seoul", "timezone": "Asia/Seoul"}
+    st = Stack(a.checkpoint, a.temp, a.temp_text)
     done = 0
     for si, sdir in enumerate(samples):
         base = os.path.basename(sdir)
@@ -83,25 +72,17 @@ def main(argv=None):
             meta = json.load(open(f"{sdir}/metadata.json"))
         except Exception:
             pass
-        pcm, sr = sf.read(f"{sdir}/input.wav", dtype="float32")
-        if pcm.ndim == 2:
-            pcm = pcm.mean(1)
-        if sr != want:
-            pcm = _resample(pcm, sr, want)
-        pcm = np.concatenate([pcm, np.zeros(int(a.tail_s * want), np.float32)])
-        n = len(pcm) // fs
-        # a real voice prompt, deterministic per sample (a voiceless prefix is outside the training distribution)
-        voice = VOICES[int(hashlib.md5(base.encode()).hexdigest()[:8], 16) % len(VOICES)]
-        eng.reset(); eng.set_persona(PERSONA, voices[voice])
-        res = run_stream(eng, backend, asr, pcm, ctx=ctx, verbose=False)
+        pcm = np.concatenate([load_mono(f"{sdir}/input.wav", st.sr), np.zeros(int(a.tail_s * st.sr), np.float32)])
+        n = len(pcm) // st.fs
+        res = st.run(PERSONA, base, pcm)
         calls = [{"function": e["src"][4:], "args": e.get("args") or {},
                   "timestamp_start": round(float(e.get("t_inj", e.get("t_ret", 0.0))), 2)}
                  for e in res["events"] if (e.get("src") or "").startswith("mcp:") and e["src"][4:] in V3_TOOLS]
         result = {"example_id": example_id, "provider": a.provider, "actual_tool_calls": calls,
-                  "transcript": transcript(eng.spm, res["tokens"]),
+                  "transcript": transcript(st.eng.spm, res["tokens"]),
                   "domain": meta.get("domain"), "difficulty": meta.get("difficulty"), "title": meta.get("title"),
                   "num_expected_calls": meta.get("num_expected_calls"),
-                  "input_duration_s": round(n * fs / want - a.tail_s, 2),
+                  "input_duration_s": round(n * st.fs / st.sr - a.tail_s, 2),
                   "retrieval_events": [{k: e.get(k) for k in ("t_ret", "t_inj", "question", "src", "args", "reference", "inject")}
                                        for e in res["events"]]}
         with open(result_path, "w") as f:
