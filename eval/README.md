@@ -12,6 +12,7 @@ benchmark's official scorers run on the outputs unchanged. Nothing is scored on 
 | Full-Duplex-Bench v1 / v1.5 | pause handling, smooth turn-taking, backchannel, interruption | `eval.fdb.v1_render` | the benchmark's scorers |
 | Full-Duplex-Bench v2 | examiner (GPT Realtime) multi-turn conversation | `eval/fdb/v2/go.sh` + `ours_adapter.js` | the benchmark's scorers |
 | Full-Duplex-Bench v3 | tool calling under disfluency: tool selection, argument accuracy, pass rate | `eval.fdb.v3_run` | `eval/fdb/v3_score.sh` (official) |
+| Live session (`eval/live`) | the shipped page end to end: span rate, **span utilisation** (a span arrived and the answer used it), accuracy, retrieval latency | `eval.live.run` (browser driven by Playwright) | built in |
 
 ## Run conditions (every benchmark)
 
@@ -33,6 +34,17 @@ Span latency is part of what is measured, so the machine state is part of the pr
 Servers: the same router / RAG / ASR servers as the runtime (see the top-level README) plus a judge LLM
 for the RAG suite (`JUDGE_LLM_URL`, `JUDGE_LLM_MODEL`; `scripts/env.sh` points it at the router server unless
 `JUDGE_MODEL` is set — the paper's RAG-suite judge was google/gemma-4-31B-it on its own server).
+
+## Live session
+
+`eval/live` talks to a running `python main.py serve` through the real page (Playwright, a fake microphone
+fed with the case clips) and scores what the page rendered. Its headline number, **span utilisation**, is
+the live counterpart of the RAG suite's P(resp | ref): of the turns where a span arrived on time, how many
+answers used it. Two protocol differences from the RAG suite, stated so the numbers are not mixed: the
+answer is matched on the model's **text stream** as rendered by the page (not a Whisper transcript of the
+audio), and the clips are synthetic TTS of twelve hand-written questions (`cases.json`), not a benchmark
+release. Use it to check a deployment or a new checkpoint end to end; quote paper numbers from the suites
+above. `pip install -e '.[eval]' && playwright install chromium`.
 
 ## Protocols: full and semi
 
