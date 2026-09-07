@@ -29,8 +29,8 @@ pip install -e .
 export HF_TOKEN=<token with access to nvidia/personaplex-7b-v1 and the weights repo>
 ```
 
-`CS_BASE_DIR` / `CS_WEIGHTS_DIR` point at local copies of the PersonaPlex base and of the weights
-repo (`context_spanning_7b.pt`, `voices/*.pt`) instead of downloading them.
+`CS_BASE_DIR` / `CS_WEIGHTS_DIR` point at local copies of the base speech-LM checkpoint and of the
+weights repo (`context_spanning_7b.pt`, `voices/*.pt`) instead of downloading them.
 
 ## Backends
 
@@ -79,7 +79,7 @@ python main.py train   --data-dir data/prepared --out-dir runs/ft
 
 `data/raw` holds one JSON per dialogue (turns with `speaker`, `text`, and for retrieval turns
 `reference`) next to its stereo wav; `prepare` encodes them and splices the Context Span blocks at
-sampled retrieval delays; `train` fine-tunes from the PersonaPlex base (or `--checkpoint`).
+sampled retrieval delays; `train` fine-tunes from the base speech-LM checkpoint (or `--checkpoint`).
 
 ## License
 
