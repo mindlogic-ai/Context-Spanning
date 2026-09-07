@@ -17,6 +17,9 @@ from pathlib import Path
 import numpy as np
 from aiohttp import WSMsgType, web
 
+from .duetaspan.runtime.backend.context_db import ContextDB, ContextProfile
+from .stream import retrieve_for_ret
+
 WEB = Path(__file__).parent / "web"
 log = logging.getLogger(__name__)
 
@@ -41,15 +44,21 @@ async def ws_handler(request):
         pending = None
         heard, keep = [], int(request.app["listen_s"] * eng.frame_rate)
         said, shown, user, cloning, stepped = [], "", {}, False, 0
+        db, events = ContextDB(ContextProfile(persona=persona)), []
         async for msg in ws:
             if msg.type == WSMsgType.TEXT:
                 m = json.loads(msg.data)
                 if m.get("type") == "reset":
                     eng.reset(); eng.set_persona(persona, voice); heard.clear(); stepped = 0
+                    db, events = ContextDB(ContextProfile(persona=persona, **user)), []
                 elif m.get("type") == "clone":          # the next binary message is the recording
                     cloning = True
                 elif m.get("type") == "context":
-                    user = {k: m[k] for k in ("name", "location", "lat", "lon", "tz", "db") if m.get(k) not in (None, "")}
+                    # page fields -> Context DB profile (duetaspan ContextProfile): the "Knowledge" text
+                    # is the profile's notes, so the router sees it in the working text.
+                    keys = {"name": "name", "location": "city", "lat": "lat", "lon": "lon", "tz": "timezone", "db": "notes"}
+                    user = {keys[k]: m[k] for k in keys if m.get(k) not in (None, "")}
+                    db = ContextDB(ContextProfile(persona=m.get("persona") or persona, **user))
                     if "persona" in m and m["persona"] != persona:
                         if stepped:
                             await ws.send_json({"type": "error", "stage": "persona",
@@ -67,13 +76,14 @@ async def ws_handler(request):
                                     "seconds": round(voice.shape[1] / eng.frame_rate, 1)})
                 continue
             if pending is not None and pending.done():
-                ref, question = pending.result(); pending = None
-                if isinstance(ref, dict):
-                    await ws.send_json(ref)
+                r = pending.result(); pending = None
+                if r.get("error"):
+                    await ws.send_json({"type": "error", "stage": r["error"], "message": r["message"]})
                 else:
-                    n = eng.inject_context_span(ref)
-                    await ws.send_json({"type": "span", "text": ref, "question": question, "frames": n,
-                                        "seconds": round(n / eng.frame_rate, 2)})
+                    n = eng.inject_context_span(r["inject"])
+                    events.append(r)
+                    await ws.send_json({"type": "span", "text": r["inject"], "question": r["question"],
+                                        "source": r["src"], "frames": n, "seconds": round(n / eng.frame_rate, 2)})
             frame = np.frombuffer(msg.data, dtype=np.float32).copy()
             heard.append(frame)
             if len(heard) > keep:
@@ -91,40 +101,30 @@ async def ws_handler(request):
                 await ws.send_json({"type": "ret"})
                 notify = lambda ev: asyncio.run_coroutine_threadsafe(ws.send_json(ev), loop)
                 pending = loop.run_in_executor(None, _retrieve, request.app, np.concatenate(heard),
-                                               int(eng.mimi.sample_rate), dict(user), notify)
+                                               int(eng.mimi.sample_rate), dict(user), db, shown, list(events), notify)
     return ws
 
 
-def _retrieve(app, clip, sample_rate, user, notify):
-    """Transcribe the recent user audio and ask the backend. Returns (reference or error event, question).
-
-    The transcript is sent to the page as a `question` event as soon as the ASR returns, before the
-    backend is asked, and both the question and the reference are logged once per `<ret>`: a wrong
-    span is then attributable to the ASR (misheard or truncated question) or to the router."""
-    from .backend import NO_INFO
+def _retrieve(app, clip, sample_rate, user, db, said_text, events, notify):
+    """One `<ret>` off the frame clock: the DuetaSpan handler (stream.retrieve_for_ret) with the page
+    told what the ASR heard as soon as it is known, and question/reference logged once per `<ret>`."""
     t0 = time.monotonic()
+    timing = {}
+
+    def on_question(q):
+        timing["asr_ms"] = int((time.monotonic() - t0) * 1000)
+        log.info("question (%d ms asr): %s", timing["asr_ms"], q)
+        if q.strip():
+            notify({"type": "question", "text": q, "ms": timing["asr_ms"]})
     try:
-        question = app["asr"].transcribe(clip, sample_rate)
+        r = retrieve_for_ret(app["backend"], app["asr"], clip, sample_rate, user, db, said_text, events,
+                             on_question=on_question)
     except Exception as e:
-        return {"type": "error", "stage": "asr", "message": str(e)}, None
-    asr_ms = int((time.monotonic() - t0) * 1000)
-    log.info("question (%d ms asr): %s", asr_ms, question)
-    if not question:
-        return {"type": "error", "stage": "asr", "message": "empty transcript"}, None
-    notify({"type": "question", "text": question, "ms": asr_ms})
-    ctx = {k: v for k, v in {"name": user.get("name"), "city": user.get("location"), "timezone": user.get("tz"),
-                             "lat": user.get("lat"), "lon": user.get("lon")}.items() if v not in (None, "")}
-    if user.get("db"):
-        ctx["context_db"] = f"[context db] {user['db']}"
-    t1 = time.monotonic()
-    try:
-        ref = app["backend"].retrieve(question, ctx)
-    except Exception as e:
-        return {"type": "error", "stage": "retrieval", "message": str(e)}, question
-    log.info("reference (%d ms backend): %s", int((time.monotonic() - t1) * 1000), ref)
-    if not ref or ref == NO_INFO:
-        return {"type": "error", "stage": "retrieval", "message": f"{NO_INFO} for: {question}"}, question
-    return ref, question
+        log.exception("retrieval failed")
+        return {"error": "retrieval", "message": str(e)}
+    if r["reference"] is not None:
+        log.info("reference (%d ms total, src=%s): %s", int((time.monotonic() - t0) * 1000), r["src"], r["reference"])
+    return r
 
 
 async def health(request):

@@ -6,3 +6,6 @@ __pycache__/
 runs/
 data/
 .omc/
+contextspan/work/
+contextspan/datasets/moshicp/mcp_http_cache.sqlite
+contextspan/datasets/moshicp/realtime_cache/

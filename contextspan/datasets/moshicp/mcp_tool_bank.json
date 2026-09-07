@@ -1,0 +1,4703 @@
+[
+ {
+  "function": "Weather_1_GetWeather",
+  "description": "Retrieves the weather forecast for a specified city on a particular date.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "city"
+   ],
+   "properties": {
+    "city": {
+     "type": "string",
+     "description": "The name of the city for which weather information is requested."
+    },
+    "date": {
+     "type": "string",
+     "description": "The date for which weather information is requested, in the format of 'YYYY-MM-DD'. If not provided, the current date is used.",
+     "default": "2019-03-01"
+    }
+   }
+  },
+  "domain": "Weather",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Movies_3_FindMovies",
+  "description": "Retrieves a list of movies based on the director, genre, and cast specified by the user.",
+  "parameters": {
+   "type": "dict",
+   "required": [],
+   "properties": {
+    "directed_by": {
+     "type": "string",
+     "description": "Director of the movie. Use 'dontcare' if the director is not a specific search criterion.",
+     "default": "dontcare"
+    },
+    "genre": {
+     "type": "string",
+     "description": "Genre of the movie. Use 'dontcare' to include all genres or genre is not specified by user",
+     "enum": [
+      "Offbeat",
+      "Fantasy",
+      "World",
+      "Mystery",
+      "Thriller",
+      "Comedy",
+      "Comedy-drama",
+      "Horror",
+      "Animation",
+      "Sci-fi",
+      "Cult",
+      "Drama",
+      "Anime",
+      "Family",
+      "Action",
+      "dontcare"
+     ],
+     "default": "dontcare"
+    },
+    "cast": {
+     "type": "string",
+     "description": "Names of leading actors or actresses in the movie. Use 'dontcare' if the cast is not a specific search criterion.",
+     "default": "dontcare"
+    }
+   }
+  },
+  "domain": "Movies",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Flights_4_SearchOnewayFlight",
+  "description": "Search for one-way flights from an origin to a destination on a specified date, with options for seating class, ticket quantity, and preferred airline.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "origin_airport",
+    "destination_airport",
+    "departure_date"
+   ],
+   "properties": {
+    "origin_airport": {
+     "type": "string",
+     "description": "The IATA code or the name of the airport or city to depart from. For example, 'LAX' for Los Angeles International Airport."
+    },
+    "destination_airport": {
+     "type": "string",
+     "description": "The IATA code or the name of the airport or city to arrive at. For example, 'JFK' for John F. Kennedy International Airport."
+    },
+    "departure_date": {
+     "type": "string",
+     "description": "The start date of the trip in the format 'YYYY-MM-DD'."
+    },
+    "seating_class": {
+     "type": "string",
+     "description": "The cabin seat option for the flight.",
+     "enum": [
+      "Economy",
+      "Premium Economy",
+      "Business"
+     ],
+     "default": "Economy"
+    },
+    "number_of_tickets": {
+     "type": "integer",
+     "description": "The number of flight tickets for the trip.",
+     "default": 1
+    },
+    "airlines": {
+     "type": "string",
+     "description": "The preferred airline company for the flight. Use 'dontcare' if there is no preference.",
+     "enum": [
+      "United Airlines",
+      "American Airlines",
+      "Delta Airlines",
+      "Southwest Airlines",
+      "Alaska Airlines",
+      "British Airways",
+      "Air Canada",
+      "Air France",
+      "South African Airways",
+      "LOT Polish Airlines",
+      "LATAM Brasil",
+      "dontcare"
+     ],
+     "default": "dontcare"
+    }
+   }
+  },
+  "domain": "Flights",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Flights_4_SearchRoundtripFlights",
+  "description": "Search for roundtrip flights based on specified criteria including departure and return dates, airports, seating class, and airlines.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "origin_airport",
+    "destination_airport",
+    "departure_date",
+    "return_date"
+   ],
+   "properties": {
+    "origin_airport": {
+     "type": "string",
+     "description": "The IATA airport code or the name of the city for the departure airport. Example: 'JFK' for John F. Kennedy International Airport."
+    },
+    "destination_airport": {
+     "type": "string",
+     "description": "The IATA airport code or the name of the city for the arrival airport. Example: 'LAX' for Los Angeles International Airport."
+    },
+    "departure_date": {
+     "type": "string",
+     "description": "The departure date for the trip, in the format 'YYYY-MM-DD'."
+    },
+    "return_date": {
+     "type": "string",
+     "description": "The return date for the trip, in the format 'YYYY-MM-DD'."
+    },
+    "seating_class": {
+     "type": "string",
+     "description": "The class of the cabin seat.",
+     "enum": [
+      "Economy",
+      "Premium Economy",
+      "Business"
+     ],
+     "default": "Economy"
+    },
+    "number_of_tickets": {
+     "type": "integer",
+     "description": "The number of flight tickets required for the trip.",
+     "default": 1
+    },
+    "airlines": {
+     "type": "string",
+     "description": "Preferred airline for the trip. Use 'dontcare' to include all available airlines.",
+     "enum": [
+      "United Airlines",
+      "American Airlines",
+      "Delta Airlines",
+      "Southwest Airlines",
+      "Alaska Airlines",
+      "British Airways",
+      "Air Canada",
+      "Air France",
+      "South African Airways",
+      "LOT Polish Airlines",
+      "LATAM Brasil",
+      "dontcare"
+     ],
+     "default": "dontcare"
+    }
+   }
+  },
+  "domain": "Flights",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "RentalCars_3_GetCarsAvailable",
+  "description": "Retrieve a list of cars that are available for rent within a specified location and time frame.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "city",
+    "start_date",
+    "pickup_time",
+    "end_date"
+   ],
+   "properties": {
+    "city": {
+     "type": "string",
+     "description": "The city where the rental car will be picked up. For example, 'Los Angeles, CA'."
+    },
+    "start_date": {
+     "type": "string",
+     "description": "The start date for the car rental in the format 'YYYY-MM-DD'."
+    },
+    "pickup_time": {
+     "type": "string",
+     "description": "The pick-up time for the car rental in 24-hour format 'HH:MM'."
+    },
+    "end_date": {
+     "type": "string",
+     "description": "The end date for returning the rental car in the format 'YYYY-MM-DD'."
+    },
+    "car_type": {
+     "type": "string",
+     "description": "The preferred type of car to rent.",
+     "enum": [
+      "Hatchback",
+      "Sedan",
+      "SUV",
+      "dontcare"
+     ],
+     "default": "dontcare"
+    }
+   }
+  },
+  "domain": "RentalCars",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "RentalCars_3_ReserveCar",
+  "description": "This function reserves a car for rental, allowing a user to specify pick-up and drop-off times and locations, as well as the type of car and insurance options.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "pickup_location",
+    "start_date",
+    "pickup_time",
+    "end_date",
+    "car_type",
+    "add_insurance"
+   ],
+   "properties": {
+    "pickup_location": {
+     "type": "string",
+     "description": "The location where the car will be picked up, in the format of 'City, State', such as 'Berkeley, CA' or 'New York, NY'."
+    },
+    "start_date": {
+     "type": "string",
+     "description": "The starting date of the car rental in the format 'YYYY-MM-DD'."
+    },
+    "pickup_time": {
+     "type": "string",
+     "description": "The time of day when the car will be picked up, in 24-hour format 'HH:MM'."
+    },
+    "end_date": {
+     "type": "string",
+     "description": "The end date of the car rental in the format 'YYYY-MM-DD'."
+    },
+    "car_type": {
+     "type": "string",
+     "description": "The category of car to reserve.",
+     "enum": [
+      "Hatchback",
+      "Sedan",
+      "SUV",
+      "dontcare"
+     ]
+    },
+    "add_insurance": {
+     "type": "boolean",
+     "description": "Flag to indicate whether to add insurance to the rental. True for adding insurance, false otherwise."
+    }
+   }
+  },
+  "domain": "RentalCars",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Restaurants_2_ReserveRestaurant",
+  "description": "Make a table reservation at a restaurant specifying the restaurant name, location, reservation date and time, and the number of seats.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "restaurant_name",
+    "location",
+    "date",
+    "time"
+   ],
+   "properties": {
+    "restaurant_name": {
+     "type": "string",
+     "description": "The name of the restaurant where the reservation is to be made."
+    },
+    "location": {
+     "type": "string",
+     "description": "The city and state where the restaurant is located, in the format of 'City, State', such as 'Berkeley, CA' or 'New York, NY'."
+    },
+    "date": {
+     "type": "string",
+     "description": "The tentative date for the reservation in ISO format (YYYY-MM-DD), such as '2023-03-01'."
+    },
+    "time": {
+     "type": "string",
+     "description": "The tentative time for the reservation in 24-hour format, such as '18:00' for 6 PM."
+    },
+    "number_of_seats": {
+     "type": "integer",
+     "description": "The number of seats to reserve at the restaurant. Valid options range from 1 to 6.",
+     "default": 2
+    }
+   }
+  },
+  "domain": "Restaurants",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Restaurants_2_FindRestaurants",
+  "description": "Searches for restaurants based on specified location, category, and other optional preferences.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "category",
+    "location"
+   ],
+   "properties": {
+    "category": {
+     "type": "string",
+     "description": "The type of cuisine or food category offered by the restaurant.",
+     "enum": [
+      "Mexican",
+      "Bistro",
+      "Izakaya",
+      "Brunch",
+      "Thai",
+      "Sandwich",
+      "Seafood",
+      "Barbecue",
+      "European",
+      "Steakhouse",
+      "Vietnamese",
+      "Asian",
+      "Coffeehouse",
+      "American",
+      "Gastropub",
+      "Austrian",
+      "Italian",
+      "Indian",
+      "Spanish",
+      "Vegetarian",
+      "Brasserie",
+      "Chinese",
+      "Breakfast",
+      "Greek",
+      "California",
+      "Tapas",
+      "Take-out",
+      "Japanese"
+     ]
+    },
+    "location": {
+     "type": "string",
+     "description": "The city where the restaurant is located, in the format 'City, State' (e.g., 'New York, NY'). State has to be abbrieviated"
+    },
+    "price_range": {
+     "type": "string",
+     "description": "The desired price range for the restaurant's offerings.",
+     "enum": [
+      "cheap",
+      "moderate",
+      "pricey",
+      "ultra high-end"
+     ],
+     "default": "moderate"
+    },
+    "has_vegetarian_options": {
+     "type": "boolean",
+     "description": "Specifies if the restaurant should offer vegetarian options.",
+     "default": false
+    },
+    "has_seating_outdoors": {
+     "type": "boolean",
+     "description": "Indicates whether the restaurant should have outdoor seating.",
+     "default": false
+    }
+   }
+  },
+  "domain": "Restaurants",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "RideSharing_2_GetRide",
+  "description": "Book a cab to travel to the specified destination with a selected number of seats and ride type.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "destination",
+    "number_of_seats",
+    "ride_type"
+   ],
+   "properties": {
+    "destination": {
+     "type": "string",
+     "description": "The precise address or location where the cab should take the passenger, in the format of 'Street, City, State'."
+    },
+    "number_of_seats": {
+     "type": "integer",
+     "description": "The number of seats to reserve in the cab."
+    },
+    "ride_type": {
+     "type": "string",
+     "description": "The category of cab ride to book.",
+     "enum": [
+      "Pool",
+      "Regular",
+      "Luxury"
+     ]
+    }
+   }
+  },
+  "domain": "RideSharing",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Services_4_BookAppointment",
+  "description": "Books an appointment with a selected therapist for a specified date and time.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "therapist_name",
+    "appointment_time",
+    "appointment_date"
+   ],
+   "properties": {
+    "therapist_name": {
+     "type": "string",
+     "description": "The full name of the therapist with whom the appointment is to be booked."
+    },
+    "appointment_time": {
+     "type": "string",
+     "description": "The desired time for the appointment, in 24-hour format (e.g., '14:00' for 2 PM)."
+    },
+    "appointment_date": {
+     "type": "string",
+     "description": "The desired date for the appointment, in the format of 'YYYY-MM-DD' (e.g., '2023-04-15')."
+    }
+   }
+  },
+  "domain": "Services",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Services_4_FindProvider",
+  "description": "Discover a therapist based on the user's specific needs and location.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "city",
+    "type"
+   ],
+   "properties": {
+    "city": {
+     "type": "string",
+     "description": "The city where the user is looking for a therapist, in the format of 'City, State', such as 'Berkeley, CA' or 'New York, NY'. State has to be abbrieviated."
+    },
+    "type": {
+     "type": "string",
+     "description": "The specialization of the therapist the user is seeking.",
+     "enum": [
+      "Psychologist",
+      "Family Counselor",
+      "Psychiatrist"
+     ]
+    },
+    "insurance_accepted": {
+     "type": "boolean",
+     "description": "Indicates whether the therapist should accept insurance, true for yes and false for no.",
+     "default": true
+    }
+   }
+  },
+  "domain": "Services",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Hotels_2_BookHouse",
+  "description": "Books a selected house for a specified duration and number of adults.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "where_to",
+    "number_of_adults",
+    "check_in_date",
+    "check_out_date"
+   ],
+   "properties": {
+    "where_to": {
+     "type": "string",
+     "description": "The location of the house to book, in the format of 'City, State', such as 'San Francisco, CA'."
+    },
+    "number_of_adults": {
+     "type": "integer",
+     "description": "The number of adults to include in the reservation."
+    },
+    "check_in_date": {
+     "type": "string",
+     "description": "The check-in date for the reservation in the format 'MM/DD/YYYY'."
+    },
+    "check_out_date": {
+     "type": "string",
+     "description": "The check-out date for the reservation in the format 'MM/DD/YYYY'."
+    }
+   }
+  },
+  "domain": "Hotels",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Hotels_2_SearchHouse",
+  "description": "Search for a house accommodation at a specific location, optionally filtering by laundry service availability, number of adults, and review rating.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "where_to"
+   ],
+   "properties": {
+    "where_to": {
+     "type": "string",
+     "description": "The destination where the house is searched for, in the format of 'City, State', such as 'Austin, TX' or 'San Francisco, CA'. State has to be abbrieviated"
+    },
+    "has_laundry_service": {
+     "type": "string",
+     "description": "Indicates if the house should have laundry service available.",
+     "enum": [
+      "True",
+      "False",
+      "dontcare"
+     ],
+     "default": "dontcare"
+    },
+    "number_of_adults": {
+     "type": "integer",
+     "description": "The number of adults for the reservation. Use 0 to indicate 'dontcare'.",
+     "default": 0
+    },
+    "rating": {
+     "type": "float",
+     "description": "The minimum review rating of the house on a scale from 1.0 to 5.0, with 5.0 being the highest. Use 0 to indicate 'dontcare'.",
+     "default": 0.0
+    }
+   }
+  },
+  "domain": "Hotels",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Hotels_4_ReserveHotel",
+  "description": "Reserve a specified number of hotel rooms at a selected location for a given duration and check-in date.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "place_name",
+    "check_in_date",
+    "stay_length",
+    "location"
+   ],
+   "properties": {
+    "place_name": {
+     "type": "string",
+     "description": "The name of the hotel or accommodation to reserve."
+    },
+    "check_in_date": {
+     "type": "string",
+     "description": "The check-in date for the reservation, in the format 'YYYY-MM-DD'."
+    },
+    "stay_length": {
+     "type": "integer",
+     "description": "The length of the stay in number of days."
+    },
+    "location": {
+     "type": "string",
+     "description": "The city or town where the accommodation is located, in the format 'City, State'."
+    },
+    "number_of_rooms": {
+     "type": "string",
+     "description": "The number of rooms to reserve.",
+     "enum": [
+      "1",
+      "2",
+      "3",
+      "dontcare"
+     ],
+     "default": "dontcare"
+    }
+   }
+  },
+  "domain": "Hotels",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Hotels_4_SearchHotel",
+  "description": "Searches for available accommodation in a specified location with optional filters such as star rating, smoking policy, and number of rooms.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "location"
+   ],
+   "properties": {
+    "location": {
+     "type": "string",
+     "description": "The city or town where the accommodation is searched for, in the format of 'City, State' or 'City, Country'. State has to be abbrieviated"
+    },
+    "star_rating": {
+     "type": "string",
+     "description": "The star rating for the accommodation ranging from 1 to 5 stars.",
+     "enum": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "dontcare"
+     ],
+     "default": "dontcare"
+    },
+    "smoking_allowed": {
+     "type": "string",
+     "description": "Indicates if smoking is allowed. Choose 'True' for smoking rooms, 'False' for non-smoking rooms, or 'dontcare' if no preference.",
+     "enum": [
+      "True",
+      "False",
+      "dontcare"
+     ],
+     "default": "dontcare"
+    },
+    "number_of_rooms": {
+     "type": "integer",
+     "description": "The number of rooms required for the reservation.",
+     "default": 1
+    }
+   }
+  },
+  "domain": "Hotels",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Travel_1_FindAttractions",
+  "description": "Browse attractions in a given city, filtering by various criteria such as free entry, category, and suitability for children.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "location"
+   ],
+   "properties": {
+    "location": {
+     "type": "string",
+     "description": "The name of the city or town where the attraction is located, in the format of 'City, State' or 'City, Country', such as 'Paris, France' or 'New York, NY'."
+    },
+    "free_entry": {
+     "type": "boolean",
+     "description": "Flag indicating whether the attraction offers free entry. A value of 'True' filters for attractions with free entry, 'False' for attractions with an entry fee, and 'dontcare' (default) includes all attractions regardless of entry fee.",
+     "enum": [
+      "True",
+      "False",
+      "dontcare"
+     ],
+     "default": "dontcare"
+    },
+    "category": {
+     "type": "string",
+     "description": "Category of the attraction, such as 'Place of Worship', 'Theme Park', etc. Use 'dontcare' (default) to include all categories.",
+     "enum": [
+      "Place of Worship",
+      "Theme Park",
+      "Museum",
+      "Historical Landmark",
+      "Park",
+      "Tourist Attraction",
+      "Sports Venue",
+      "Shopping Area",
+      "Performing Arts Venue",
+      "Nature Preserve",
+      "dontcare"
+     ],
+     "default": "dontcare"
+    },
+    "good_for_kids": {
+     "type": "boolean",
+     "description": "Flag indicating whether the attraction is suitable for children. 'True' filters for kid-friendly attractions, 'False' for attractions that may not be suitable for children, and 'dontcare' (default) includes all attractions.",
+     "enum": [
+      "True",
+      "False",
+      "dontcare"
+     ],
+     "default": "dontcare"
+    }
+   }
+  },
+  "domain": "Travel",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Media_3_FindMovies",
+  "description": "Search for movies that fit a user's preferences such as genre and starring actors.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "genre"
+   ],
+   "properties": {
+    "genre": {
+     "type": "string",
+     "description": "The genre of the movie to search for.",
+     "enum": [
+      "World",
+      "Fantasy",
+      "Offbeat",
+      "Mystery",
+      "Musical",
+      "Thriller",
+      "Comedy",
+      "Horror",
+      "Animation",
+      "Cult",
+      "Sci-fi",
+      "War",
+      "Drama",
+      "Family",
+      "Action"
+     ]
+    },
+    "starring": {
+     "type": "string",
+     "description": "The name of a specific actor or actress the user wants to see in the movie. Use 'All' to include any.",
+     "default": "All"
+    }
+   }
+  },
+  "domain": "Media",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Media_3_PlayMovie",
+  "description": "Streams a selected movie online with the option to choose subtitles in various languages.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "title"
+   ],
+   "properties": {
+    "title": {
+     "type": "string",
+     "description": "The title of the movie to be streamed."
+    },
+    "subtitle_language": {
+     "type": "string",
+     "description": "The preferred language for the movie's subtitles.",
+     "enum": [
+      "English",
+      "Spanish",
+      "Hindi",
+      "French"
+     ],
+     "default": "English"
+    }
+   }
+  },
+  "domain": "Media",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Music_3_PlayMedia",
+  "description": "Plays a specified track on a designated media player device.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "track"
+   ],
+   "properties": {
+    "track": {
+     "type": "string",
+     "description": "The title of the song to be played."
+    },
+    "artist": {
+     "type": "string",
+     "description": "The name of the artist performing the song. If unspecified, any artist is acceptable.",
+     "default": "dontcare"
+    },
+    "device": {
+     "type": "string",
+     "description": "The media player device where the song will be played.",
+     "enum": [
+      "Living room",
+      "Kitchen",
+      "Patio"
+     ],
+     "default": "Living room"
+    },
+    "album": {
+     "type": "string",
+     "description": "The album where the song is featured. If unspecified, any album is acceptable.",
+     "default": "dontcare"
+    }
+   }
+  },
+  "domain": "Music",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Music_3_LookupMusic",
+  "description": "Retrieve a list of songs that align with the user's musical preferences based on artist, album, genre, and release year.",
+  "parameters": {
+   "type": "dict",
+   "properties": {
+    "artist": {
+     "type": "string",
+     "description": "The name of the artist or band. Use 'dontcare' if this is not a filtering criterion.",
+     "default": "dontcare"
+    },
+    "album": {
+     "type": "string",
+     "description": "The title of the album. Use 'dontcare' if this is not a filtering criterion.",
+     "default": "dontcare"
+    },
+    "genre": {
+     "type": "string",
+     "description": "The musical genre of the songs. Select 'dontcare' to include all genres.",
+     "enum": [
+      "Reggae",
+      "Holiday",
+      "Electropop",
+      "Pop",
+      "Asia",
+      "House",
+      "Electronica",
+      "Funk",
+      "Rock",
+      "Metal",
+      "Dubstep",
+      "Country",
+      "dontcare"
+     ],
+     "default": "dontcare"
+    },
+    "year": {
+     "type": "integer",
+     "description": "The release year of the song. Use 'dontcare' to include songs from any year.",
+     "default": "dontcare"
+    }
+   },
+   "required": []
+  },
+  "domain": "Music",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Alarm_1_GetAlarms",
+  "description": "Retrieve a list of all alarms that the user has set in the application.",
+  "parameters": {
+   "type": "dict",
+   "properties": {
+    "user_id": {
+     "type": "string",
+     "description": "The unique identifier for the user whose alarms are being retrieved."
+    },
+    "include_disabled": {
+     "type": "boolean",
+     "description": "A flag indicating whether to include disabled alarms in the result set.",
+     "default": false
+    }
+   },
+   "required": [
+    "user_id"
+   ]
+  },
+  "domain": "Alarm",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Alarm_1_AddAlarm",
+  "description": "Sets a new alarm with specified time and an optional custom name.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "new_alarm_time"
+   ],
+   "properties": {
+    "new_alarm_time": {
+     "type": "string",
+     "description": "The time to set for the new alarm in 24-hour format (e.g., '14:30' for 2:30 PM)."
+    },
+    "new_alarm_name": {
+     "type": "string",
+     "description": "The custom name to assign to the new alarm.",
+     "default": "New Alarm"
+    }
+   }
+  },
+  "domain": "Alarm",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Messaging_1_ShareLocation",
+  "description": "Shares the current geographical location with a specified contact.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "location",
+    "contact_name"
+   ],
+   "properties": {
+    "location": {
+     "type": "string",
+     "description": "The current location to share, expressed in the format 'Latitude, Longitude' (e.g., '34.052235, -118.243683')."
+    },
+    "contact_name": {
+     "type": "string",
+     "description": "The full name of the contact to whom the location will be sent."
+    }
+   }
+  },
+  "domain": "Messaging",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Services_1_BookAppointment",
+  "description": "This function books an appointment with a specified hair stylist or salon on a desired date and time.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "stylist_name",
+    "appointment_date",
+    "appointment_time"
+   ],
+   "properties": {
+    "stylist_name": {
+     "type": "string",
+     "description": "The full name of the hair stylist or the name of the salon."
+    },
+    "appointment_date": {
+     "type": "string",
+     "description": "The date for the appointment in the format of 'YYYY-MM-DD', such as '2023-10-05'."
+    },
+    "appointment_time": {
+     "type": "string",
+     "description": "The time for the appointment in 24-hour format 'HH:MM', such as '14:30'."
+    }
+   }
+  },
+  "domain": "Services",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Services_1_FindProvider",
+  "description": "Search for a hair stylist in a specified city, with options to filter for unisex salons.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "city"
+   ],
+   "properties": {
+    "city": {
+     "type": "string",
+     "description": "The city where the stylist or salon is sought, such as 'New York, NY'. State names must be abbreviated with two letters."
+    },
+    "is_unisex": {
+     "type": "boolean",
+     "description": "Indicates whether the salon caters to all genders. True for yes, False for no.",
+     "default": false
+    }
+   }
+  },
+  "domain": "Services",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Events_3_FindEvents",
+  "description": "Find cultural events, such as concerts and plays, happening in a specified city on a given date.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "event_type",
+    "city"
+   ],
+   "properties": {
+    "event_type": {
+     "type": "string",
+     "description": "The type of cultural event to find. Events include concerts and plays.",
+     "enum": [
+      "Music",
+      "Theater"
+     ]
+    },
+    "city": {
+     "type": "string",
+     "description": "The city where the event is taking place, in the format 'City, State' or 'City, Country' (e.g., 'New York, NY' or 'London, UK'). State names must be abbreviated with two letters."
+    },
+    "date": {
+     "type": "string",
+     "description": "The date of the event. Use the format 'YYYY-MM-DD'. If not specified, the current date is used.",
+     "default": null
+    }
+   }
+  },
+  "domain": "Events",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Events_3_BuyEventTickets",
+  "description": "Purchase tickets for a specific cultural event on a chosen date in a specified city.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "event_name",
+    "number_of_tickets",
+    "date",
+    "city"
+   ],
+   "properties": {
+    "event_name": {
+     "type": "string",
+     "description": "The official title of the event, such as an artist's name or a play title."
+    },
+    "number_of_tickets": {
+     "type": "integer",
+     "description": "The quantity of tickets to be reserved, must be an integer from 1 to 9.",
+     "enum": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+     ]
+    },
+    "date": {
+     "type": "string",
+     "description": "The date of the event, formatted as 'YYYY-MM-DD'."
+    },
+    "city": {
+     "type": "string",
+     "description": "The name of the city where the event will take place, formatted as 'City, State' (e.g., 'New York, NY')."
+    }
+   }
+  },
+  "domain": "Events",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Movies_1_BuyMovieTickets",
+  "description": "Purchase tickets for a specific movie showing, including the number of tickets, show date and time, and location.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "movie_name",
+    "number_of_tickets",
+    "location"
+   ],
+   "properties": {
+    "movie_name": {
+     "type": "string",
+     "description": "The title of the movie for which tickets are being purchased."
+    },
+    "number_of_tickets": {
+     "type": "integer",
+     "description": "The total number of tickets to be bought."
+    },
+    "show_date": {
+     "type": "string",
+     "description": "The date on which the movie is showing, in the format 'YYYY-MM-DD'.",
+     "default": null
+    },
+    "location": {
+     "type": "string",
+     "description": "The city in which the movie theater is located, in the format of 'City, State', such as 'Los Angeles, CA'."
+    },
+    "show_time": {
+     "type": "string",
+     "description": "The start time of the movie showing, in 24-hour format 'HH:MM'.",
+     "default": "20:00"
+    },
+    "show_type": {
+     "type": "string",
+     "description": "The format of the movie showing.",
+     "enum": [
+      "regular",
+      "3d",
+      "imax"
+     ],
+     "default": "regular"
+    }
+   }
+  },
+  "domain": "Movies",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Movies_1_FindMovies",
+  "description": "Search for movies based on location, genre, and show type at specific theaters.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "location"
+   ],
+   "properties": {
+    "location": {
+     "type": "string",
+     "description": "The city where the theatre is located, in the format of 'City, State', such as 'Berkeley, CA' or 'New York, NY'. State names must be abbreviated"
+    },
+    "theater_name": {
+     "type": "string",
+     "description": "The name of the theatre. If unspecified, all theatres are considered.",
+     "default": "dontcare"
+    },
+    "genre": {
+     "type": "string",
+     "description": "The genre of the movie. If unspecified, all genres are considered.",
+     "enum": [
+      "World",
+      "Offbeat",
+      "Mystery",
+      "Supernatural",
+      "Horror",
+      "Animation",
+      "Sci-fi",
+      "Documentary",
+      "Drama",
+      "War",
+      "Family",
+      "Action"
+     ],
+     "default": "dontcare"
+    },
+    "show_type": {
+     "type": "string",
+     "description": "The type of movie show. If unspecified, all show types are considered.",
+     "enum": [
+      "regular",
+      "3d",
+      "imax"
+     ],
+     "default": "dontcare"
+    }
+   }
+  },
+  "domain": "Movies",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Movies_1_GetTimesForMovie",
+  "description": "Retrieves the show times for a specific movie at a particular theater location on a specified date.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "movie_name",
+    "location",
+    "show_date"
+   ],
+   "properties": {
+    "movie_name": {
+     "type": "string",
+     "description": "The title of the movie for which to find show times."
+    },
+    "location": {
+     "type": "string",
+     "description": "The city and state where the theater is located, in the format of 'City, State', such as 'Berkeley, CA' and 'New York, NY'."
+    },
+    "show_date": {
+     "type": "string",
+     "description": "The date of the show in the format 'YYYY-MM-DD', for example, '2023-04-15'."
+    },
+    "theater_name": {
+     "type": "string",
+     "description": "The name of the theater where the movie is showing. If not specified, any theater will be considered.",
+     "default": "Any Theater"
+    },
+    "show_type": {
+     "type": "string",
+     "description": "The format of the movie showing.",
+     "enum": [
+      "regular",
+      "3D",
+      "IMAX"
+     ],
+     "default": "regular"
+    }
+   }
+  },
+  "domain": "Movies",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Buses_3_FindBus",
+  "description": "Search for a bus itinerary between two cities on a specific date.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "from_city",
+    "to_city",
+    "departure_date"
+   ],
+   "properties": {
+    "from_city": {
+     "type": "string",
+     "description": "The city of departure, in the format 'City, State', such as 'New York, NY'."
+    },
+    "to_city": {
+     "type": "string",
+     "description": "The destination city of the trip, in the format 'City, State', such as 'Los Angeles, CA'."
+    },
+    "departure_date": {
+     "type": "string",
+     "description": "The date of departure in the format 'YYYY-MM-DD'."
+    },
+    "num_passengers": {
+     "type": "integer",
+     "description": "The number of passengers for the trip.",
+     "enum": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "default": 1
+    },
+    "category": {
+     "type": "string",
+     "description": "The category of the trip based on the number of stops.",
+     "enum": [
+      "direct",
+      "one-stop"
+     ],
+     "default": "direct"
+    }
+   }
+  },
+  "domain": "Buses",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Buses_3_BuyBusTicket",
+  "description": "This function processes the purchase of bus tickets from a departure city to a destination city on a specified date and time. It also accounts for the number of passengers and additional luggage optio",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "from_city",
+    "to_city",
+    "departure_date",
+    "departure_time",
+    "num_passengers"
+   ],
+   "properties": {
+    "from_city": {
+     "type": "string",
+     "description": "The city where the journey begins, in the format of 'City, State', such as 'New York, NY'."
+    },
+    "to_city": {
+     "type": "string",
+     "description": "The destination city for the trip, in the format of 'City, State', such as 'Los Angeles, CA'."
+    },
+    "departure_date": {
+     "type": "string",
+     "description": "The departure date in 'YYYY-MM-DD' format, for example, '2023-04-21'."
+    },
+    "departure_time": {
+     "type": "string",
+     "description": "The time of departure in 24-hour format 'HH:MM', such as '14:30' for 2:30 PM."
+    },
+    "num_passengers": {
+     "type": "integer",
+     "description": "The number of passengers for whom the tickets are being purchased. Must be a positive integer."
+    },
+    "additional_luggage": {
+     "type": "boolean",
+     "description": "Indicates whether additional luggage will be carried on the bus.",
+     "default": false
+    }
+   }
+  },
+  "domain": "Buses",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Trains_1_GetTrainTickets",
+  "description": "Reserve tickets for a train journey by providing journey details, the number of passengers, and seating class preferences.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "_from",
+    "to",
+    "date_of_journey",
+    "journey_start_time",
+    "number_of_adults",
+    "trip_protection"
+   ],
+   "properties": {
+    "_from": {
+     "type": "string",
+     "description": "The departure city for the train journey, in the format of 'City, State', such as 'Los Angeles, CA'."
+    },
+    "to": {
+     "type": "string",
+     "description": "The arrival city for the train journey, in the format of 'City, State', such as 'New York, NY'."
+    },
+    "date_of_journey": {
+     "type": "string",
+     "description": "The date of the train journey in the format 'YYYY-MM-DD', such as '2023-04-15'."
+    },
+    "journey_start_time": {
+     "type": "string",
+     "description": "The start time of the train journey in 24-hour format 'HH:MM', such as '14:30'."
+    },
+    "number_of_adults": {
+     "type": "integer",
+     "description": "The number of adults to reserve train tickets for. Must be between 1 to 5 adults."
+    },
+    "trip_protection": {
+     "type": "boolean",
+     "description": "Indicates whether to add trip protection to the reservation for an additional fee. Trip protection provides refund options and assistance in case of trip disruptions."
+    },
+    "_class": {
+     "type": "string",
+     "description": "The fare class for the train reservation. Options include 'Value', 'Flexible', and 'Business'.",
+     "enum": [
+      "Value",
+      "Flexible",
+      "Business"
+     ],
+     "default": "Value"
+    }
+   }
+  },
+  "domain": "Trains",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Trains_1_FindTrains",
+  "description": "Finds available train options for a specified route on a given date, allowing users to select a preferred travel class.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "_from",
+    "to",
+    "date_of_journey"
+   ],
+   "properties": {
+    "_from": {
+     "type": "string",
+     "description": "The city where the train journey will start. Eg: 'Berkeley, CA'. State names must be abbreviated."
+    },
+    "to": {
+     "type": "string",
+     "description": "The destination city for the train journey. Eg: 'Berkeley, CA'. State names must be abbreviated."
+    },
+    "date_of_journey": {
+     "type": "string",
+     "description": "The date of the train journey, in the format of 'YYYY-MM-DD'."
+    },
+    "_class": {
+     "type": "string",
+     "description": "The fare class for the train reservation.",
+     "enum": [
+      "Value",
+      "Flexible",
+      "Business"
+     ],
+     "default": "Value"
+    },
+    "number_of_adults": {
+     "type": "integer",
+     "description": "The number of adults to reserve train tickets for.",
+     "default": 1
+    }
+   }
+  },
+  "domain": "Trains",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Payment_1_RequestPayment",
+  "description": "Initiates a payment request to a specified contact or account.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "receiver",
+    "amount"
+   ],
+   "properties": {
+    "receiver": {
+     "type": "string",
+     "description": "The name or identifier of the contact or account to which the payment request will be sent."
+    },
+    "amount": {
+     "type": "float",
+     "description": "The monetary value to be requested, specified in dollars."
+    },
+    "private_visibility": {
+     "type": "boolean",
+     "description": "Indicates whether the payment request should be visible to others or kept private.",
+     "default": false
+    }
+   }
+  },
+  "domain": "Payment",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Payment_1_MakePayment",
+  "description": "Executes a transaction to transfer funds from the user to another account.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "payment_method",
+    "amount",
+    "receiver"
+   ],
+   "properties": {
+    "payment_method": {
+     "type": "string",
+     "description": "The funding source for the payment such as 'app balance', 'debit card', or 'credit card'.",
+     "enum": [
+      "app balance",
+      "debit card",
+      "credit card"
+     ]
+    },
+    "amount": {
+     "type": "float",
+     "description": "The monetary value to be transferred, in USD."
+    },
+    "receiver": {
+     "type": "string",
+     "description": "The identifier for the recipient, such as an account number or username."
+    },
+    "private_visibility": {
+     "type": "boolean",
+     "description": "Indicates if the transaction should be private (true) or public (false).",
+     "default": false
+    }
+   }
+  },
+  "domain": "Payment",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Homes_2_FindHomeByArea",
+  "description": "Search for a property to rent or buy in a specified city, filtering by number of bedrooms, number of bathrooms, garage availability, and in-unit laundry facilities.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "area",
+    "intent",
+    "number_of_beds",
+    "number_of_baths"
+   ],
+   "properties": {
+    "area": {
+     "type": "string",
+     "description": "The city where the property is located, in the format of 'City, State' (e.g., 'San Francisco, CA'). State names must be abbreviated"
+    },
+    "intent": {
+     "type": "string",
+     "description": "The intent of the search, whether the user is looking to rent or buy.",
+     "enum": [
+      "rent",
+      "buy"
+     ]
+    },
+    "number_of_beds": {
+     "type": "integer",
+     "description": "The number of bedrooms required in the property."
+    },
+    "number_of_baths": {
+     "type": "integer",
+     "description": "The number of bathrooms required in the property."
+    },
+    "has_garage": {
+     "type": "boolean",
+     "description": "Indicates if the property must have a garage.",
+     "default": false
+    },
+    "in_unit_laundry": {
+     "type": "boolean",
+     "description": "Indicates if the property must have in-unit laundry facilities.",
+     "default": false
+    }
+   }
+  },
+  "domain": "Homes",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Homes_2_ScheduleVisit",
+  "description": "Schedules a property visit for a potential buyer or tenant on a specific date.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "property_name",
+    "visit_date"
+   ],
+   "properties": {
+    "property_name": {
+     "type": "string",
+     "description": "The name of the property or apartment complex to be visited."
+    },
+    "visit_date": {
+     "type": "string",
+     "description": "The scheduled date for the visit in the format 'YYYY-MM-DD', such as '2023-04-15'."
+    }
+   }
+  },
+  "domain": "Homes",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "start_codegen_session",
+  "description": "Start a new code generation session to record Playwright actions",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "options": {
+     "type": "object",
+     "description": "Code generation options",
+     "properties": {
+      "outputPath": {
+       "type": "string",
+       "description": "Directory path where generated tests will be saved (use absolute path)"
+      },
+      "testNamePrefix": {
+       "type": "string",
+       "description": "Prefix to use for generated test names (default: 'GeneratedTest')"
+      },
+      "includeComments": {
+       "type": "boolean",
+       "description": "Whether to include descriptive comments in generated tests"
+      }
+     },
+     "required": [
+      "outputPath"
+     ]
+    }
+   },
+   "required": [
+    "options"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "end_codegen_session",
+  "description": "End a code generation session and generate the test file",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "sessionId": {
+     "type": "string",
+     "description": "ID of the session to end"
+    }
+   },
+   "required": [
+    "sessionId"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "get_codegen_session",
+  "description": "Get information about a code generation session",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "sessionId": {
+     "type": "string",
+     "description": "ID of the session to retrieve"
+    }
+   },
+   "required": [
+    "sessionId"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "clear_codegen_session",
+  "description": "Clear a code generation session without generating a test",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "sessionId": {
+     "type": "string",
+     "description": "ID of the session to clear"
+    }
+   },
+   "required": [
+    "sessionId"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "playwright_navigate",
+  "description": "Navigate to a URL",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "url": {
+     "type": "string",
+     "description": "URL to navigate to the website specified"
+    },
+    "browserType": {
+     "type": "string",
+     "description": "Browser type to use (chromium, firefox, webkit). Defaults to chromium",
+     "enum": [
+      "chromium",
+      "firefox",
+      "webkit"
+     ]
+    },
+    "width": {
+     "type": "number",
+     "description": "Viewport width in pixels (default: 1280)"
+    },
+    "height": {
+     "type": "number",
+     "description": "Viewport height in pixels (default: 720)"
+    },
+    "timeout": {
+     "type": "number",
+     "description": "Navigation timeout in milliseconds"
+    },
+    "waitUntil": {
+     "type": "string",
+     "description": "Navigation wait condition"
+    },
+    "headless": {
+     "type": "boolean",
+     "description": "Run browser in headless mode (default: false)"
+    }
+   },
+   "required": [
+    "url"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "playwright_screenshot",
+  "description": "Take a screenshot of the current page or a specific element",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "name": {
+     "type": "string",
+     "description": "Name for the screenshot"
+    },
+    "selector": {
+     "type": "string",
+     "description": "CSS selector for element to screenshot"
+    },
+    "width": {
+     "type": "number",
+     "description": "Width in pixels (default: 800)"
+    },
+    "height": {
+     "type": "number",
+     "description": "Height in pixels (default: 600)"
+    },
+    "storeBase64": {
+     "type": "boolean",
+     "description": "Store screenshot in base64 format (default: true)"
+    },
+    "fullPage": {
+     "type": "boolean",
+     "description": "Store screenshot of the entire page (default: false)"
+    },
+    "savePng": {
+     "type": "boolean",
+     "description": "Save screenshot as PNG file (default: false)"
+    },
+    "downloadsDir": {
+     "type": "string",
+     "description": "Custom downloads directory path (default: user's Downloads folder)"
+    }
+   },
+   "required": [
+    "name"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "playwright_click",
+  "description": "Click an element on the page",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "selector": {
+     "type": "string",
+     "description": "CSS selector for the element to click"
+    }
+   },
+   "required": [
+    "selector"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "playwright_iframe_click",
+  "description": "Click an element in an iframe on the page",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "iframeSelector": {
+     "type": "string",
+     "description": "CSS selector for the iframe containing the element to click"
+    },
+    "selector": {
+     "type": "string",
+     "description": "CSS selector for the element to click"
+    }
+   },
+   "required": [
+    "iframeSelector",
+    "selector"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "playwright_iframe_fill",
+  "description": "Fill an element in an iframe on the page",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "iframeSelector": {
+     "type": "string",
+     "description": "CSS selector for the iframe containing the element to fill"
+    },
+    "selector": {
+     "type": "string",
+     "description": "CSS selector for the element to fill"
+    },
+    "value": {
+     "type": "string",
+     "description": "Value to fill"
+    }
+   },
+   "required": [
+    "iframeSelector",
+    "selector",
+    "value"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "playwright_fill",
+  "description": "fill out an input field",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "selector": {
+     "type": "string",
+     "description": "CSS selector for input field"
+    },
+    "value": {
+     "type": "string",
+     "description": "Value to fill"
+    }
+   },
+   "required": [
+    "selector",
+    "value"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "playwright_select",
+  "description": "Select an element on the page with Select tag",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "selector": {
+     "type": "string",
+     "description": "CSS selector for element to select"
+    },
+    "value": {
+     "type": "string",
+     "description": "Value to select"
+    }
+   },
+   "required": [
+    "selector",
+    "value"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "playwright_hover",
+  "description": "Hover an element on the page",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "selector": {
+     "type": "string",
+     "description": "CSS selector for element to hover"
+    }
+   },
+   "required": [
+    "selector"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "playwright_evaluate",
+  "description": "Execute JavaScript in the browser console",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "script": {
+     "type": "string",
+     "description": "JavaScript code to execute"
+    }
+   },
+   "required": [
+    "script"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "playwright_console_logs",
+  "description": "Retrieve console logs from the browser with filtering options",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "type": {
+     "type": "string",
+     "description": "Type of logs to retrieve (all, error, warning, log, info, debug, exception)",
+     "enum": [
+      "all",
+      "error",
+      "warning",
+      "log",
+      "info",
+      "debug",
+      "exception"
+     ]
+    },
+    "search": {
+     "type": "string",
+     "description": "Text to search for in logs (handles text with square brackets)"
+    },
+    "limit": {
+     "type": "number",
+     "description": "Maximum number of logs to return"
+    },
+    "clear": {
+     "type": "boolean",
+     "description": "Whether to clear logs after retrieval (default: false)"
+    }
+   },
+   "required": []
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "playwright_get",
+  "description": "Perform an HTTP GET request",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "url": {
+     "type": "string",
+     "description": "URL to perform GET operation"
+    }
+   },
+   "required": [
+    "url"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "playwright_post",
+  "description": "Perform an HTTP POST request",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "url": {
+     "type": "string",
+     "description": "URL to perform POST operation"
+    },
+    "value": {
+     "type": "string",
+     "description": "Data to post in the body"
+    },
+    "token": {
+     "type": "string",
+     "description": "Bearer token for authorization"
+    },
+    "headers": {
+     "type": "object",
+     "description": "Additional headers to include in the request",
+     "additionalProperties": {
+      "type": "string"
+     }
+    }
+   },
+   "required": [
+    "url",
+    "value"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "playwright_put",
+  "description": "Perform an HTTP PUT request",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "url": {
+     "type": "string",
+     "description": "URL to perform PUT operation"
+    },
+    "value": {
+     "type": "string",
+     "description": "Data to PUT in the body"
+    }
+   },
+   "required": [
+    "url",
+    "value"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "playwright_patch",
+  "description": "Perform an HTTP PATCH request",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "url": {
+     "type": "string",
+     "description": "URL to perform PUT operation"
+    },
+    "value": {
+     "type": "string",
+     "description": "Data to PATCH in the body"
+    }
+   },
+   "required": [
+    "url",
+    "value"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "playwright_delete",
+  "description": "Perform an HTTP DELETE request",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "url": {
+     "type": "string",
+     "description": "URL to perform DELETE operation"
+    }
+   },
+   "required": [
+    "url"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "playwright_expect_response",
+  "description": "Ask Playwright to start waiting for a HTTP response. This tool initiates the wait operation but does not wait for its completion.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "Unique & arbitrary identifier to be used for retrieving this response later with `Playwright_assert_response`."
+    },
+    "url": {
+     "type": "string",
+     "description": "URL pattern to match in the response."
+    }
+   },
+   "required": [
+    "id",
+    "url"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "playwright_assert_response",
+  "description": "Wait for and validate a previously initiated HTTP response wait operation.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "Identifier of the HTTP response initially expected using `Playwright_expect_response`."
+    },
+    "value": {
+     "type": "string",
+     "description": "Data to expect in the body of the HTTP response. If provided, the assertion will fail if this value is not found in the response body."
+    }
+   },
+   "required": [
+    "id"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "playwright_custom_user_agent",
+  "description": "Set a custom User Agent for the browser",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "userAgent": {
+     "type": "string",
+     "description": "Custom User Agent for the Playwright browser instance"
+    }
+   },
+   "required": [
+    "userAgent"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "playwright_drag",
+  "description": "Drag an element to a target location",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "sourceSelector": {
+     "type": "string",
+     "description": "CSS selector for the element to drag"
+    },
+    "targetSelector": {
+     "type": "string",
+     "description": "CSS selector for the target location"
+    }
+   },
+   "required": [
+    "sourceSelector",
+    "targetSelector"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "playwright_press_key",
+  "description": "Press a keyboard key",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "key": {
+     "type": "string",
+     "description": "Key to press (e.g. 'Enter', 'ArrowDown', 'a')"
+    },
+    "selector": {
+     "type": "string",
+     "description": "Optional CSS selector to focus before pressing key"
+    }
+   },
+   "required": [
+    "key"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "playwright_click_and_switch_tab",
+  "description": "Click a link and switch to the newly opened tab",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "selector": {
+     "type": "string",
+     "description": "CSS selector for the link to click"
+    }
+   },
+   "required": [
+    "selector"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "puppeteer_navigate",
+  "description": "Navigate to a URL",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "url": {
+     "type": "string",
+     "description": "URL to navigate to"
+    },
+    "launchOptions": {
+     "type": "object",
+     "description": "PuppeteerJS LaunchOptions. Default null. If changed and not null, browser restarts. Example: { headless: true, args: ['--no-sandbox'] }"
+    },
+    "allowDangerous": {
+     "type": "boolean",
+     "description": "Allow dangerous LaunchOptions that reduce security. When false, dangerous args like --no-sandbox will throw errors. Default false."
+    }
+   },
+   "required": [
+    "url"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "puppeteer_screenshot",
+  "description": "Take a screenshot of the current page or a specific element",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "name": {
+     "type": "string",
+     "description": "Name for the screenshot"
+    },
+    "selector": {
+     "type": "string",
+     "description": "CSS selector for element to screenshot"
+    },
+    "width": {
+     "type": "number",
+     "description": "Width in pixels (default: 800)"
+    },
+    "height": {
+     "type": "number",
+     "description": "Height in pixels (default: 600)"
+    },
+    "encoded": {
+     "type": "boolean",
+     "description": "If true, capture the screenshot as a base64-encoded data URI (as text) instead of binary image content. Default false."
+    }
+   },
+   "required": [
+    "name"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "puppeteer_click",
+  "description": "Click an element on the page",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "selector": {
+     "type": "string",
+     "description": "CSS selector for element to click"
+    }
+   },
+   "required": [
+    "selector"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "puppeteer_fill",
+  "description": "Fill out an input field",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "selector": {
+     "type": "string",
+     "description": "CSS selector for input field"
+    },
+    "value": {
+     "type": "string",
+     "description": "Value to fill"
+    }
+   },
+   "required": [
+    "selector",
+    "value"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "puppeteer_select",
+  "description": "Select an element on the page with Select tag",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "selector": {
+     "type": "string",
+     "description": "CSS selector for element to select"
+    },
+    "value": {
+     "type": "string",
+     "description": "Value to select"
+    }
+   },
+   "required": [
+    "selector",
+    "value"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "puppeteer_hover",
+  "description": "Hover an element on the page",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "selector": {
+     "type": "string",
+     "description": "CSS selector for element to hover"
+    }
+   },
+   "required": [
+    "selector"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "puppeteer_evaluate",
+  "description": "Execute JavaScript in the browser console",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "script": {
+     "type": "string",
+     "description": "JavaScript code to execute"
+    }
+   },
+   "required": [
+    "script"
+   ]
+  },
+  "domain": "browser",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "read_file",
+  "description": "Read the complete contents of a file from the file system. Handles various text encodings and provides detailed error messages if the file cannot be read. Use this tool when you need to examine the co",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "path": {
+     "type": "string"
+    },
+    "tail": {
+     "type": "number",
+     "description": "If provided, returns only the last N lines of the file"
+    },
+    "head": {
+     "type": "number",
+     "description": "If provided, returns only the first N lines of the file"
+    }
+   },
+   "required": [
+    "path"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "domain": "filesystem",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "read_multiple_files",
+  "description": "Read the contents of multiple files simultaneously. This is more efficient than reading files one by one when you need to analyze or compare multiple files. Each file's content is returned with its pa",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "paths": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    }
+   },
+   "required": [
+    "paths"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "domain": "filesystem",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "write_file",
+  "description": "Create a new file or completely overwrite an existing file with new content. Use with caution as it will overwrite existing files without warning. Handles text content with proper encoding. Only works",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "path": {
+     "type": "string"
+    },
+    "content": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "path",
+    "content"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "domain": "filesystem",
+  "kind": "action",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "edit_file",
+  "description": "Make line-based edits to a text file. Each edit replaces exact line sequences with new content. Returns a git-style diff showing the changes made. Only works within allowed directories.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "path": {
+     "type": "string"
+    },
+    "edits": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "oldText": {
+        "type": "string",
+        "description": "Text to search for - must match exactly"
+       },
+       "newText": {
+        "type": "string",
+        "description": "Text to replace with"
+       }
+      },
+      "required": [
+       "oldText",
+       "newText"
+      ],
+      "additionalProperties": false
+     }
+    },
+    "dryRun": {
+     "type": "boolean",
+     "default": false,
+     "description": "Preview changes using git-style diff format"
+    }
+   },
+   "required": [
+    "path",
+    "edits"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "domain": "filesystem",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "create_directory",
+  "description": "Create a new directory or ensure a directory exists. Can create multiple nested directories in one operation. If the directory already exists, this operation will succeed silently. Perfect for setting",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "path": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "path"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "domain": "filesystem",
+  "kind": "action",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "list_directory",
+  "description": "Get a detailed listing of all files and directories in a specified path. Results clearly distinguish between files and directories with [FILE] and [DIR] prefixes. This tool is essential for understand",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "path": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "path"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "domain": "filesystem",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "list_directory_with_sizes",
+  "description": "Get a detailed listing of all files and directories in a specified path, including sizes. Results clearly distinguish between files and directories with [FILE] and [DIR] prefixes. This tool is useful ",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "path": {
+     "type": "string"
+    },
+    "sortBy": {
+     "type": "string",
+     "enum": [
+      "name",
+      "size"
+     ],
+     "default": "name",
+     "description": "Sort entries by name or size"
+    }
+   },
+   "required": [
+    "path"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "domain": "filesystem",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "directory_tree",
+  "description": "Get a recursive tree view of files and directories as a JSON structure. Each entry includes 'name', 'type' (file/directory), and 'children' for directories. Files have no children array, while directo",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "path": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "path"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "domain": "filesystem",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "search_files",
+  "description": "Recursively search for files and directories matching a pattern. Searches through all subdirectories from the starting path. The search is case-insensitive and matches partial names. Returns full path",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "path": {
+     "type": "string"
+    },
+    "pattern": {
+     "type": "string"
+    },
+    "excludePatterns": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "default": []
+    }
+   },
+   "required": [
+    "path",
+    "pattern"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "domain": "filesystem",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "get_file_info",
+  "description": "Retrieve detailed metadata about a file or directory. Returns comprehensive information including size, creation time, last modified time, permissions, and type. This tool is perfect for understanding",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "path": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "path"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "domain": "filesystem",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "list_allowed_directories",
+  "description": "Returns the list of directories that this server is allowed to access. Use this to understand which directories are available before trying to access files.",
+  "parameters": {
+   "type": "object",
+   "properties": {},
+   "required": []
+  },
+  "domain": "filesystem",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "get_stock_price_global_market",
+  "description": "Get Public Available Stock Symbols from Global Marketplace Args: symbol_list (List): List of Symbols, such as Tencent: 700, Kuaishou: 1024, Tesla (TSLA), Microsoft(MSFT), Google (GOOG), London Stock E",
+  "parameters": {
+   "properties": {
+    "symbol_list": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Symbol List",
+     "type": "array"
+    },
+    "market": {
+     "title": "Market",
+     "type": "string"
+    }
+   },
+   "required": [
+    "symbol_list",
+    "market"
+   ],
+   "title": "get_stock_price_global_marketArguments",
+   "type": "object"
+  },
+  "domain": "finance",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_geocode",
+  "description": "Convert an address into geographic coordinates",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "address": {
+     "type": "string",
+     "description": "The address to geocode"
+    }
+   },
+   "required": [
+    "address"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_reverse_geocode",
+  "description": "Convert coordinates into an address",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "latitude": {
+     "type": "number",
+     "description": "Latitude coordinate"
+    },
+    "longitude": {
+     "type": "number",
+     "description": "Longitude coordinate"
+    }
+   },
+   "required": [
+    "latitude",
+    "longitude"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_search_places",
+  "description": "Search for places using Google Places API",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "query": {
+     "type": "string",
+     "description": "Search query"
+    },
+    "location": {
+     "type": "object",
+     "properties": {
+      "latitude": {
+       "type": "number"
+      },
+      "longitude": {
+       "type": "number"
+      }
+     },
+     "description": "Optional center point for the search"
+    },
+    "radius": {
+     "type": "number",
+     "description": "Search radius in meters (max 50000)"
+    }
+   },
+   "required": [
+    "query"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_place_details",
+  "description": "Get detailed information about a specific place",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "place_id": {
+     "type": "string",
+     "description": "The place ID to get details for"
+    }
+   },
+   "required": [
+    "place_id"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_distance_matrix",
+  "description": "Calculate travel distance and time for multiple origins and destinations",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "origins": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "Array of origin addresses or coordinates"
+    },
+    "destinations": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "Array of destination addresses or coordinates"
+    },
+    "mode": {
+     "type": "string",
+     "description": "Travel mode (driving, walking, bicycling, transit)",
+     "enum": [
+      "driving",
+      "walking",
+      "bicycling",
+      "transit"
+     ]
+    }
+   },
+   "required": [
+    "origins",
+    "destinations"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_elevation",
+  "description": "Get elevation data for locations on the earth",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "locations": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "latitude": {
+        "type": "number"
+       },
+       "longitude": {
+        "type": "number"
+       }
+      },
+      "required": [
+       "latitude",
+       "longitude"
+      ]
+     },
+     "description": "Array of locations to get elevation for"
+    }
+   },
+   "required": [
+    "locations"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_directions",
+  "description": "Get directions between two points",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "origin": {
+     "type": "string",
+     "description": "Starting point address or coordinates"
+    },
+    "destination": {
+     "type": "string",
+     "description": "Ending point address or coordinates"
+    },
+    "mode": {
+     "type": "string",
+     "description": "Travel mode (driving, walking, bicycling, transit)",
+     "enum": [
+      "driving",
+      "walking",
+      "bicycling",
+      "transit"
+     ]
+    }
+   },
+   "required": [
+    "origin",
+    "destination"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "map_geocode",
+  "description": "地理编码服务: 将地址解析为对应的位置坐标.地址结构越完整, 地址内容越准确, 解析的坐标精度越高.",
+  "parameters": {
+   "type": "object",
+   "required": [
+    "address"
+   ],
+   "properties": {
+    "address": {
+     "type": "string",
+     "description": "待解析的地址.最多支持84个字节.可以输入两种样式的值, 分别是：\n1、标准的结构化地址信息, 如北京市海淀区上地十街十号\n2、支持*路与*路交叉口描述方式, 如北一环路和阜阳路的交叉路口\n第二种方式并不总是有返回结果, 只有当地址库中存在该地址描述时才有返回"
+    }
+   }
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "map_reverse_geocode",
+  "description": "逆地理编码服务: 根据纬经度坐标, 获取对应位置的地址描述, 所在行政区划, 道路以及相关POI等信息",
+  "parameters": {
+   "type": "object",
+   "required": [
+    "latitude",
+    "longitude"
+   ],
+   "properties": {
+    "latitude": {
+     "type": "number",
+     "description": "纬度 (bd09ll)"
+    },
+    "longitude": {
+     "type": "number",
+     "description": "经度 (bd09ll)"
+    }
+   }
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "map_search_places",
+  "description": "地点检索服务: 支持检索城市内的地点信息(最小到city级别), 也可支持圆形区域内的周边地点信息检索. 城市内检索: 检索某一城市内（目前最细到城市级别）的地点信息. 周边检索: 设置圆心和半径, 检索圆形区域内的地点信息（常用于周边检索场景）.",
+  "parameters": {
+   "type": "object",
+   "required": [
+    "query"
+   ],
+   "properties": {
+    "query": {
+     "type": "string",
+     "description": "检索关键字, 可直接使用名称或类型, 如'天安门', 且可以至多10个关键字, 用英文逗号隔开"
+    },
+    "tag": {
+     "type": "string",
+     "description": "检索分类, 以中文字符输入, 如'美食', 多个分类用英文逗号隔开, 如'美食,购物'"
+    },
+    "region": {
+     "type": "string",
+     "description": "检索的城市名称, 可为行政区划名或citycode, 格式如'北京市'或'131', 不传默认为'全国'"
+    },
+    "location": {
+     "type": "string",
+     "description": "圆形区域检索的中心点纬经度坐标, 格式为lat,lng"
+    },
+    "radius": {
+     "type": "integer",
+     "description": "圆形区域检索半径, 单位：米"
+    },
+    "language": {
+     "type": "string",
+     "description": "指定输入参数和召回参数的语言类型, 需要传入的是语言名称的英文缩写. \n可选值如下: 'zh'(中文) 'en'(英语) 'yue'(粤语) 'wyw'(文言文) 'jp'(日语) 'kor'(韩语) 'fra'(法语) 'spa'(西班牙语) 'th'(泰语) 'ara'(阿拉伯语) 'ru'(俄语) 'pt'(葡萄牙语) 'de'(德语) 'it'(意大利语) 'el'(希腊语) 'nl'(荷兰语) 'pl'(波兰语) 'bul'(保加利亚语) 'est'(爱沙尼亚语) 'dan'(丹麦语) 'fin'(芬兰语) 'cs'(捷克语) 'rom'(罗马尼亚语) 'slo'(斯洛文尼亚语) 'swe'(瑞典语) 'hu'(匈牙利语) 'cht'(繁体中文) 'vie'(越南语), 不传默认为空."
+    }
+   }
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "map_place_details",
+  "description": "地点详情检索服务: 地点详情检索针对指定POI, 检索其相关的详情信息. 通过地点检索服务获取POI uid.使用地点详情检索功能, 传入uid, 即可检索POI详情信息, 如评分、营业时间等(不同类型POI对应不同类别详情数据).",
+  "parameters": {
+   "type": "object",
+   "required": [
+    "uid"
+   ],
+   "properties": {
+    "uid": {
+     "type": "string",
+     "description": "POI的唯一标识"
+    }
+   }
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "map_directions_matrix",
+  "description": "批量算路服务: 根据起点和终点坐标计算路线规划距离和行驶时间. 批量算路目前支持驾车、骑行、步行. 步行时任意起终点之间的距离不得超过200KM, 超过此限制会返回参数错误. 驾车批量算路一次最多计算100条路线, 起终点个数之积不能超过100.",
+  "parameters": {
+   "type": "object",
+   "required": [
+    "origins",
+    "destinations"
+   ],
+   "properties": {
+    "origins": {
+     "type": "string",
+     "description": "多个起点纬经度坐标, 纬度在前, 经度在后, 多个起点用|分隔"
+    },
+    "destinations": {
+     "type": "string",
+     "description": "多个终点纬经度坐标, 纬度在前, 经度在后, 多个终点用|分隔"
+    },
+    "model": {
+     "type": "string",
+     "description": "批量算路类型(driving, riding, walking)"
+    }
+   }
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "map_directions",
+  "description": "路线规划服务: 根据起终点`位置名称`或`纬经度坐标`规划出行路线. 驾车路线规划: 根据起终点`位置名称`或`纬经度坐标`规划驾车出行路线. 骑行路线规划: 根据起终点`位置名称`或`纬经度坐标`规划骑行出行路线. 步行路线规划: 根据起终点`位置名称`或`纬经度坐标`规划步行出行路线. 公交路线规划: 根据起终点`位置名称`或`纬经度坐标`规划公共交通出行路线.",
+  "parameters": {
+   "type": "object",
+   "required": [
+    "origin",
+    "destination"
+   ],
+   "properties": {
+    "model": {
+     "type": "string",
+     "description": "路线规划类型(driving, riding, walking, transit)"
+    },
+    "origin": {
+     "type": "string",
+     "description": "起点位置名称或纬经度坐标, 纬度在前, 经度在后"
+    },
+    "destination": {
+     "type": "string",
+     "description": "终点位置名称或纬经度坐标, 纬度在前, 经度在后"
+    }
+   }
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "map_weather",
+  "description": "天气查询服务: 通过行政区划或是经纬度坐标查询实时天气信息及未来5天天气预报.",
+  "parameters": {
+   "type": "object",
+   "required": [],
+   "properties": {
+    "location": {
+     "type": "string",
+     "description": "经纬度坐标, 经度在前纬度在后, 逗号分隔"
+    },
+    "district_id": {
+     "type": "string",
+     "description": "行政区划代码, 需保证为6位无符号整数"
+    }
+   }
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "map_ip_location",
+  "description": "IP定位服务: 通过所给IP获取具体位置信息和城市名称, 可用于定位IP或用户当前位置.",
+  "parameters": {
+   "type": "object",
+   "required": [],
+   "properties": {
+    "ip": {
+     "type": "string",
+     "description": "需要定位的IP地址, 如果为空则获取用户当前IP地址(支持IPv4和IPv6)"
+    }
+   }
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "map_road_traffic",
+  "description": "实时路况查询服务: 查询实时交通拥堵情况, 可通过指定道路名和区域形状(矩形, 多边形, 圆形)进行实时路况查询. 道路实时路况查询: 查询具体道路的实时拥堵评价和拥堵路段、拥堵距离、拥堵趋势等信息. 矩形区域实时路况查询: 查询指定矩形地理范围的实时拥堵情况和各拥堵路段信息. 多边形区域实时路况查询: 查询指定多边形地理范围的实时拥堵情况和各拥堵路段信息. 圆形区域(周边)实时路况查询: 查询某",
+  "parameters": {
+   "type": "object",
+   "required": [
+    "model"
+   ],
+   "properties": {
+    "model": {
+     "type": "string",
+     "description": "路况查询类型(road, bound, polygon, around)"
+    },
+    "road_name": {
+     "type": "string",
+     "description": "道路名称和道路方向, model=road时必传 (如:朝阳路南向北)"
+    },
+    "city": {
+     "type": "string",
+     "description": "城市名称或城市adcode, model=road时必传 (如:北京市)"
+    },
+    "bounds": {
+     "type": "string",
+     "description": "区域左下角和右上角的纬经度坐标, 纬度在前, 经度在后, model=bound时必传"
+    },
+    "vertexes": {
+     "type": "string",
+     "description": "多边形区域的顶点纬经度坐标, 纬度在前, 经度在后, model=polygon时必传"
+    },
+    "center": {
+     "type": "string",
+     "description": "圆形区域的中心点纬经度坐标, 纬度在前, 经度在后, model=around时必传"
+    },
+    "radius": {
+     "type": "integer",
+     "description": "圆形区域的半径(米), 取值[1,1000], model=around时必传"
+    }
+   }
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "map_mark",
+  "description": "根据旅游规划生成地图规划展示, 当根据用户的需求申城完旅游规划后, 在给用户详细讲解旅游规划的同时, 也需要使用该工具生成旅游规划地图. 该工具只会生成一个分享用的url, 并对针对该url生成一个二维码便于用户分享.",
+  "parameters": {
+   "type": "object",
+   "required": [
+    "text_content"
+   ],
+   "properties": {
+    "text_content": {
+     "type": "string",
+     "description": "旅行规划的文本描述(注意避免传入特殊字符, 如\\等)"
+    }
+   }
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_direction_bicycling",
+  "description": "骑行路径规划用于规划骑行通勤方案，规划时会考虑天桥、单行线、封路等情况。最大支持 500km 的骑行路线规划",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "origin": {
+     "type": "string",
+     "description": "出发点经纬度，坐标格式为：经度，纬度"
+    },
+    "destination": {
+     "type": "string",
+     "description": "目的地经纬度，坐标格式为：经度，纬度"
+    }
+   },
+   "required": [
+    "origin",
+    "destination"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_direction_driving",
+  "description": "驾车路径规划 API 可以根据用户起终点经纬度坐标规划以小客车、轿车通勤出行的方案，并且返回通勤方案的数据。",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "origin": {
+     "type": "string",
+     "description": "出发点经纬度，坐标格式为：经度，纬度"
+    },
+    "destination": {
+     "type": "string",
+     "description": "目的地经纬度，坐标格式为：经度，纬度"
+    }
+   },
+   "required": [
+    "origin",
+    "destination"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_direction_transit_integrated",
+  "description": "根据用户起终点经纬度坐标规划综合各类公共（火车、公交、地铁）交通方式的通勤方案，并且返回通勤方案的数据，跨城场景下必须传起点城市与终点城市",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "origin": {
+     "type": "string",
+     "description": "出发点经纬度，坐标格式为：经度，纬度"
+    },
+    "destination": {
+     "type": "string",
+     "description": "目的地经纬度，坐标格式为：经度，纬度"
+    },
+    "city": {
+     "type": "string",
+     "description": "公共交通规划起点城市"
+    },
+    "cityd": {
+     "type": "string",
+     "description": "公共交通规划终点城市"
+    }
+   },
+   "required": [
+    "origin",
+    "destination",
+    "city",
+    "cityd"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_direction_walking",
+  "description": "根据输入起点终点经纬度坐标规划100km 以内的步行通勤方案，并且返回通勤方案的数据",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "origin": {
+     "type": "string",
+     "description": "出发点经度，纬度，坐标格式为：经度，纬度"
+    },
+    "destination": {
+     "type": "string",
+     "description": "目的地经度，纬度，坐标格式为：经度，纬度"
+    }
+   },
+   "required": [
+    "origin",
+    "destination"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_distance",
+  "description": "测量两个经纬度坐标之间的距离,支持驾车、步行以及球面距离测量",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "origins": {
+     "type": "string",
+     "description": "起点经度，纬度，可以传多个坐标，使用竖线隔离，比如120,30|120,31，坐标格式为：经度，纬度"
+    },
+    "destination": {
+     "type": "string",
+     "description": "终点经度，纬度，坐标格式为：经度，纬度"
+    },
+    "type": {
+     "type": "string",
+     "description": "距离测量类型,1代表驾车距离测量，0代表直线距离测量，3步行距离测量"
+    }
+   },
+   "required": [
+    "origins",
+    "destination"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_geo",
+  "description": "将详细的结构化地址转换为经纬度坐标。支持对地标性名胜景区、建筑物名称解析为经纬度坐标",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "address": {
+     "type": "string",
+     "description": "待解析的结构化地址信息"
+    },
+    "city": {
+     "type": "string",
+     "description": "指定查询的城市"
+    }
+   },
+   "required": [
+    "address"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_regeocode",
+  "description": "将一个高德经纬度坐标转换为行政区划地址信息",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "location": {
+     "type": "string",
+     "description": "经纬度"
+    }
+   },
+   "required": [
+    "location"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_ip_location",
+  "description": "IP 定位根据用户输入的 IP 地址，定位 IP 的所在位置",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "ip": {
+     "type": "string",
+     "description": "IP地址"
+    }
+   },
+   "required": [
+    "ip"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_schema_personal_map",
+  "description": "用于行程规划结果在高德地图展示。将行程规划位置点按照行程顺序填入lineList，返回结果为高德地图打开的URI链接，该结果不需总结，直接返回！",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "orgName": {
+     "type": "string",
+     "description": "行程规划地图小程序名称"
+    },
+    "lineList": {
+     "type": "array",
+     "description": "行程列表",
+     "items": {
+      "type": "object",
+      "properties": {
+       "title": {
+        "type": "string",
+        "description": "行程名称描述（按行程顺序）"
+       },
+       "pointInfoList": {
+        "type": "array",
+        "description": "行程目标位置点描述",
+        "items": {
+         "type": "object",
+         "properties": {
+          "name": {
+           "type": "string",
+           "description": "行程目标位置点名称"
+          },
+          "lon": {
+           "type": "number",
+           "description": "行程目标位置点经度"
+          },
+          "lat": {
+           "type": "number",
+           "description": "行程目标位置点纬度"
+          },
+          "poiId": {
+           "type": "string",
+           "description": "行程目标位置点POIID"
+          }
+         },
+         "required": [
+          "name",
+          "lon",
+          "lat",
+          "poiId"
+         ]
+        }
+       }
+      },
+      "required": [
+       "title",
+       "pointInfoList"
+      ]
+     }
+    }
+   },
+   "required": [
+    "orgName",
+    "lineList"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_around_search",
+  "description": "周边搜，根据用户传入关键词以及坐标location，搜索出radius半径范围的POI",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "keywords": {
+     "type": "string",
+     "description": "搜索关键词"
+    },
+    "location": {
+     "type": "string",
+     "description": "中心点经度纬度"
+    },
+    "radius": {
+     "type": "string",
+     "description": "搜索半径"
+    }
+   },
+   "required": [
+    "keywords",
+    "location"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_search_detail",
+  "description": "查询关键词搜或者周边搜获取到的POI ID的详细信息",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "关键词搜或者周边搜获取到的POI ID"
+    }
+   },
+   "required": [
+    "id"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_text_search",
+  "description": "关键字搜索 API 根据用户输入的关键字进行 POI 搜索，并返回相关的信息",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "keywords": {
+     "type": "string",
+     "description": "查询关键字"
+    },
+    "city": {
+     "type": "string",
+     "description": "查询城市"
+    },
+    "citylimit": {
+     "type": "boolean",
+     "default": false,
+     "description": "是否限制城市范围内搜索，默认不限制"
+    }
+   },
+   "required": [
+    "keywords"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_schema_navi",
+  "description": "Schema唤醒客户端-导航页面，用于根据用户输入终点信息，返回一个拼装好的客户端唤醒URI，用户点击该URI即可唤起对应的客户端APP。唤起客户端后，会自动跳转到导航页面。",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "lon": {
+     "type": "string",
+     "description": "终点经度"
+    },
+    "lat": {
+     "type": "string",
+     "description": "终点纬度"
+    }
+   },
+   "required": [
+    "lon",
+    "lat"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_schema_take_taxi",
+  "description": "根据用户输入的起点和终点信息，返回一个拼装好的客户端唤醒URI，直接唤起高德地图进行打车。直接展示生成的链接，不需要总结",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "slon": {
+     "type": "string",
+     "description": "起点经度"
+    },
+    "slat": {
+     "type": "string",
+     "description": "起点纬度"
+    },
+    "sname": {
+     "type": "string",
+     "description": "起点名称"
+    },
+    "dlon": {
+     "type": "string",
+     "description": "终点经度"
+    },
+    "dlat": {
+     "type": "string",
+     "description": "终点纬度"
+    },
+    "dname": {
+     "type": "string",
+     "description": "终点名称"
+    }
+   },
+   "required": [
+    "dlon",
+    "dlat",
+    "dname"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_weather",
+  "description": "根据城市名称或者标准adcode查询指定城市的天气",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "city": {
+     "type": "string",
+     "description": "城市名称或者adcode"
+    }
+   },
+   "required": [
+    "city"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "create_invoice",
+  "description": "Create Invoices on PayPal. This function is used to create an invoice in the PayPal system. It allows you to generate a new invoice, specifying details such as customer information, items, quantities,",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "detail": {
+     "type": "object",
+     "properties": {
+      "invoice_date": {
+       "type": "string",
+       "description": "The invoice date in YYYY-MM-DD format"
+      },
+      "currency_code": {
+       "type": "string",
+       "description": "currency code of the invoice"
+      }
+     },
+     "required": [
+      "currency_code"
+     ],
+     "additionalProperties": false,
+     "description": "The invoice detail, like{ \"invoice_number\": \"#123\", \"reference\": \"deal-ref\", \"invoice_date\": \"2018-11-12\", \"currency_code\": \"USD\", \"note\": \"Thank you for your business.\", \"term\": \"No refunds after 30 days.\", \"memo\": \"This is a long contract\", \"payment_term\": { \"term_type\": \"NET_10\", \"due_date\": \"2018-11-22\" } }"
+    },
+    "invoicer": {
+     "type": "object",
+     "properties": {
+      "business_name": {
+       "type": "string",
+       "maxLength": 300,
+       "description": "business name of the invoicer"
+      },
+      "name": {
+       "type": "object",
+       "properties": {
+        "given_name": {
+         "type": "string",
+         "description": "given name of the invoicer"
+        },
+        "surname": {
+         "type": "string",
+         "description": "surname of the invoicer"
+        }
+       },
+       "additionalProperties": false,
+       "description": "name of the invoicer"
+      },
+      "email_address": {
+       "type": "string",
+       "description": "email address of the invoicer"
+      }
+     },
+     "required": [
+      "business_name"
+     ],
+     "additionalProperties": false,
+     "description": "The invoicer business information that appears on the invoice."
+    },
+    "primary_recipients": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "billing_info": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "object",
+          "properties": {
+           "given_name": {
+            "type": "string",
+            "description": "given name of the recipient"
+           },
+           "surname": {
+            "type": "string",
+            "description": "surname of the recipient"
+           }
+          },
+          "additionalProperties": false,
+          "description": "name of the recipient"
+         },
+         "email_address": {
+          "type": "string",
+          "description": "email address of the recipient"
+         }
+        },
+        "additionalProperties": false,
+        "description": "The billing information of the invoice recipient"
+       }
+      },
+      "additionalProperties": false
+     },
+     "description": "array of recipients"
+    },
+    "items": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "name": {
+        "type": "string",
+        "description": "The name of the item"
+       },
+       "quantity": {
+        "type": "string",
+        "description": "The quantity of the item that the invoicer provides to the payer. Value is from -1000000 to 1000000. Supports up to five decimal places. Cast to string"
+       },
+       "unit_amount": {
+        "type": "object",
+        "properties": {
+         "currency_code": {
+          "type": "string",
+          "description": "Currency code of the unit amount"
+         },
+         "value": {
+          "type": "string",
+          "description": "The unit price. Up to 2 decimal points"
+         }
+        },
+        "required": [
+         "currency_code",
+         "value"
+        ],
+        "additionalProperties": false,
+        "description": "unit amount object"
+       },
+       "tax": {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string",
+          "description": "Tax name"
+         },
+         "percent": {
+          "type": "string",
+          "description": "Tax Percent"
+         }
+        },
+        "additionalProperties": false,
+        "description": "tax object"
+       },
+       "unit_of_measure": {
+        "type": "string",
+        "enum": [
+         "QUANTITY",
+         "HOURS",
+         "AMOUNT"
+        ],
+        "description": "The unit of measure for the invoiced item"
+       }
+      },
+      "required": [
+       "name",
+       "quantity",
+       "unit_amount"
+      ],
+      "additionalProperties": false,
+      "description": "invoice line item object"
+     },
+     "description": "Array of invoice line items"
+    }
+   },
+   "required": [
+    "detail"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "domain": "pay",
+  "kind": "action",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "create_product",
+  "description": "Create a product in PayPal using product catalog - create products API. This function creates a new product that will be used in subscription plans, subscriptions. Required parameters are: name (produ",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "name": {
+     "type": "string",
+     "description": "The product name."
+    },
+    "type": {
+     "type": "string",
+     "enum": [
+      "PHYSICAL",
+      "DIGITAL",
+      "SERVICE"
+     ],
+     "description": "The product type. Value is PHYSICAL, DIGITAL, or SERVICE."
+    },
+    "description": {
+     "type": "string",
+     "description": "The product description."
+    },
+    "category": {
+     "type": "string",
+     "description": "The product category."
+    },
+    "image_url": {
+     "type": "string",
+     "description": "The image URL for the product."
+    },
+    "home_url": {
+     "type": "string",
+     "description": "The home page URL for the product."
+    }
+   },
+   "required": [
+    "name",
+    "type"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "domain": "pay",
+  "kind": "action",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "create_subscription_plan",
+  "description": "Create a subsctiption plan in PayPal using subscription - create plan API. This function creates a new subscription plan that defines pricing and billing cycle details for subscriptions. Required para",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "product_id": {
+     "type": "string",
+     "description": "The ID of the product for which to create the plan."
+    },
+    "name": {
+     "type": "string",
+     "description": "The subscription plan name."
+    },
+    "description": {
+     "type": "string",
+     "description": "The subscription plan description."
+    },
+    "billing_cycles": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "frequency": {
+        "type": "object",
+        "properties": {
+         "interval_unit": {
+          "type": "string",
+          "enum": [
+           "DAY",
+           "WEEK",
+           "MONTH",
+           "YEAR"
+          ],
+          "description": "The unit of time for the billing cycle."
+         },
+         "interval_count": {
+          "type": "number",
+          "description": "The number of units for the billing cycle."
+         }
+        },
+        "required": [
+         "interval_unit",
+         "interval_count"
+        ],
+        "additionalProperties": true,
+        "description": "The frequency of the billing cycle."
+       },
+       "tenure_type": {
+        "type": "string",
+        "enum": [
+         "REGULAR",
+         "TRIAL"
+        ],
+        "description": "The type of billing cycle tenure."
+       },
+       "sequence": {
+        "type": "number",
+        "description": "The sequence of the billing cycle."
+       },
+       "total_cycles": {
+        "type": "number",
+        "description": "The total number of cycles in the billing plan."
+       },
+       "pricing_scheme": {
+        "type": "object",
+        "properties": {
+         "fixed_price": {
+          "type": "object",
+          "properties": {
+           "currency_code": {
+            "type": "string",
+            "enum": [
+             "USD"
+            ],
+            "description": "The currency code for the fixed price."
+           },
+           "value": {
+            "type": "string",
+            "description": "The value of the fixed price."
+           }
+          },
+          "required": [
+           "currency_code",
+           "value"
+          ],
+          "additionalProperties": true,
+          "description": "The fixed price for the subscription plan."
+         },
+         "version": {
+          "type": "string",
+          "description": "The version of the pricing scheme."
+         }
+        },
+        "additionalProperties": true,
+        "description": "The pricing scheme for the billing cycle."
+       }
+      },
+      "required": [
+       "frequency",
+       "tenure_type",
+       "sequence",
+       "pricing_scheme"
+      ],
+      "additionalProperties": true
+     },
+     "description": "The billing cycles of the plan."
+    },
+    "payment_preferences": {
+     "type": "object",
+     "properties": {
+      "auto_bill_outstanding": {
+       "type": "boolean",
+       "description": "Indicates whether to automatically bill outstanding amounts."
+      },
+      "setup_fee": {
+       "type": "object",
+       "properties": {
+        "currency_code": {
+         "type": "string",
+         "enum": [
+          "USD"
+         ],
+         "description": "The currency code for the setup fee."
+        },
+        "value": {
+         "type": "string",
+         "description": "The value of the setup fee."
+        }
+       },
+       "additionalProperties": true,
+       "description": "The setup fee for the subscription plan."
+      },
+      "setup_fee_failure_action": {
+       "type": "string",
+       "enum": [
+        "CONTINUE",
+        "CANCEL"
+       ],
+       "description": "The action to take if the setup fee payment fails."
+      },
+      "payment_failure_threshold": {
+       "type": "number",
+       "description": "The number of failed payments before the subscription is canceled."
+      }
+     },
+     "additionalProperties": true,
+     "description": "The payment preferences for the subscription plan."
+    },
+    "taxes": {
+     "type": "object",
+     "properties": {
+      "percentage": {
+       "type": "string",
+       "description": "The tax percentage."
+      },
+      "inclusive": {
+       "type": "boolean",
+       "description": "Indicates whether the tax is inclusive."
+      }
+     },
+     "additionalProperties": true,
+     "description": "The tax details."
+    }
+   },
+   "required": [
+    "product_id",
+    "name",
+    "billing_cycles"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "domain": "pay",
+  "kind": "action",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "create_shipment_tracking",
+  "description": "Create a shipment for a transaction in PayPal. This function creates a shipment record for a specific transaction, allowing you to track the shipment status and details. The transaction_id can fetch f",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "order_id": {
+     "type": "string",
+     "description": "The ID of the order for which to create a shipment"
+    },
+    "tracking_number": {
+     "type": "string",
+     "description": "The tracking number for the shipment. Id is provided by the shipper. This is required to create a shipment."
+    },
+    "transaction_id": {
+     "type": "string",
+     "description": "The transaction ID associated with the shipment. Transaction id available after the order is paid or captured. This is required to create a shipment."
+    },
+    "status": {
+     "type": "string",
+     "description": "The status of the shipment. It can be \"ON_HOLD\", \"SHIPPED\", \"DELIVERED\", or \"CANCELLED\".",
+     "default": "SHIPPED"
+    },
+    "carrier": {
+     "type": "string",
+     "description": "The carrier handling the shipment."
+    }
+   },
+   "required": [
+    "tracking_number",
+    "transaction_id"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "domain": "pay",
+  "kind": "action",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "create_order",
+  "description": "Create an order in PayPal. This tool is used to create a new order in PayPal. This is typically the first step in initiating a payment flow. It sets up an order with specified details such as item(s) ",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "currencyCode": {
+     "type": "string",
+     "enum": [
+      "USD"
+     ],
+     "description": "Currency code of the amount."
+    },
+    "items": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "name": {
+        "type": "string",
+        "description": "The name of the item."
+       },
+       "quantity": {
+        "type": "number",
+        "description": "The item quantity. Must be a whole number.",
+        "default": 1
+       },
+       "description": {
+        "type": "string",
+        "description": "The detailed item description."
+       },
+       "itemCost": {
+        "type": "number",
+        "description": "The cost of each item - upto 2 decimal points."
+       },
+       "taxPercent": {
+        "type": "number",
+        "description": "The tax percent for the specific item.",
+        "default": 0
+       },
+       "itemTotal": {
+        "type": "number",
+        "description": "The total cost of this line item."
+       }
+      },
+      "required": [
+       "name",
+       "itemCost",
+       "itemTotal"
+      ],
+      "additionalProperties": false
+     },
+     "maxItems": 50
+    },
+    "discount": {
+     "type": "number",
+     "description": "The discount amount for the order.",
+     "default": 0
+    },
+    "shippingCost": {
+     "type": "number",
+     "description": "The cost of shipping for the order.",
+     "default": 0
+    },
+    "shippingAddress": {
+     "anyOf": [
+      {
+       "type": "object",
+       "properties": {
+        "address_line_1": {
+         "type": "string",
+         "description": "The first line of the address, such as number and street, for example, `173 Drury Lane`.This field needs to pass the full address."
+        },
+        "address_line_2": {
+         "type": "string",
+         "description": "The second line of the address, for example, a suite or apartment number."
+        },
+        "admin_area_2": {
+         "type": "string",
+         "description": "A city, town, or village. Smaller than `admin_area_level_1`."
+        },
+        "admin_area_1": {
+         "type": "string",
+         "description": "The highest-level sub-division in a country, which is usually a province, state, or ISO-3166-2 subdivision. "
+        },
+        "postal_code": {
+         "type": "string",
+         "description": "The postal code, which is the ZIP code or equivalent. Typically required for countries with a postal code or an equivalent."
+        },
+        "country_code": {
+         "type": "string",
+         "minLength": 2,
+         "maxLength": 2,
+         "description": "The 2-character ISO 3166-1 code that identifies the country or region. Note: The country code for Great Britain is `GB` and not `UK` as used in the top-level domain names for that country."
+        }
+       },
+       "additionalProperties": false,
+       "description": "The shipping address for the order."
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "description": "The shipping address for the order.",
+     "default": null
+    },
+    "notes": {
+     "anyOf": [
+      {
+       "anyOf": [
+        {
+         "not": {}
+        },
+        {
+         "type": "string"
+        }
+       ]
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    },
+    "returnUrl": {
+     "type": "string",
+     "default": "https://example.com/returnUrl"
+    },
+    "cancelUrl": {
+     "type": "string",
+     "default": "https://example.com/cancelUrl"
+    }
+   },
+   "required": [
+    "currencyCode",
+    "items"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "domain": "pay",
+  "kind": "action",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "create_refund",
+  "description": "Initiate a refund for a PayPal payment capture. If you have an order ID instead of a capture ID, first use the get order tool to obtain the capture ID from the order details. This function allows you ",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "capture_id": {
+     "type": "string",
+     "description": "The ID of the capture to refund."
+    },
+    "amount": {
+     "type": "object",
+     "properties": {
+      "currency_code": {
+       "type": "string"
+      },
+      "value": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "currency_code",
+      "value"
+     ],
+     "additionalProperties": false,
+     "description": "The amount to refund. If not specified, the full captured amount is refunded."
+    },
+    "invoice_id": {
+     "type": "string",
+     "description": "The invoice ID that is used to track this payment."
+    },
+    "note_to_payer": {
+     "type": "string",
+     "description": "A note to the payer."
+    }
+   },
+   "required": [
+    "capture_id"
+   ],
+   "additionalProperties": false,
+   "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "domain": "pay",
+  "kind": "action",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "tavily-search",
+  "description": "A powerful web search tool that provides comprehensive, real-time results using Tavily's AI search engine. Returns relevant web content with customizable parameters for result count, content type, and",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "query": {
+     "type": "string",
+     "description": "Search query"
+    },
+    "search_depth": {
+     "type": "string",
+     "enum": [
+      "basic",
+      "advanced"
+     ],
+     "description": "The depth of the search. It can be 'basic' or 'advanced'",
+     "default": "basic"
+    },
+    "topic": {
+     "type": "string",
+     "enum": [
+      "general",
+      "news"
+     ],
+     "description": "The category of the search. This will determine which of our agents will be used for the search",
+     "default": "general"
+    },
+    "days": {
+     "type": "number",
+     "description": "The number of days back from the current date to include in the search results. This specifies the time frame of data to be retrieved. Please note that this feature is only available when using the 'news' search topic",
+     "default": 3
+    },
+    "time_range": {
+     "type": "string",
+     "description": "The time range back from the current date to include in the search results. This feature is available for both 'general' and 'news' search topics",
+     "enum": [
+      "day",
+      "week",
+      "month",
+      "year",
+      "d",
+      "w",
+      "m",
+      "y"
+     ]
+    },
+    "max_results": {
+     "type": "number",
+     "description": "The maximum number of search results to return",
+     "default": 10,
+     "minimum": 5,
+     "maximum": 20
+    },
+    "include_images": {
+     "type": "boolean",
+     "description": "Include a list of query-related images in the response",
+     "default": false
+    },
+    "include_image_descriptions": {
+     "type": "boolean",
+     "description": "Include a list of query-related images and their descriptions in the response",
+     "default": false
+    },
+    "include_raw_content": {
+     "type": "boolean",
+     "description": "Include the cleaned and parsed HTML content of each search result",
+     "default": false
+    },
+    "include_domains": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "A list of domains to specifically include in the search results, if the user asks to search on specific sites set this to the domain of the site",
+     "default": []
+    },
+    "exclude_domains": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "List of domains to specifically exclude, if the user asks to exclude a domain set this to the domain of the site",
+     "default": []
+    },
+    "country": {
+     "type": "string",
+     "enum": [
+      "afghanistan",
+      "albania",
+      "algeria",
+      "andorra",
+      "angola",
+      "argentina",
+      "armenia",
+      "australia",
+      "austria",
+      "azerbaijan",
+      "bahamas",
+      "bahrain",
+      "bangladesh",
+      "barbados",
+      "belarus",
+      "belgium",
+      "belize",
+      "benin",
+      "bhutan",
+      "bolivia",
+      "bosnia and herzegovina",
+      "botswana",
+      "brazil",
+      "brunei",
+      "bulgaria",
+      "burkina faso",
+      "burundi",
+      "cambodia",
+      "cameroon",
+      "canada",
+      "cape verde",
+      "central african republic",
+      "chad",
+      "chile",
+      "china",
+      "colombia",
+      "comoros",
+      "congo",
+      "costa rica",
+      "croatia",
+      "cuba",
+      "cyprus",
+      "czech republic",
+      "denmark",
+      "djibouti",
+      "dominican republic",
+      "ecuador",
+      "egypt",
+      "el salvador",
+      "equatorial guinea",
+      "eritrea",
+      "estonia",
+      "ethiopia",
+      "fiji",
+      "finland",
+      "france",
+      "gabon",
+      "gambia",
+      "georgia",
+      "germany",
+      "ghana",
+      "greece",
+      "guatemala",
+      "guinea",
+      "haiti",
+      "honduras",
+      "hungary",
+      "iceland",
+      "india",
+      "indonesia",
+      "iran",
+      "iraq",
+      "ireland",
+      "israel",
+      "italy",
+      "jamaica",
+      "japan",
+      "jordan",
+      "kazakhstan",
+      "kenya",
+      "kuwait",
+      "kyrgyzstan",
+      "latvia",
+      "lebanon",
+      "lesotho",
+      "liberia",
+      "libya",
+      "liechtenstein",
+      "lithuania",
+      "luxembourg",
+      "madagascar",
+      "malawi",
+      "malaysia",
+      "maldives",
+      "mali",
+      "malta",
+      "mauritania",
+      "mauritius",
+      "mexico",
+      "moldova",
+      "monaco",
+      "mongolia",
+      "montenegro",
+      "morocco",
+      "mozambique",
+      "myanmar",
+      "namibia",
+      "nepal",
+      "netherlands",
+      "new zealand",
+      "nicaragua",
+      "niger",
+      "nigeria",
+      "north korea",
+      "north macedonia",
+      "norway",
+      "oman",
+      "pakistan",
+      "panama",
+      "papua new guinea",
+      "paraguay",
+      "peru",
+      "philippines",
+      "poland",
+      "portugal",
+      "qatar",
+      "romania",
+      "russia",
+      "rwanda",
+      "saudi arabia",
+      "senegal",
+      "serbia",
+      "singapore",
+      "slovakia",
+      "slovenia",
+      "somalia",
+      "south africa",
+      "south korea",
+      "south sudan",
+      "spain",
+      "sri lanka",
+      "sudan",
+      "sweden",
+      "switzerland",
+      "syria",
+      "taiwan",
+      "tajikistan",
+      "tanzania",
+      "thailand",
+      "togo",
+      "trinidad and tobago",
+      "tunisia",
+      "turkey",
+      "turkmenistan",
+      "uganda",
+      "ukraine",
+      "united arab emirates",
+      "united kingdom",
+      "united states",
+      "uruguay",
+      "uzbekistan",
+      "venezuela",
+      "vietnam",
+      "yemen",
+      "zambia",
+      "zimbabwe"
+     ],
+     "description": "Boost search results from a specific country. This will prioritize content from the selected country in the search results. Available only if topic is general.",
+     "default": ""
+    }
+   },
+   "required": [
+    "query"
+   ]
+  },
+  "domain": "search",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "tavily-extract",
+  "description": "A powerful web content extraction tool that retrieves and processes raw content from specified URLs, ideal for data collection, content analysis, and research tasks.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "urls": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "List of URLs to extract content from"
+    },
+    "extract_depth": {
+     "type": "string",
+     "enum": [
+      "basic",
+      "advanced"
+     ],
+     "description": "Depth of extraction - 'basic' or 'advanced', if usrls are linkedin use 'advanced' or if explicitly told to use advanced",
+     "default": "basic"
+    },
+    "include_images": {
+     "type": "boolean",
+     "description": "Include a list of images extracted from the urls in the response",
+     "default": false
+    },
+    "format": {
+     "type": "string",
+     "enum": [
+      "markdown",
+      "text"
+     ],
+     "description": "The format of the extracted web page content. markdown returns content in markdown format. text returns plain text and may increase latency.",
+     "default": "markdown"
+    }
+   },
+   "required": [
+    "urls"
+   ]
+  },
+  "domain": "search",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "tavily-crawl",
+  "description": "A powerful web crawler that initiates a structured web crawl starting from a specified base URL. The crawler expands from that point like a tree, following internal links across pages. You can control",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "url": {
+     "type": "string",
+     "description": "The root URL to begin the crawl"
+    },
+    "max_depth": {
+     "type": "integer",
+     "description": "Max depth of the crawl. Defines how far from the base URL the crawler can explore.",
+     "default": 1,
+     "minimum": 1
+    },
+    "max_breadth": {
+     "type": "integer",
+     "description": "Max number of links to follow per level of the tree (i.e., per page)",
+     "default": 20,
+     "minimum": 1
+    },
+    "limit": {
+     "type": "integer",
+     "description": "Total number of links the crawler will process before stopping",
+     "default": 50,
+     "minimum": 1
+    },
+    "instructions": {
+     "type": "string",
+     "description": "Natural language instructions for the crawler"
+    },
+    "select_paths": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "Regex patterns to select only URLs with specific path patterns (e.g., /docs/.*, /api/v1.*)",
+     "default": []
+    },
+    "select_domains": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "Regex patterns to select crawling to specific domains or subdomains (e.g., ^docs\\.example\\.com$)",
+     "default": []
+    },
+    "allow_external": {
+     "type": "boolean",
+     "description": "Whether to allow following links that go to external domains",
+     "default": false
+    },
+    "categories": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "enum": [
+       "Careers",
+       "Blog",
+       "Documentation",
+       "About",
+       "Pricing",
+       "Community",
+       "Developers",
+       "Contact",
+       "Media"
+      ]
+     },
+     "description": "Filter URLs using predefined categories like documentation, blog, api, etc",
+     "default": []
+    },
+    "extract_depth": {
+     "type": "string",
+     "enum": [
+      "basic",
+      "advanced"
+     ],
+     "description": "Advanced extraction retrieves more data, including tables and embedded content, with higher success but may increase latency",
+     "default": "basic"
+    },
+    "format": {
+     "type": "string",
+     "enum": [
+      "markdown",
+      "text"
+     ],
+     "description": "The format of the extracted web page content. markdown returns content in markdown format. text returns plain text and may increase latency.",
+     "default": "markdown"
+    }
+   },
+   "required": [
+    "url"
+   ]
+  },
+  "domain": "search",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "tavily-map",
+  "description": "A powerful web mapping tool that creates a structured map of website URLs, allowing you to discover and analyze site structure, content organization, and navigation paths. Perfect for site audits, con",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "url": {
+     "type": "string",
+     "description": "The root URL to begin the mapping"
+    },
+    "max_depth": {
+     "type": "integer",
+     "description": "Max depth of the mapping. Defines how far from the base URL the crawler can explore",
+     "default": 1,
+     "minimum": 1
+    },
+    "max_breadth": {
+     "type": "integer",
+     "description": "Max number of links to follow per level of the tree (i.e., per page)",
+     "default": 20,
+     "minimum": 1
+    },
+    "limit": {
+     "type": "integer",
+     "description": "Total number of links the crawler will process before stopping",
+     "default": 50,
+     "minimum": 1
+    },
+    "instructions": {
+     "type": "string",
+     "description": "Natural language instructions for the crawler"
+    },
+    "select_paths": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "Regex patterns to select only URLs with specific path patterns (e.g., /docs/.*, /api/v1.*)",
+     "default": []
+    },
+    "select_domains": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "Regex patterns to select crawling to specific domains or subdomains (e.g., ^docs\\.example\\.com$)",
+     "default": []
+    },
+    "allow_external": {
+     "type": "boolean",
+     "description": "Whether to allow following links that go to external domains",
+     "default": false
+    },
+    "categories": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "enum": [
+       "Careers",
+       "Blog",
+       "Documentation",
+       "About",
+       "Pricing",
+       "Community",
+       "Developers",
+       "Contact",
+       "Media"
+      ]
+     },
+     "description": "Filter URLs using predefined categories like documentation, blog, api, etc",
+     "default": []
+    }
+   },
+   "required": [
+    "url"
+   ]
+  },
+  "domain": "search",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "search",
+  "description": "Perform a web search query",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "query": {
+     "type": "string",
+     "description": "Search query"
+    },
+    "num": {
+     "type": "number",
+     "description": "Number of results (1-10)",
+     "minimum": 1,
+     "maximum": 10
+    }
+   },
+   "required": [
+    "query",
+    "num"
+   ]
+  },
+  "domain": "search",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ }
+]

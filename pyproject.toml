@@ -12,10 +12,15 @@ license = {text = "MIT"}
 dependencies = [
   "torch>=2.2", "numpy", "soundfile", "librosa", "requests", "sentencepiece", "huggingface_hub", "aiohttp",
   "safetensors", "einops", "sphn",
+  "mcp", "beautifulsoup4",
 ]
+
+[project.optional-dependencies]
+browser = ["playwright"]          # the 32 browser tools of the bank; run `playwright install chromium`
+asr-server = ["qwen-asr"]         # python -m contextspan.duetaspan.runtime.asr_server (Qwen3-ASR)
 
 [tool.setuptools.packages.find]
 include = ["contextspan*"]
 
 [tool.setuptools.package-data]
-contextspan = ["web/*", "moshi/LICENSE.*"]
+contextspan = ["web/*", "moshi/LICENSE.*", "datasets/moshicp/mcp_tool_bank.json", "datasets/moshicp/*.sqlite"]

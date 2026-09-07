@@ -37,20 +37,26 @@ repo (`context_spanning_7b.pt`, `voices/*.pt`) instead of downloading them.
 
 ## Backends
 
-Two OpenAI-compatible HTTP servers; any implementation works (vLLM shown).
+The backend is the DuetaSpan runtime, vendored unchanged in `contextspan/duetaspan/` (router,
+125-tool bank with its SQLite world, MCP tool servers, LLM-RAG fallback, Context DB, ASR client).
+On `<ret>` the router LLM picks ONE tool from the bank (or answers a knowledge question directly);
+the tool runs for real (time, weather, prices, web search, maps, browser, SGD-seeded bookings) and
+its result is the span. Three servers are needed; any OpenAI-compatible LLM server works (vLLM shown).
 
 ```bash
-# router LLM
-vllm serve google/gemma-3-27b-it --port 8000
-export CS_LLM_URL=http://localhost:8000/v1/chat/completions CS_LLM_MODEL=google/gemma-3-27b-it
-# ASR for the user question
-qwen-asr-serve Qwen/Qwen3-ASR-1.7B --port 8901 --served-model-name qwen3-asr
-export CS_ASR_URL=http://localhost:8901/v1/audio/transcriptions CS_ASR_MODEL=qwen3-asr
+# router + RAG LLM (one server serves both)
+vllm serve google/gemma-3-27b-it --port 8004
+export MCP_ROUTER_LLM_API=openai MCP_ROUTER_LLM_URL=http://localhost:8004 MCP_ROUTER_LLM_MODEL=google/gemma-3-27b-it
+export MOSHICP_RAG_LLM_URL=http://localhost:8004/v1/chat/completions MOSHICP_RAG_LLM_MODEL=google/gemma-3-27b-it
+# ASR (Qwen3-ASR; POST /transcribe with a wav -> {"text": ...})
+pip install -e '.[asr-server]' && python -m contextspan.duetaspan.runtime.asr_server   # :8990
+export MOSHICP_ASR_URL=http://localhost:8990/transcribe
 ```
 
-A hosted API works the same way (`CS_LLM_URL=https://api.openai.com/v1/chat/completions`,
-`CS_LLM_MODEL`, `CS_LLM_API_KEY`). `retrieve(question, context) -> str` in `contextspan/backend.py`
-is the only contract: replace `LLMReferenceBackend` to change where the knowledge comes from.
+A hosted API works the same way (`MCP_ROUTER_LLM_URL=https://api.openai.com`, `MCP_ROUTER_LLM_KEY`,
+`MOSHICP_RAG_LLM_KEY`). The 32 browser tools need `pip install -e '.[browser]' && playwright install
+chromium`; without them the bank reports 93 tools. Tool results and the SQLite world live under
+`contextspan/datasets/` (override with `DUETASPAN_DATA`).
 
 ## Inference
 
@@ -69,8 +75,8 @@ python main.py serve --voice f0 --host 0.0.0.0 --port 8080 --token <value>
 ```
 
 Browsers open the microphone only over https or on localhost. The page shows the agent's text and
-each injected span as it lands; name, location and timezone go to the router as user context, the
-**Knowledge** field goes to it as the Context DB. Stop offers the conversation as a stereo wav and a
+each injected span as it lands; name, location and timezone are the Context DB profile, the **Knowledge** field its notes;
+the router sees the profile, the user's turns and every tool result (call and value). Stop offers the conversation as a stereo wav and a
 JSON transcript (`ret` / `question` / `span` / `text` events with timing; `question` is what the ASR heard, so a wrong span can be traced to the ASR or to the backend). "Clone my voice" records 12 s and speaks with that voice.
 
 ## Training

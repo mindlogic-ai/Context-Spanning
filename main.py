@@ -5,8 +5,10 @@
   python main.py prepare --in-dir data/raw --out-dir data/prepared
   python main.py train   --data-dir data/prepared --out-dir runs/ft [--checkpoint ckpt.pt]
 
-Backends (OpenAI-compatible servers) are set with CS_LLM_URL / CS_LLM_MODEL and
-CS_ASR_URL / CS_ASR_MODEL.
+Backends are the DuetaSpan runtime's (contextspan/duetaspan): the tool router + 125-tool bank
+(MCP_ROUTER_LLM_URL / MCP_ROUTER_LLM_MODEL / MCP_ROUTER_LLM_API=openai), the RAG LLM
+(MOSHICP_RAG_LLM_URL / MOSHICP_RAG_LLM_MODEL) and the ASR endpoint (MOSHICP_ASR_URL, the
+`python -m contextspan.duetaspan.runtime.asr_server` protocol). See README.
 """
 import argparse
 import json
@@ -33,8 +35,34 @@ def transcript(spm, toks):
     return " ".join(out)
 
 
+def _backend_and_asr():
+    """The DuetaSpan runtime backend (MCP router over the tool bank, then LLM-RAG) and its ASR client,
+    prewarmed the way the DuetaSpan offline chat does: the first `<ret>` otherwise pays the MCP session
+    set-up, the tool discovery and the router's first call (measured 3.5 s -> 0.2-0.5 s warm)."""
+    import time
+    from contextspan.duetaspan.align.asr import ASR
+    from contextspan.duetaspan.runtime.backend.realtime import RealtimeBackend
+    backend = RealtimeBackend(cache=False)
+    t0 = time.time()
+    for q in ("hello", "what time is it now?", "how is the weather today?"):
+        try:
+            backend.retrieve(q, ctx={}, aux_context="", history=[])
+        except Exception as e:                                   # a cold backend is not fatal
+            print(f"[warm] {type(e).__name__}: {e}", flush=True)
+    print(f"[warm] backend {time.time() - t0:.1f}s", flush=True)
+    asr = ASR()
+    try:
+        asr.transcribe(np.zeros(12000, dtype=np.float32), 24000)
+    except Exception:
+        pass
+    return backend, asr
+
+
+def _ctx(a):
+    return {k: v for k, v in {"name": a.user_name, "city": a.user_city, "timezone": a.user_tz}.items() if v}
+
+
 def infer(a):
-    from contextspan.backend import ASR, LLMReferenceBackend
     from contextspan.model import Engine, load_voice
     from contextspan.stream import run_stream
     eng = Engine(a.checkpoint, temp=a.temp, temp_text=a.temp_text, cpu_offload=a.cpu_offload)
@@ -48,7 +76,8 @@ def infer(a):
         pcm = librosa.resample(pcm, orig_sr=sr, target_sr=want)
     pcm = np.concatenate([np.zeros(int(a.lead_silence * want), np.float32), pcm,
                           np.zeros(int(a.tail_silence * want), np.float32)])
-    res = run_stream(eng, LLMReferenceBackend(), ASR(), pcm, listen_s=a.listen_s)
+    backend, asr = _backend_and_asr()
+    res = run_stream(eng, backend, asr, pcm, ctx=_ctx(a), asr_window_s=a.listen_s)
     n = min(len(pcm), len(res["agent"]))
     sf.write(a.output_wav, np.stack([pcm[:n], res["agent"][:n]], 1), want)      # L=user, R=agent
     text = transcript(eng.spm, res["tokens"])
@@ -58,11 +87,11 @@ def infer(a):
 
 
 def serve_cmd(a):
-    from contextspan.backend import ASR, LLMReferenceBackend
     from contextspan.model import Engine, load_voice
     from contextspan.serve import serve
     eng = Engine(a.checkpoint, temp=a.temp, temp_text=a.temp_text)
-    serve(eng, LLMReferenceBackend(), ASR(), a.text_prompt, load_voice(a.voice),
+    backend, asr = _backend_and_asr()
+    serve(eng, backend, asr, a.text_prompt, load_voice(a.voice),
           host=a.host, port=a.port, token=a.token, listen_s=a.listen_s)
 
 
@@ -80,6 +109,9 @@ def main(argv=None):
     p.add_argument("--lead-silence", type=float, default=4.0)
     p.add_argument("--tail-silence", type=float, default=8.0)
     p.add_argument("--listen-s", type=float, default=12.0, help="seconds of user audio transcribed on <ret>")
+    p.add_argument("--user-name", default="", help="user profile for the Context DB")
+    p.add_argument("--user-city", default="")
+    p.add_argument("--user-tz", default="", help="IANA timezone, e.g. Asia/Seoul")
     p.add_argument("--temp", type=float, default=0.8)
     p.add_argument("--temp-text", type=float, default=0.7)
     p.add_argument("--cpu-offload", action="store_true")
