@@ -1,6 +1,7 @@
 """Context Spanning — single entry point.
 
-  python main.py infer   --input-wav q.wav --output-wav out.wav [--voice voices/f0.pt]
+  python main.py infer   --input-wav q.wav --output-wav out.wav [--voice f0]
+  python main.py serve   [--voice f0] [--host 0.0.0.0 --port 8080 --token ...]
   python main.py prepare --in-dir data/raw --out-dir data/prepared
   python main.py train   --data-dir data/prepared --out-dir runs/ft [--checkpoint ckpt.pt]
 
@@ -37,7 +38,7 @@ def infer(a):
     from contextspan.model import Engine, load_voice
     from contextspan.stream import run_stream
     eng = Engine(a.checkpoint, temp=a.temp, temp_text=a.temp_text, cpu_offload=a.cpu_offload)
-    eng.set_persona(a.text_prompt, load_voice(a.voice) if a.voice else None)
+    eng.set_persona(a.text_prompt, load_voice(a.voice))
     pcm, sr = sf.read(a.input_wav, dtype="float32")
     if pcm.ndim == 2:
         pcm = pcm[:, 0]
@@ -47,13 +48,22 @@ def infer(a):
         pcm = librosa.resample(pcm, orig_sr=sr, target_sr=want)
     pcm = np.concatenate([np.zeros(int(a.lead_silence * want), np.float32), pcm,
                           np.zeros(int(a.tail_silence * want), np.float32)])
-    res = run_stream(eng, LLMReferenceBackend(), ASR(), pcm, debounce_s=a.debounce, reroute_s=a.reroute)
+    res = run_stream(eng, LLMReferenceBackend(), ASR(), pcm, listen_s=a.listen_s)
     n = min(len(pcm), len(res["agent"]))
     sf.write(a.output_wav, np.stack([pcm[:n], res["agent"][:n]], 1), want)      # L=user, R=agent
     text = transcript(eng.spm, res["tokens"])
     print(text)
     if a.output_text:
         json.dump({"transcript": text, "events": res["events"]}, open(a.output_text, "w"), indent=1)
+
+
+def serve_cmd(a):
+    from contextspan.backend import ASR, LLMReferenceBackend
+    from contextspan.model import Engine, load_voice
+    from contextspan.serve import serve
+    eng = Engine(a.checkpoint, temp=a.temp, temp_text=a.temp_text)
+    serve(eng, LLMReferenceBackend(), ASR(), a.text_prompt, load_voice(a.voice),
+          host=a.host, port=a.port, token=a.token, listen_s=a.listen_s)
 
 
 def main(argv=None):
@@ -65,16 +75,27 @@ def main(argv=None):
     p.add_argument("--output-wav", default="output.wav")
     p.add_argument("--output-text", default=None)
     p.add_argument("--checkpoint", default=None, help="local .pt; default downloads the released weights")
-    p.add_argument("--voice", default=None, help="voice prompt .pt (agent-voice Mimi codes)")
+    p.add_argument("--voice", default="f0", help="voice: f0 / f1 / f2 from the weights repo, or a local .pt of agent-voice Mimi codes")
     p.add_argument("--text-prompt", default="You are a helpful and friendly voice assistant.")
     p.add_argument("--lead-silence", type=float, default=4.0)
     p.add_argument("--tail-silence", type=float, default=8.0)
-    p.add_argument("--debounce", type=float, default=0.5)
-    p.add_argument("--reroute", type=float, default=1.5)
+    p.add_argument("--listen-s", type=float, default=12.0, help="seconds of user audio transcribed on <ret>")
     p.add_argument("--temp", type=float, default=0.8)
     p.add_argument("--temp-text", type=float, default=0.7)
     p.add_argument("--cpu-offload", action="store_true")
     p.set_defaults(fn=infer)
+
+    p = sub.add_parser("serve", help="live conversation in the browser")
+    p.add_argument("--checkpoint", default=None)
+    p.add_argument("--voice", default="f0")
+    p.add_argument("--text-prompt", default="You are a helpful and friendly voice assistant.")
+    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8080)
+    p.add_argument("--token", default="", help="if set, /ws requires ?token=<this>")
+    p.add_argument("--listen-s", type=float, default=12.0)
+    p.add_argument("--temp", type=float, default=0.8)
+    p.add_argument("--temp-text", type=float, default=0.7)
+    p.set_defaults(fn=serve_cmd)
 
     p = sub.add_parser("prepare", help="encode dialogues (json + stereo wav) into training tensors")
     p.add_argument("--in-dir", required=True)

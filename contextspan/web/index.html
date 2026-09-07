@@ -1,0 +1,410 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Context Spanning</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #f6f4ef; --panel: #fffefb; --fg: #12120f; --dim: #6a675f; --line: #e0dcd2;
+  --mint: #1f9d6b; --mint-soft: #1f9d6b14; --blue: #2f5fd0; --coral: #e0563f;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f0f0e; --panel: #171716; --fg: #eeece6; --dim: #9b978e; --line: #2a2a27;
+    --mint: #5fd3a0; --mint-soft: #5fd3a01c; --blue: #7ba2f0; --coral: #f08a72;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg); min-height: 100vh;
+  font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  display: flex; flex-direction: column; align-items: center; padding: 56px 22px 90px;
+}
+.shapes { width: min(880px, 100%); display: flex; gap: 7px; margin-bottom: 22px; }
+.shapes i { width: 13px; height: 13px; display: block; }
+.shapes i:nth-child(1) { background: var(--mint); }
+.shapes i:nth-child(2) { background: var(--blue); border-radius: 50%; }
+.shapes i:nth-child(3) { background: var(--coral); }
+header { width: min(880px, 100%); display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+h1 { font-size: 30px; font-weight: 640; margin: 0; letter-spacing: -0.01em; }
+.tag { font-size: 12px; color: var(--dim); }
+p.lede { width: min(880px, 100%); color: var(--dim); margin: 6px 0 22px; font-size: 14px; }
+
+.bar {
+  width: min(880px, 100%); display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--panel); border: 1px solid var(--line); padding: 14px 16px;
+}
+button {
+  font: inherit; font-weight: 550; padding: 9px 18px; border-radius: 0; cursor: pointer;
+  border: 1px solid var(--line); background: transparent; color: var(--fg);
+  transition: background .15s, border-color .15s, opacity .15s;
+}
+button:hover:not([disabled]) { border-color: var(--fg); }
+button.primary { background: var(--mint); border-color: var(--mint); color: #fff; }
+button.primary:hover:not([disabled]) { filter: brightness(1.08); }
+button[disabled] { opacity: .4; cursor: default; }
+.status { margin-left: auto; display: flex; align-items: center; gap: 8px; color: var(--dim); font-size: 13.5px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); }
+.dot.live { background: var(--mint); animation: pulse 1.6s ease-in-out infinite; }
+.dot.busy { background: var(--coral); animation: pulse .9s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+
+.meters { width: min(880px, 100%); display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+.card {
+  background: var(--panel); border: 1px solid var(--line); padding: 14px 16px;
+}
+.card h2 {
+  font-size: 11.5px; font-weight: 600; margin: 0 0 9px; color: var(--dim);
+  text-transform: uppercase; letter-spacing: .1em;
+}
+canvas { width: 100%; height: 46px; display: block; }
+
+.grid { width: min(880px, 100%); display: grid; grid-template-columns: 1.55fr 1fr; gap: 12px; margin-top: 12px; }
+@media (max-width: 780px) { .grid, .meters { grid-template-columns: 1fr; } }
+#said { min-height: 200px; max-height: 340px; overflow-y: auto; white-space: pre-wrap;
+        overflow-wrap: anywhere; font-size: 15.5px; }
+.cursor { display: inline-block; width: 7px; height: 1.05em; vertical-align: -2px;
+          background: var(--mint); animation: pulse 1.1s steps(2) infinite; }
+#spans { min-height: 200px; max-height: 340px; overflow-y: auto; display: flex;
+         flex-direction: column; gap: 10px; }
+.span {
+  border-left: 3px solid var(--mint); background: var(--mint-soft);
+  border-radius: 0; padding: 9px 11px; font-size: 13px; animation: slide .3s ease;
+}
+.span .meta { color: var(--dim); font-size: 11.5px; margin-bottom: 3px;
+              display: flex; justify-content: space-between; gap: 10px; }
+@keyframes slide { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.empty { color: var(--dim); font-size: 13px; }
+.notice {
+  width: min(880px, 100%); margin-top: 12px; border-left: 3px solid var(--coral);
+  background: var(--panel); border-radius: 0; padding: 10px 13px;
+  color: var(--dim); font-size: 13px; display: none;
+}
+.notice.show { display: block; }
+.who {
+  width: min(880px, 100%); margin-top: 12px; background: var(--panel); border: 1px solid var(--line);
+  padding: 12px 16px; display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;
+}
+.who label { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: var(--dim);
+             text-transform: uppercase; letter-spacing: .1em; font-weight: 600; }
+.who input {
+  font: inherit; font-size: 14px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 0;
+  background: transparent; color: var(--fg); text-transform: none; letter-spacing: 0; font-weight: 400;
+}
+.who input:focus { outline: none; border-color: var(--fg); }
+.who .persona { grid-column: 1 / -1; }
+.who .hint { grid-column: 1 / -1; color: var(--dim); font-size: 12px; margin: -2px 0 0; }
+@media (max-width: 780px) { .who { grid-template-columns: 1fr; } }
+</style>
+
+<div class="shapes"><i></i><i></i><i></i></div>
+<header>
+  <h1>Context Spanning</h1>
+  <span class="tag">full-duplex speech &middot; knowledge injected mid-stream</span>
+</header>
+<p class="lede">Speak normally. When the model needs a fact it retrieves one without stopping, and the
+reference lands in the stream it is already speaking.</p>
+
+<div class="bar">
+  <button id="go" class="primary">Start talking</button>
+  <button id="clone">Clone my voice</button>
+  <span class="status"><span class="dot" id="dot"></span><span id="state">idle</span></span>
+</div>
+
+<div class="notice" id="notice"></div>
+<div class="bar" id="rec" hidden>
+  <a id="recwav" download>Download recording (wav: left = you, right = agent)</a>
+  <a id="recjson" download>Download transcript (json: spans, text, timing)</a>
+</div>
+
+<div class="who">
+  <label>Your name <input id="name" placeholder="optional" autocomplete="off"></label>
+  <label>Where you are <input id="loc" placeholder="city, or use the button" autocomplete="off"></label>
+  <button id="geo" type="button" title="Asks the browser once; nothing is sent anywhere but this server">Use my location</button>
+  <label class="persona">Agent persona <input id="persona" placeholder="who the agent is"></label>
+  <label class="persona">Knowledge (optional) <input id="db" placeholder="a passage the agent may draw on; it goes to the retrieval router, not the model" autocomplete="off"></label>
+  <p class="hint">Name, location and timezone go to the retrieval router as user context; Knowledge goes to it as
+  the Context DB. The persona is read when a conversation starts.</p>
+</div>
+
+<div class="meters">
+  <div class="card"><h2>You</h2><canvas id="wu" height="46"></canvas></div>
+  <div class="card"><h2>Agent</h2><canvas id="wa" height="46"></canvas></div>
+</div>
+
+<div class="grid">
+  <div class="card"><h2>What the agent is saying</h2>
+    <div id="said"><span class="empty">nothing yet</span></div></div>
+  <div class="card"><h2>Retrieved spans</h2>
+    <div id="spans"><span class="empty">none injected</span></div></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let ws, ctx, node, stream, playAt = 0, running = false;
+let geo = null;                          // {lat, lon} once the user allowed it
+let rec = null;                          // {user: [Float32Array], agent: [...], events: [], sr}
+const now = () => (rec ? (performance.now() - rec.t0) / 1000 : 0);
+function recEvent(kind, extra) { if (rec) rec.events.push(Object.assign({ t: +now().toFixed(3), type: kind }, extra || {})); }
+
+// Who is talking. Remembered in this browser only; sent to this server only.
+const FIELDS = ["name", "loc", "persona", "db"];
+const stored = (f) => { try { return localStorage.getItem("cs." + f); } catch (e) { return null; } };
+for (const f of FIELDS) { const v = stored(f); if (v !== null) $(f).value = v; }
+let serverPersona = "";                  // the default this server starts from, sent with `ready`
+function context() {
+  let tz = "";
+  try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) {}
+  return { type: "context", name: $("name").value.trim(), location: $("loc").value.trim(),
+           lat: geo ? geo.lat : null, lon: geo ? geo.lon : null, tz, persona: $("persona").value.trim(),
+           db: $("db").value.trim() };
+}
+function sendContext() {
+  for (const f of FIELDS) {
+    // A persona equal to the server's default is not remembered, so a later release changing that
+    // default reaches everyone. Only an edit — including emptying the field — is a stored choice.
+    const keep = f !== "persona" || $(f).value !== serverPersona;
+    try { keep ? localStorage.setItem("cs." + f, $(f).value) : localStorage.removeItem("cs." + f); }
+    catch (e) {}
+  }
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(context()));
+}
+for (const f of FIELDS) $(f).addEventListener("change", sendContext);
+$("geo").onclick = () => {
+  if (!navigator.geolocation) { notice("This browser has no geolocation."); return; }
+  $("geo").disabled = true; $("geo").textContent = "Locating";
+  navigator.geolocation.getCurrentPosition((p) => {
+    geo = { lat: p.coords.latitude, lon: p.coords.longitude };
+    $("geo").textContent = `${geo.lat.toFixed(2)}, ${geo.lon.toFixed(2)}`; $("geo").disabled = false;
+    sendContext();
+  }, (err) => {
+    // Refused or unavailable: fine, the typed location (if any) still counts.
+    geo = null; $("geo").textContent = "Use my location"; $("geo").disabled = false;
+    notice("Location not shared (" + err.message + "). Type a place instead, or leave it empty.");
+  }, { enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 });
+};
+let cloning = false, clip = [];
+const lvl = { u: new Array(110).fill(0), a: new Array(110).fill(0) };
+
+function status(text, kind) {
+  $("state").textContent = text;
+  $("dot").className = "dot" + (kind ? " " + kind : "");
+}
+function notice(text) {
+  $("notice").textContent = text || "";
+  $("notice").classList.toggle("show", !!text);
+}
+function rms(f) { let s = 0; for (let i = 0; i < f.length; i++) s += f[i] * f[i]; return Math.sqrt(s / f.length); }
+function push(which, v) { lvl[which].push(v); lvl[which].shift(); }
+
+// Both meters are drawn on the animation frame rather than per audio frame, so a slow tab loses
+// pixels instead of losing audio.
+function draw(id, arr, color) {
+  const c = $(id), w = c.clientWidth, h = 46, dpr = devicePixelRatio || 1;
+  if (!w) return;
+  if (c.width !== Math.round(w * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+  const g = c.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  const bw = w / arr.length;
+  g.fillStyle = color;
+  for (let i = 0; i < arr.length; i++) {
+    const v = Math.min(1, arr[i] * 7), bh = Math.max(2, v * (h - 8));
+    g.globalAlpha = 0.22 + 0.78 * v;
+    g.fillRect(i * bw, (h - bh) / 2, Math.max(1, bw - 1.5), bh);
+  }
+  g.globalAlpha = 1;
+}
+(function tick() {
+  const cs = getComputedStyle(document.documentElement);
+  draw("wu", lvl.u, cs.getPropertyValue("--blue").trim());
+  draw("wa", lvl.a, cs.getPropertyValue("--mint").trim());
+  requestAnimationFrame(tick);
+})();
+
+async function start() {
+  if (!window.isSecureContext) {
+    notice("Browsers allow microphone access only over https or on localhost. Reach this page that way and reload.");
+    return;
+  }
+  notice("");
+  $("go").disabled = true; status("connecting", "busy");
+  const scheme = location.protocol === "https:" ? "wss" : "ws";
+  // The page's own query string rides along, so `?token=...` reaches the server's --token check.
+  ws = new WebSocket(`${scheme}://${location.host}/ws${location.search}`);
+  ws.binaryType = "arraybuffer";
+
+  ws.onmessage = (ev) => {
+    if (typeof ev.data !== "string") {
+      const pcm = new Float32Array(ev.data);
+      if (rec) rec.agent.push(pcm);
+      push("a", rms(pcm));
+      play(pcm);
+      return;
+    }
+    const m = JSON.parse(ev.data);
+    // Context first, then the microphone: the persona has to land before the first frame. The
+    // server's default persona is shown rather than assumed, so emptying the field is a choice.
+    if (m.type === "ready") {
+      serverPersona = m.persona || "";
+      if (stored("persona") === null) $("persona").value = serverPersona;
+      sendContext(); openMic(m.sample_rate, m.frame_size);
+    }
+    else if (m.type === "busy") {
+      notice("Another conversation is already running on this server.");
+      status("busy", "busy"); $("go").disabled = false;
+    }
+    else if (m.type === "text") { recEvent("text", { delta: m.delta }); appendText(m.delta); }
+    else if (m.type === "ret") { recEvent("ret"); status("retrieving", "busy"); }
+    else if (m.type === "span") { recEvent("span", { text: m.text, frames: m.frames }); addSpan(m); }
+    else if (m.type === "error") { recEvent("error", { stage: m.stage, message: m.message }); notice(`${m.stage}: ${m.message}`); status("listening", "live"); }
+    else if (m.type === "cloned") {
+      cloning = false;
+      status(`voice cloned from ${m.seconds}s`, "live");
+      $("clone").textContent = "Clone my voice"; $("clone").disabled = false;
+    }
+  };
+  ws.onclose = (e) => stop(e.wasClean ? "idle" : "connection closed");
+  ws.onerror = () => notice("Could not reach the server. Check that it is running on this host and port.");
+}
+
+function appendText(delta) {
+  const el = $("said");
+  if (el.querySelector(".empty")) el.textContent = "";
+  const c = el.querySelector(".cursor");
+  if (c) c.remove();
+  el.append(document.createTextNode(delta));
+  const cur = document.createElement("span");
+  cur.className = "cursor";
+  el.append(cur);
+  el.scrollTop = el.scrollHeight;
+}
+
+function addSpan(m) {
+  const box = $("spans");
+  if (box.querySelector(".empty")) box.textContent = "";
+  const d = document.createElement("div");
+  d.className = "span";
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  const left = document.createElement("span"); left.textContent = "injected";
+  const right = document.createElement("span"); right.textContent = `${m.frames} frames · ${m.seconds}s`;
+  meta.append(left, right);
+  const t = document.createElement("div");
+  t.textContent = m.text;
+  d.append(meta, t);
+  box.prepend(d);
+  notice("");
+  status("listening", "live");
+}
+
+async function openMic(sampleRate, frameSize) {
+  try {
+    ctx = new AudioContext({ sampleRate });
+    const raw = new URLSearchParams(location.search).get("raw") === "1";
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: !raw, autoGainControl: false,
+               channelCount: 1 } });
+    if (raw) notice("Raw microphone: the browser's noise suppression is off.");
+    await ctx.audioWorklet.addModule("/static/mic.js");
+  } catch (e) {
+    notice("Microphone unavailable: " + (e && e.message ? e.message : e));
+    stop("idle");
+    return;
+  }
+  const src = ctx.createMediaStreamSource(stream);
+  node = new AudioWorkletNode(ctx, "mic-frames", { processorOptions: { frameSize } });
+  node.port.onmessage = (e) => {
+    if (!running) return;
+    const f = new Float32Array(e.data);
+    push("u", rms(f));
+    if (cloning) clip.push(f); else { if (rec) rec.user.push(f); ws.send(f.buffer); }
+  };
+  src.connect(node);
+  rec = { user: [], agent: [], events: [], sr: sampleRate, t0: performance.now(),
+          context: context() };
+  $("rec").hidden = true;
+  running = true; playAt = ctx.currentTime + 0.1;
+  status("listening", "live");
+  $("go").textContent = "Stop"; $("go").disabled = false;
+  $("go").onclick = () => stop("idle");
+}
+
+function play(pcm) {
+  if (!ctx || pcm.length === 0) return;
+  const buf = ctx.createBuffer(1, pcm.length, ctx.sampleRate);
+  buf.getChannelData(0).set(pcm);
+  const s = ctx.createBufferSource();
+  s.buffer = buf; s.connect(ctx.destination);
+  playAt = Math.max(playAt, ctx.currentTime + 0.02);   // keep the queue just ahead of the clock
+  s.start(playAt);
+  playAt += buf.duration;
+}
+
+function wav16(left, right, sr) {
+  // Two-channel 16-bit PCM. Left = what the microphone sent, right = what the agent said, on the
+  // same frame clock, so the timing of a span against the speech can be read off the waveform.
+  const n = Math.max(left.length, right.length), bytes = 44 + n * 4, b = new DataView(new ArrayBuffer(bytes));
+  const str = (o, t) => { for (let i = 0; i < t.length; i++) b.setUint8(o + i, t.charCodeAt(i)); };
+  str(0, "RIFF"); b.setUint32(4, bytes - 8, true); str(8, "WAVE"); str(12, "fmt "); b.setUint32(16, 16, true);
+  b.setUint16(20, 1, true); b.setUint16(22, 2, true); b.setUint32(24, sr, true); b.setUint32(28, sr * 4, true);
+  b.setUint16(32, 4, true); b.setUint16(34, 16, true); str(36, "data"); b.setUint32(40, n * 4, true);
+  const s16 = (x) => Math.max(-32768, Math.min(32767, Math.round((x || 0) * 32767)));
+  for (let i = 0, o = 44; i < n; i++, o += 4) { b.setInt16(o, s16(left[i]), true); b.setInt16(o + 2, s16(right[i]), true); }
+  return new Blob([b.buffer], { type: "audio/wav" });
+}
+function concat(chunks) {
+  const total = chunks.reduce((k, f) => k + f.length, 0), out = new Float32Array(total);
+  let o = 0; for (const f of chunks) { out.set(f, o); o += f.length; }
+  return out;
+}
+function offerRecording() {
+  if (!rec || (!rec.user.length && !rec.agent.length)) return;
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  const wav = wav16(concat(rec.user), concat(rec.agent), rec.sr);
+  const transcript = { recorded_at: new Date().toISOString(), sample_rate: rec.sr,
+                       seconds: +(Math.max(rec.user.length, rec.agent.length) * (rec.user[0] || rec.agent[0]).length / rec.sr).toFixed(2),
+                       context: rec.context, agent_text: $("said").textContent, events: rec.events };
+  const js = new Blob([JSON.stringify(transcript, null, 1)], { type: "application/json" });
+  for (const [id, blob, name] of [["recwav", wav, `contextspanning-${stamp}.wav`], ["recjson", js, `contextspanning-${stamp}.json`]]) {
+    const a = $(id); if (a.href) URL.revokeObjectURL(a.href);
+    a.href = URL.createObjectURL(blob); a.download = name;
+  }
+  $("rec").hidden = false;
+}
+
+function stop(msg) {
+  running = false;
+  try { offerRecording(); } catch (e) { console.warn("recording", e); }
+  if (stream) stream.getTracks().forEach((t) => t.stop());
+  if (node) node.disconnect();
+  if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+  lvl.u.fill(0); lvl.a.fill(0);
+  status(msg, null);
+  $("go").textContent = "Start talking"; $("go").disabled = false;
+  $("go").onclick = start;
+}
+
+$("clone").onclick = async () => {
+  if (!running) { notice("Press Start talking first — cloning records through the same microphone."); return; }
+  notice("");
+  cloning = true; clip = [];
+  $("clone").disabled = true;
+  for (let left = 12; left > 0; left--) {
+    $("clone").textContent = `Recording ${left}s`;
+    status("read a sentence or two out loud", "busy");
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  // The model conditions on timbre, not on the words, so any speech of this length works.
+  const total = clip.reduce((n, f) => n + f.length, 0);
+  const pcm = new Float32Array(total);
+  let o = 0; for (const f of clip) { pcm.set(f, o); o += f.length; }
+  clip = [];
+  $("clone").textContent = "Encoding";
+  status("encoding voice", "busy");
+  ws.send(JSON.stringify({ type: "clone" }));
+  ws.send(pcm.buffer);
+};
+
+$("go").onclick = start;
+</script>

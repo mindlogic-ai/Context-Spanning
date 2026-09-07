@@ -6,7 +6,9 @@ import torch
 from huggingface_hub import hf_hub_download
 from moshi.models import LMGen, loaders
 
-from .spans import N_AUDIO_CB, RET_TOKEN_ID, SILENCE_TOKENS, SINE_TOKENS, context_span_ids, persona_prompt
+from . import inject as inject_mod
+from .spans import (N_AUDIO_CB, RET_TOKEN_ID, SILENCE_TOKENS, SINE_TOKENS, SPAN_TOKEN_ID, TEXT_PAD,
+                    persona_prompt)
 
 BASE_REPO = "nvidia/personaplex-7b-v1"
 WEIGHTS_REPO = "mindlogicinc/context-spanning-7b"
@@ -34,8 +36,10 @@ def load_model(checkpoint=None, device="cuda", cpu_offload=False):
     return lm, mimi, spm
 
 
-def load_voice(path):
-    """Voice prompt = agent-voice Mimi codes [8, P] saved as {'codes': LongTensor}."""
+def load_voice(name_or_path="f0"):
+    """Voice prompt = agent-voice Mimi codes [8, P] saved as {'codes': LongTensor}. A bare name
+    ("f0", "f1", "f2") is fetched as voices/<name>.pt from the weights repo."""
+    path = name_or_path if os.path.exists(name_or_path) else _hf(WEIGHTS_REPO, f"voices/{name_or_path}.pt")
     return torch.load(path, map_location="cpu")["codes"].long()
 
 
@@ -54,7 +58,7 @@ class Engine:
                        else LMGen(self.lm, device=device, temp=temp, temp_text=temp_text, **kw))
         self._sil = torch.tensor(SILENCE_TOKENS, device=device)[None, :, None]
         self._sine = torch.tensor(SINE_TOKENS, device=device)[None, :, None]
-        self._prev = None
+        self._pending_exit_cb0 = None
         self.frames = 0
         self.reset()
         with torch.no_grad():
@@ -69,7 +73,7 @@ class Engine:
             except Exception:
                 pass
             m.streaming_forever(1)
-        self._prev, self.frames = None, 0
+        self._pending_exit_cb0, self.frames = None, 0
 
     def _forced(self, text_id, agent=None, user=None):
         tt = torch.tensor([text_id], dtype=torch.long, device=self.device)
@@ -95,27 +99,50 @@ class Engine:
     def step(self, user_pcm):
         """user_pcm: float32 [frame_size] -> {'agent_pcm', 'text_token', 'is_ret'}."""
         u = torch.as_tensor(user_pcm, dtype=torch.float32, device=self.device).reshape(1, 1, -1)
-        uc = self.user_mimi.encode(u)
-        tok = self.lm_gen.step(input_tokens=uc)
+        tok = self.lm_gen.step(input_tokens=self.user_mimi.encode(u))
         if tok is None:
             return {"agent_pcm": None, "text_token": None, "is_ret": False}
-        ac = tok[:, 1:1 + N_AUDIO_CB]
-        self._prev = (ac, uc)
-        self.frames += 1
         t = int(tok[0, 0, 0])
+        ac = tok[:, 1:1 + N_AUDIO_CB]
+        if self._pending_exit_cb0 is not None:
+            # The readout runs one frame late, so the live frame a span swallows would otherwise come
+            # back carrying the block's placeholder; restore its real semantic code.
+            if t == SPAN_TOKEN_ID:
+                ac = ac.clone()
+                ac[:, 0, 0] = self._pending_exit_cb0
+            self._pending_exit_cb0 = None
+        self.frames += 1
         return {"agent_pcm": self.mimi.decode(ac)[0, 0].cpu().numpy(), "text_token": t,
                 "is_ret": t == RET_TOKEN_ID}
 
     @torch.no_grad()
     def inject_context_span(self, reference: str) -> int:
-        """Force the span tokens as a masked block; the last column carries the previous real
-        acoustic codes (the training-time MOVE convention)."""
-        ids = context_span_ids(reference, self.spm)
-        for i, tid in enumerate(ids):
-            if i == len(ids) - 1 and self._prev is not None:
-                pa, pu = self._prev
-                self._forced(tid, agent=torch.cat([self._sil[:, :1], pa[:, 1:]], 1),
-                             user=torch.cat([self._sine[:, :1], pu[:, 1:]], 1))
-            else:
-                self._forced(tid)
-        return len(ids)
+        """Read the reference into the stream as a masked Context Span block in one batched forward.
+        Returns the number of frames the block consumed."""
+        ids = inject_mod.span_ids(reference, self.spm)
+        self._pending_exit_cb0 = inject_mod.pending_exit_cb0(self.lm_gen)
+        return inject_mod.prefill(self.lm_gen, ids, self._sil, self._sine)
+
+    @torch.no_grad()
+    def clone_voice(self, pcm, sample_rate: int) -> torch.Tensor:
+        """Agent-voice Mimi codes [8, P] from a recording (resampled, -24 LUFS), the way PersonaPlex
+        conditions on a voice. Resets the streams; call it between conversations."""
+        from moshi.models.lm import normalize_audio
+        x = np.asarray(pcm, dtype=np.float32).reshape(-1)
+        want = int(self.mimi.sample_rate)
+        if sample_rate != want:
+            import librosa
+            x = librosa.resample(x, orig_sr=sample_rate, target_sr=want)
+        x = normalize_audio(x[None, :], want, -24.0)
+        for m in (self.mimi, self.user_mimi):
+            try:
+                m._stop_streaming()
+            except Exception:
+                pass
+        codes = self.mimi.encode(torch.as_tensor(x, dtype=torch.float32, device=self.device).reshape(1, 1, -1))
+        self.reset()
+        return codes[0].to(torch.long)
+
+    def decode_text(self, tokens) -> str:
+        skip = {TEXT_PAD, 0, 1, 2, RET_TOKEN_ID, SPAN_TOKEN_ID}
+        return self.spm.decode([int(t) for t in tokens if t is not None and int(t) not in skip])

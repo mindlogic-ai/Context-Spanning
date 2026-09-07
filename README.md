@@ -2,25 +2,42 @@
 
 Official code for **Context Spanning: A Communication Framework for Full-Duplex Speech Models and External LLM Backends**.
 
-Context Spanning lets a full-duplex speech model call an external backend while it keeps listening and talking: The external information are written into the model's context stream as a masked *Context Span* at whatever frame it arrives. Training and inference share one sequence convention, so anything an LLM, a tool, or a search engine returns can be spoken grounded, in real time.
-
+Context Spanning lets a full-duplex speech model call an external backend while it keeps listening and
+talking: when the model emits `<ret>`, the recent user audio is transcribed, the backend returns one
+reference sentence, and that sentence is written into the model's context stream as a masked
+*Context Span* block at whatever frame it arrives. Training and inference share one sequence convention.
 
 Weights: [mindlogicinc/context-spanning-7b](https://huggingface.co/mindlogicinc/context-spanning-7b) (fine-tuned from `nvidia/personaplex-7b-v1`).
+
+| file | what it is |
+|---|---|
+| `contextspan/model.py` | model loading, the streaming `Engine`: persona prefix, `step`, `inject_context_span`, `clone_voice` |
+| `contextspan/inject.py` | the Context Span block, read in one batched forward |
+| `contextspan/spans.py` | the sequence conventions shared by training and inference |
+| `contextspan/backend.py` | the router (the DuetaSpan router prompt, one OpenAI-compatible LLM call) and the ASR client |
+| `contextspan/stream.py` | frame-clock loop for a wav file |
+| `contextspan/serve.py` | WebSocket server + browser page |
+| `contextspan/train.py` | data preparation and fine-tuning |
+| `main.py` | `infer` / `serve` / `prepare` / `train` |
 
 ## Install
 
 ```bash
-pip install "git+https://github.com/NVIDIA/personaplex.git#subdirectory=moshi"   # PersonaPlex moshi fork
+pip install torch --index-url https://download.pytorch.org/whl/cu128
+pip install --no-deps "git+https://github.com/NVIDIA/personaplex.git#subdirectory=moshi"
 pip install -e .
 export HF_TOKEN=<token with access to nvidia/personaplex-7b-v1 and the weights repo>
 ```
 
+`CS_BASE_DIR` / `CS_WEIGHTS_DIR` point at local copies of the PersonaPlex base and of the weights
+repo (`context_spanning_7b.pt`, `voices/*.pt`) instead of downloading them.
+
 ## Backends
 
-The model talks to two OpenAI-compatible HTTP servers; any implementation works (vLLM shown).
+Two OpenAI-compatible HTTP servers; any implementation works (vLLM shown).
 
 ```bash
-# reference LLM (writes a <=20-word spoken reference for the transcribed question)
+# router LLM
 vllm serve google/gemma-3-27b-it --port 8000
 export CS_LLM_URL=http://localhost:8000/v1/chat/completions CS_LLM_MODEL=google/gemma-3-27b-it
 # ASR for the user question
@@ -28,49 +45,42 @@ qwen-asr-serve Qwen/Qwen3-ASR-1.7B --port 8901 --served-model-name qwen3-asr
 export CS_ASR_URL=http://localhost:8901/v1/audio/transcriptions CS_ASR_MODEL=qwen3-asr
 ```
 
-A hosted API works the same way — set `CS_LLM_URL=https://api.openai.com/v1/chat/completions`, `CS_LLM_MODEL=<model>`, `CS_LLM_API_KEY=<key>` (reasoning models such as GPT-5 / Luna are handled automatically).
-
-`retrieve(question) -> str` in `contextspan/backend.py` is the only contract: replace `LLMReferenceBackend` with a search engine, a tool router, or a database to change where the knowledge comes from.
+A hosted API works the same way (`CS_LLM_URL=https://api.openai.com/v1/chat/completions`,
+`CS_LLM_MODEL`, `CS_LLM_API_KEY`). `retrieve(question, context) -> str` in `contextspan/backend.py`
+is the only contract: replace `LLMReferenceBackend` to change where the knowledge comes from.
 
 ## Inference
 
 ```bash
-python main.py infer --input-wav assets/test/question.wav --output-wav out.wav \
-    --voice assets/voices/f0.pt --text-prompt "You are a helpful and friendly voice assistant."
+python main.py infer --input-wav assets/test/question.wav --output-wav out.wav --voice f0 \
+    --text-prompt "You are a helpful and friendly voice assistant."
 ```
 
-`out.wav` is stereo: left = user, right = agent. The transcript (with `<ret>` / `<span>` markers) is printed and, with `--output-text`, saved with the retrieval events (question as transcribed, reference, arrival time).
+`out.wav` is stereo: left = user, right = agent. `--output-text` writes the transcript with the
+`<ret>` / span events and their timing.
 
-Streaming runs at a 1.0x frame clock (12.5 Hz). After `<ret>` the loop waits for the user to finish (`--debounce`, seconds of trailing silence), transcribes the utterance, asks the backend and injects the reference on the next frame. If the user keeps talking within `--reroute` seconds, the utterance is transcribed again and the span is replaced.
+## Live conversation
+
+```bash
+python main.py serve --voice f0 --host 0.0.0.0 --port 8080 --token <value>
+```
+
+Browsers open the microphone only over https or on localhost. The page shows the agent's text and
+each injected span as it lands; name, location and timezone go to the router as user context, the
+**Knowledge** field goes to it as the Context DB. Stop offers the conversation as a stereo wav and a
+JSON transcript. "Clone my voice" records 12 s and speaks with that voice.
 
 ## Training
 
-Each dialogue is a JSON file plus a stereo wav (left = user, right = agent):
-
-```json
-{"system_prompt": "You are a warm bookshop owner.", "voice": "assets/voices/f0.pt",
- "turns": [
-  {"speaker": "agent", "words": [{"w": "Hi", "t": 0.4}, {"w": "there.", "t": 0.7}]},
-  {"speaker": "user",  "words": [{"w": "When", "t": 4.1}, {"w": "does", "t": 4.3}, {"w": "it", "t": 4.5}, {"w": "open?", "t": 4.7}]},
-  {"speaker": "agent", "ret": true, "reference": "The shop opens at seven thirty AM.",
-   "words": [{"w": "Oh,", "t": 5.6}, {"w": "it", "t": 5.9}, {"w": "opens", "t": 6.1}, {"w": "at", "t": 6.3}, {"w": "seven", "t": 6.5}, {"w": "thirty.", "t": 6.8}],
-   "body_word_index": 2}
- ]}
-```
-
-`ret` marks an agent turn that needs the reference; `body_word_index` is the first word that states retrieved content, so the span is always inserted before it (a random delay after `<ret>`, following the retrieval-delay sampling of MoshiRAG).
-
 ```bash
 python main.py prepare --in-dir data/raw --out-dir data/prepared
-python main.py train --data-dir data/prepared --out-dir runs/ft --steps 1000 --checkpoint context_spanning_7b.pt
+python main.py train   --data-dir data/prepared --out-dir runs/ft
 ```
 
-`prepare` encodes both channels with Mimi and lays the agent text on the text channel at word times. `train` fine-tunes all parameters (lr 2e-6, effective batch = `--accum`, bf16), inserting spans as masked blocks at a freshly sampled delay every step and applying reference dropout (0.2); checkpoints are written every `--ckpt-every` steps as `{"model": state_dict}`, loadable by `infer --checkpoint`.
-
-## Voice prompts
-
-A voice prompt is a short clip of the agent voice encoded with Mimi and saved as `{"codes": LongTensor[8, P]}`; `assets/voices/` ships a few. Training and inference both prepend `voice -> silence -> text prompt -> silence` as a masked prefix.
+`data/raw` holds one JSON per dialogue (turns with `speaker`, `text`, and for retrieval turns
+`reference`) next to its stereo wav; `prepare` encodes them and splices the Context Span blocks at
+sampled retrieval delays; `train` fine-tunes from the PersonaPlex base (or `--checkpoint`).
 
 ## License
 
-Code: MIT. Model weights inherit the PersonaPlex model license.
+MIT — see `LICENSE`.

@@ -10,7 +10,7 @@ SINE_TOKENS = [430, 1268, 381, 1611, 1095, 1495, 56, 472]         # user audio o
 SILENCE_TOKENS = [948, 243, 1178, 546, 1736, 1030, 1978, 2008]    # agent audio on system/span frames
 RAG_DELAY = {"start_delay": 1.0, "end_gap": 1.0, "random_sampling_proba": 0.2}  # MoshiRAG Eq.3
 FRAME_RATE = 12.5
-REF_DROPOUT = 0.2
+REF_DROPOUT = 0.0
 
 
 def persona_prompt(text: str) -> str:
