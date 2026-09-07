@@ -142,9 +142,6 @@ body:not(.talking) #thread, body:not(.talking) .meters { display: none; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-// An optional local replay script (see the PR) defines window.CSMock and stands
-// in for the socket and the microphone, so the page can be driven without a GPU.
-const MOCK = window.CSMock || null;
 if (new URLSearchParams(location.search).get("theme") === "light") document.documentElement.dataset.theme = "light";
 let ws, ctx, node, stream, mic, playAt = 0, running = false;
 let micOn = false, mode = "talk", fmt = null;   // fmt = {sampleRate, frameSize} from the server's `ready`
@@ -247,7 +244,7 @@ async function start() {
 function connect() {
   const scheme = location.protocol === "https:" ? "wss" : "ws";
   // The page's own query string rides along, so `?token=...` reaches the server's --token check.
-  ws = MOCK ? MOCK.socket() : new WebSocket(`${scheme}://${location.host}/ws${location.search}`);
+  ws = new WebSocket(`${scheme}://${location.host}/ws${location.search}`);
   ws.binaryType = "arraybuffer";
 
   ws.onmessage = (ev) => {
@@ -338,7 +335,6 @@ function markRouted(text) {
 }
 
 async function openMic(sampleRate, frameSize, forClone = false) {
-  if (MOCK) { mic = MOCK.mic({ sampleRate, frameSize, onFrame: frame }); micOn = true; return begin(sampleRate, forClone); }
   try {
     ctx = new AudioContext({ sampleRate });
     const raw = new URLSearchParams(location.search).get("raw") === "1";
