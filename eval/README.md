@@ -16,6 +16,26 @@ benchmark's official scorers run on the outputs unchanged. Nothing is scored on 
 Servers: the same router / RAG / ASR servers as the runtime (see the top-level README) plus a judge LLM
 for the RAG suite (`JUDGE_LLM_URL`, `JUDGE_LLM_MODEL`; the paper used the same Gemma server).
 
+## Protocols: full and semi
+
+Two named protocols, so a number is never quoted without its scale.
+
+| | RAG suite | math | FDB v1 / v1.5 | FDB v2 | FDB v3 |
+| --- | --- | --- | --- | --- | --- |
+| **full** | HaluEvalAudio 1000, LlamaQuestions 300, WebQuestions 1000, TriviaQA 1000 | 100 | all clips (v1 727 + v1.5 overlap set) | 200 tasks | 100 scenarios |
+| **semi** | first 120 items of each set (deterministic order) | 100 | — | — | 100 scenarios |
+
+`semi` is the checkpoint-comparison protocol: it runs in about an hour per RAG set on one GPU and is
+what the checkpoint tables in this repository's history use (`--limit 120`). `full` is the reporting
+protocol. Items are taken in dataset order, so a `semi` run is a prefix of the corresponding `full`
+run and the two never disagree on an item they share. Every run directory carries its own
+`rag_report.json` with `n`, and a result quoted from a `semi` run must say so.
+
+```bash
+python -m eval.rag.run halueval <halueval_audio> runs/semi/halueval --limit 120     # semi
+python -m eval.rag.run halueval <halueval_audio> runs/full/halueval                 # full
+```
+
 ## RAG suite
 
 ```bash
