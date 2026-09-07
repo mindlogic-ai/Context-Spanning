@@ -25,7 +25,7 @@ from .spans import (FRAME_RATE, N_AUDIO_CB, RET_TOKEN_ID, TEXT_PAD, assemble_tra
 @torch.no_grad()
 def prepare(in_dir, out_dir, device="cuda"):
     import sentencepiece
-    from moshi.models import loaders
+    from .moshi.models import loaders
     mimi = loaders.get_mimi(_hf(BASE_REPO, loaders.MIMI_NAME), device)
     spm = sentencepiece.SentencePieceProcessor(_hf(BASE_REPO, loaders.TEXT_TOKENIZER_NAME))
     os.makedirs(out_dir, exist_ok=True)

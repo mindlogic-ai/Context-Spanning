@@ -127,7 +127,7 @@ class Engine:
     def clone_voice(self, pcm, sample_rate: int) -> torch.Tensor:
         """Agent-voice Mimi codes [8, P] from a recording (resampled, -24 LUFS), the way PersonaPlex
         conditions on a voice. Resets the streams; call it between conversations."""
-        from moshi.models.lm import normalize_audio
+        from .moshi.models.lm import normalize_audio
         x = np.asarray(pcm, dtype=np.float32).reshape(-1)
         want = int(self.mimi.sample_rate)
         if sample_rate != want:

@@ -11,6 +11,7 @@ import asyncio
 import hmac
 import json
 import logging
+import time
 from pathlib import Path
 
 import numpy as np
@@ -66,12 +67,13 @@ async def ws_handler(request):
                                     "seconds": round(voice.shape[1] / eng.frame_rate, 1)})
                 continue
             if pending is not None and pending.done():
-                ref = pending.result(); pending = None
+                ref, question = pending.result(); pending = None
                 if isinstance(ref, dict):
                     await ws.send_json(ref)
                 else:
                     n = eng.inject_context_span(ref)
-                    await ws.send_json({"type": "span", "text": ref, "frames": n, "seconds": round(n / eng.frame_rate, 2)})
+                    await ws.send_json({"type": "span", "text": ref, "question": question, "frames": n,
+                                        "seconds": round(n / eng.frame_rate, 2)})
             frame = np.frombuffer(msg.data, dtype=np.float32).copy()
             heard.append(frame)
             if len(heard) > keep:
@@ -87,31 +89,42 @@ async def ws_handler(request):
                     await ws.send_json({"type": "text", "delta": full[len(shown):]}); shown = full
             if out["is_ret"] and pending is None:
                 await ws.send_json({"type": "ret"})
+                notify = lambda ev: asyncio.run_coroutine_threadsafe(ws.send_json(ev), loop)
                 pending = loop.run_in_executor(None, _retrieve, request.app, np.concatenate(heard),
-                                               int(eng.mimi.sample_rate), dict(user))
+                                               int(eng.mimi.sample_rate), dict(user), notify)
     return ws
 
 
-def _retrieve(app, clip, sample_rate, user):
-    """Transcribe the recent user audio and ask the backend. Returns the reference or an error event."""
+def _retrieve(app, clip, sample_rate, user, notify):
+    """Transcribe the recent user audio and ask the backend. Returns (reference or error event, question).
+
+    The transcript is sent to the page as a `question` event as soon as the ASR returns, before the
+    backend is asked, and both the question and the reference are logged once per `<ret>`: a wrong
+    span is then attributable to the ASR (misheard or truncated question) or to the router."""
     from .backend import NO_INFO
+    t0 = time.monotonic()
     try:
         question = app["asr"].transcribe(clip, sample_rate)
     except Exception as e:
-        return {"type": "error", "stage": "asr", "message": str(e)}
+        return {"type": "error", "stage": "asr", "message": str(e)}, None
+    asr_ms = int((time.monotonic() - t0) * 1000)
+    log.info("question (%d ms asr): %s", asr_ms, question)
     if not question:
-        return {"type": "error", "stage": "asr", "message": "empty transcript"}
+        return {"type": "error", "stage": "asr", "message": "empty transcript"}, None
+    notify({"type": "question", "text": question, "ms": asr_ms})
     ctx = {k: v for k, v in {"name": user.get("name"), "city": user.get("location"), "timezone": user.get("tz"),
                              "lat": user.get("lat"), "lon": user.get("lon")}.items() if v not in (None, "")}
     if user.get("db"):
         ctx["context_db"] = f"[context db] {user['db']}"
+    t1 = time.monotonic()
     try:
         ref = app["backend"].retrieve(question, ctx)
     except Exception as e:
-        return {"type": "error", "stage": "retrieval", "message": str(e)}
+        return {"type": "error", "stage": "retrieval", "message": str(e)}, question
+    log.info("reference (%d ms backend): %s", int((time.monotonic() - t1) * 1000), ref)
     if not ref or ref == NO_INFO:
-        return {"type": "error", "stage": "retrieval", "message": f"{NO_INFO} for: {question}"}
-    return ref
+        return {"type": "error", "stage": "retrieval", "message": f"{NO_INFO} for: {question}"}, question
+    return ref, question
 
 
 async def health(request):

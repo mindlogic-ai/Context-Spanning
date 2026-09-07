@@ -71,7 +71,7 @@ python main.py serve --voice f0 --host 0.0.0.0 --port 8080 --token <value>
 Browsers open the microphone only over https or on localhost. The page shows the agent's text and
 each injected span as it lands; name, location and timezone go to the router as user context, the
 **Knowledge** field goes to it as the Context DB. Stop offers the conversation as a stereo wav and a
-JSON transcript. "Clone my voice" records 12 s and speaks with that voice.
+JSON transcript (`ret` / `question` / `span` / `text` events with timing; `question` is what the ASR heard, so a wrong span can be traced to the ASR or to the backend). "Clone my voice" records 12 s and speaks with that voice.
 
 ## Training
 

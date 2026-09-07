@@ -71,6 +71,7 @@ canvas { width: 100%; height: 46px; display: block; }
   border-left: 3px solid var(--mint); background: var(--mint-soft);
   border-radius: 0; padding: 9px 11px; font-size: 13px; animation: slide .3s ease;
 }
+.span.question { opacity: .75; }
 .span .meta { color: var(--dim); font-size: 11.5px; margin-bottom: 3px;
               display: flex; justify-content: space-between; gap: 10px; }
 @keyframes slide { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
@@ -256,7 +257,8 @@ async function start() {
     }
     else if (m.type === "text") { recEvent("text", { delta: m.delta }); appendText(m.delta); }
     else if (m.type === "ret") { recEvent("ret"); status("retrieving", "busy"); }
-    else if (m.type === "span") { recEvent("span", { text: m.text, frames: m.frames }); addSpan(m); }
+    else if (m.type === "question") { recEvent("question", { text: m.text, ms: m.ms }); addQuestion(m); }
+    else if (m.type === "span") { recEvent("span", { text: m.text, question: m.question, frames: m.frames }); addSpan(m); }
     else if (m.type === "error") { recEvent("error", { stage: m.stage, message: m.message }); notice(`${m.stage}: ${m.message}`); status("listening", "live"); }
     else if (m.type === "cloned") {
       cloning = false;
@@ -278,6 +280,24 @@ function appendText(delta) {
   cur.className = "cursor";
   el.append(cur);
   el.scrollTop = el.scrollHeight;
+}
+
+function addQuestion(m) {
+  // What the ASR heard, shown as soon as it is known so a wrong span can be traced to a misheard
+  // (or cut-off) question rather than to the router.
+  const box = $("spans");
+  if (box.querySelector(".empty")) box.textContent = "";
+  const d = document.createElement("div");
+  d.className = "span question";
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  const left = document.createElement("span"); left.textContent = "heard";
+  const right = document.createElement("span"); right.textContent = `asr ${m.ms} ms`;
+  meta.append(left, right);
+  const t = document.createElement("div");
+  t.textContent = m.text;
+  d.append(meta, t);
+  box.prepend(d);
 }
 
 function addSpan(m) {
