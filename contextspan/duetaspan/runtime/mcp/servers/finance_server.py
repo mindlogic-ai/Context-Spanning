@@ -83,7 +83,7 @@ def _search_symbol(company: str) -> tuple[str, str] | None:
                 _SEARCH_URL,
                 params={"q": company, "quotesCount": 1, "newsCount": 0},
                 headers=_UA,
-                timeout=10,
+                timeout=4,
             )
             if resp.status_code == 429:
                 time.sleep(0.5)
@@ -125,7 +125,7 @@ def get_stock_price(company: str) -> str:
         sym, name = found
 
     try:
-        resp = _http.get(_CHART_URL.format(sym=sym), headers=_UA, timeout=10)
+        resp = _http.get(_CHART_URL.format(sym=sym), headers=_UA, timeout=4)
         meta = (resp.json().get("chart", {}).get("result") or [{}])[0].get("meta") or {}
         price = meta.get("regularMarketPrice")
         if price is None:
@@ -152,7 +152,7 @@ def get_stock_price(company: str) -> str:
             f"{price_txt} {currency}{change_txt}."
         ).replace("  ", " ")
     except Exception as exc:  # pragma: no cover - network failure path
-        return f"I could not reach the market data service for {name} ({exc})."
+        return ""   # a transport failure is not something to say aloud: no span (ContextSpanning #10)
 
 
 if __name__ == "__main__":

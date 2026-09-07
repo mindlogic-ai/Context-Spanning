@@ -66,6 +66,16 @@ select GPUs. Any OpenAI-compatible server and any `POST /transcribe -> {"text"}`
 for instance) can replace them; a hosted LLM API takes `MCP_ROUTER_LLM_KEY` / `MOSHICP_RAG_LLM_KEY`.
 Tool results and the SQLite world live under `contextspan/datasets/` (override with `DUETASPAN_DATA`).
 
+Latency knobs, all with the defaults the benchmarks used: the router asks the server for a JSON object
+(`MCP_ROUTER_JSON_MODE=1`, dropped automatically if the server rejects it), decodes at most
+`MCP_ROUTER_MAX_TOKENS=120` tokens and waits at most `MCP_ROUTER_TIMEOUT_S=8`; a `get_time` / `get_weather`
+without an explicit place takes the timezone / city from the user profile instead of a second LLM call; each
+tool HTTP call has a 4 s budget and a transport failure yields no span rather than a sentence about the
+failure; a span that would land more than `CS_RET_DEADLINE_S=2.5` s after `<ret>` is dropped (`late`
+event) — the training corpus's ret-to-span delays have p99 2.3 s, and a span that arrives after the model
+has already answered is worse than none. A smaller router model (`ROUTER_MODEL`) is the remaining lever:
+router decode is ~95% of a retrieval, and the benchmark numbers in this repository are with Gemma-3-27B.
+
 ## Inference
 
 ```bash

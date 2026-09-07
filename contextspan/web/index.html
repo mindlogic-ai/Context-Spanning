@@ -273,6 +273,7 @@ function connect() {
     else if (m.type === "text") { recEvent("text", { delta: m.delta }); appendText(m.delta); }
     else if (m.type === "ret") { recEvent("ret"); status("retrieving", "busy"); }
     else if (m.type === "question") { recEvent("question", { text: m.text, ms: m.ms }); appendYou(m.text); }
+    else if (m.type === "late") { recEvent("late", { question: m.question, seconds: m.seconds, source: m.source }); appendAside(`retrieval took ${m.seconds}s — too late, dropped`); status("listening", "live"); }
     else if (m.type === "no_span") { recEvent("no_span", { question: m.question }); appendAside("nothing to look up"); status("listening", "live"); }
     else if (m.type === "span") { recEvent("span", { text: m.text, question: m.question, frames: m.frames }); addSpan(m); }
     else if (m.type === "error") { recEvent("error", { stage: m.stage, message: m.message }); notice(`${m.stage}: ${m.message}`); status("listening", "live"); }

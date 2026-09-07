@@ -29,7 +29,7 @@ def warm_connections() -> None:
 
     def _open(url: str, params: dict) -> None:
         try:
-            _http.get(url, params=params, timeout=10)
+            _http.get(url, params=params, timeout=4)
         except requests.RequestException:
             pass
 
@@ -50,7 +50,7 @@ def _ddg_answer(query: str) -> str | None:
         data = _http.get(
             _DDG_URL,
             params={"q": query, "format": "json", "no_html": 1, "skip_disambig": 1},
-            timeout=10,
+            timeout=4,
         ).json()
     except (requests.RequestException, ValueError):
         return None
@@ -80,7 +80,7 @@ def _wiki_summary(query: str) -> str | None:
                 "generator": "search", "gsrsearch": query, "gsrlimit": 1,
                 "prop": "extracts", "exintro": 1, "explaintext": 1,
             },
-            timeout=10,
+            timeout=4,
         ).json()
     except (requests.RequestException, ValueError):
         return None

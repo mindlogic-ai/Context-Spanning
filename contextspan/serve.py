@@ -19,7 +19,7 @@ import numpy as np
 from aiohttp import WSMsgType, web
 
 from .duetaspan.runtime.backend.context_db import ContextDB, ContextProfile
-from .stream import retrieve_for_ret
+from .stream import RET_DEADLINE_S, retrieve_for_ret
 
 WEB = Path(__file__).parent / "web"
 log = logging.getLogger(__name__)
@@ -78,8 +78,13 @@ async def ws_handler(request):
                 continue
             if pending is not None and pending.done():
                 r = pending.result(); pending = None
+                took = time.monotonic() - t_ret
                 if r.get("error"):
                     await ws.send_json({"type": "error", "stage": r["error"], "message": r["message"]})
+                elif r["inject"] is not None and took > RET_DEADLINE_S:   # too late to be the answer's ground
+                    r["inject"] = None; r["late"] = True; events.append(r)
+                    await ws.send_json({"type": "late", "question": r["question"], "seconds": round(took, 2),
+                                        "source": r["src"]})
                 elif r["inject"] is None:      # nothing to ground on: no span, and not a failure
                     events.append(r)
                     await ws.send_json({"type": "no_span", "question": r["question"]})
@@ -103,6 +108,7 @@ async def ws_handler(request):
                     await ws.send_json({"type": "text", "delta": full[len(shown):]}); shown = full
             if out["is_ret"] and pending is None:
                 await ws.send_json({"type": "ret"})
+                t_ret = time.monotonic()
                 notify = lambda ev: asyncio.run_coroutine_threadsafe(ws.send_json(ev), loop)
                 pending = loop.run_in_executor(None, _retrieve, request.app, np.concatenate(heard),
                                                int(eng.mimi.sample_rate), dict(user), db, shown, list(events), notify)

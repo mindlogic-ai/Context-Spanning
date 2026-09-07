@@ -76,7 +76,7 @@ def get_weather(
                 geo = _http.get(
                     _GEO_URL,
                     params={"name": city, "count": 1, "language": "en", "format": "json"},
-                    timeout=10,
+                    timeout=4,
                 ).json()
                 results = geo.get("results") or []
                 if not results:
@@ -101,7 +101,7 @@ def get_weather(
                     "longitude": lon,
                     "current": "temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m",
                 },
-                timeout=10,
+                timeout=4,
             ).json()
             _wx_cache[wk] = (time.time(), fc)
         cur = fc.get("current") or {}
@@ -124,7 +124,7 @@ def get_weather(
         parts.append(cond)
         return "(tool result) " + ", ".join(parts) + "."
     except Exception as exc:  # pragma: no cover - network failure path
-        return f"I could not reach the weather service for {place} ({exc})."
+        return ""   # a transport failure is not something to say aloud: no span (ContextSpanning #10)
 
 
 if __name__ == "__main__":

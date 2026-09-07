@@ -57,6 +57,22 @@ _LLM_MODEL = os.environ.get("MCP_ROUTER_LLM_MODEL", "llama3.2:3b")
 # prompt-embedded catalog + JSON reply, because vLLM without --tool-call-parser rejects the
 # native tools API. Default stays ollama /api/chat.
 _LLM_API = os.environ.get("MCP_ROUTER_LLM_API", "ollama").lower()
+# Decode is the router's cost (~38 ms/token on a 27B model): bound the reply and the wait, and ask
+# the server for a JSON object so no preamble is generated (ContextSpanning #12). The reply
+# contract is unchanged: {"name","arguments"} or {"answer"}.
+_MAX_TOKENS = int(os.environ.get("MCP_ROUTER_MAX_TOKENS", "120"))
+_TIMEOUT_S = float(os.environ.get("MCP_ROUTER_TIMEOUT_S", "8"))
+_JSON_MODE = os.environ.get("MCP_ROUTER_JSON_MODE", "1") not in ("0", "false", "off")
+
+
+def _post_chat(payload, headers, timeout):
+    """One chat call; JSON mode is requested first and dropped if the server rejects it."""
+    if _JSON_MODE:
+        r = requests.post(f"{_LLM_URL}/v1/chat/completions", json={**payload, "response_format": {"type": "json_object"}},
+                          headers=headers, timeout=timeout)
+        if r.status_code < 400:
+            return r
+    return requests.post(f"{_LLM_URL}/v1/chat/completions", json=payload, headers=headers, timeout=timeout)
 
 
 # ── English-only speech model: tool results are anglicized before they become a span ──────────
@@ -632,7 +648,7 @@ class MCPRouter:
             payload["max_completion_tokens"] = 512   # budget hidden reasoning + JSON reply
         else:
             payload["temperature"] = 0.0
-            payload["max_tokens"] = 150
+            payload["max_tokens"] = _MAX_TOKENS
         headers = {"Authorization": "Bearer " + _LLM_KEY} if _LLM_KEY else None
         # MCP_ROUTER_DEBUG=1 이면 라우터에 실제로 들어간 유저 메시지를 그대로 찍는다.
         # (도구 카탈로그는 124개라 너무 길어 제외 — 시스템 규칙은 코드에 고정되어 있다.)
@@ -642,8 +658,7 @@ class MCPRouter:
                   f"[/router-in]", flush=True)
         _t0 = _time.time()
         try:
-            resp = requests.post(f"{_LLM_URL}/v1/chat/completions", json=payload,
-                                 headers=headers, timeout=60)
+            resp = _post_chat(payload, headers, _TIMEOUT_S)
             content = resp.json()["choices"][0]["message"]["content"] or ""
         except Exception as exc:
             logger.warning("MCP router LLM call failed: %s", exc)
@@ -869,7 +884,7 @@ class MCPRouter:
         if _LLM_REASONING:
             payload["max_completion_tokens"] = 512
         else:
-            payload.update({"temperature": 0.0, "max_tokens": 200})
+            payload.update({"temperature": 0.0, "max_tokens": _MAX_TOKENS})
         headers = {"Authorization": "Bearer " + _LLM_KEY} if _LLM_KEY else None
         # MCP_ROUTER_DEBUG=1 이면 라우터에 실제로 들어간 유저 메시지를 그대로 찍는다.
         # (도구 카탈로그는 124개라 너무 길어 제외 — 시스템 규칙은 코드에 고정되어 있다.)
@@ -879,8 +894,7 @@ class MCPRouter:
                   f"[/router-in]", flush=True)
         _t0 = _time.time()
         try:
-            resp = requests.post(f"{_LLM_URL}/v1/chat/completions", json=payload,
-                                 headers=headers, timeout=60)
+            resp = _post_chat(payload, headers, _TIMEOUT_S)
             text = (resp.json()["choices"][0]["message"]["content"] or "").strip()
             m = text[text.index("{"): text.rindex("}") + 1]
             args = _json.loads(m)
@@ -951,8 +965,10 @@ class MCPRouter:
                 logger.warning("required args defaulted for '%s': %s", name, missing)
             # 스키마 타입 강제(후처리): "1500"→1500, "true"→true — 값 불변, 타입만.
             args = _coerce_types(args, sch)
-        # (2026-08-25) _inject_ctx 결정적 주입 제거 — 프로필 기반 인자 채움은 라우터 LLM이
-        # convo(프로필 라인)를 보고 직접 한다. 코드 폴백 체인 폐지 (유저: "그냥 맡겨").
+        # Profile arguments for the live tools without a second LLM call: a `get_time` with no timezone or a
+        # `get_weather` with no place takes the user's profile value (ContextSpanning #12: the argument
+        # round trip cost as much as the pick). Values the router did give are never overwritten.
+        args = self._inject_ctx(name, args, ctx)
 
         try:
             reference = self._submit(self._async_call_tool(name, args)).result(

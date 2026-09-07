@@ -8,12 +8,18 @@ do" that no tool produced, injects NOTHING (the benchmark harness's gate: an abs
 training only when a real tool ran and came back empty). The frame clock never waits for any of it.
 """
 import json
+import os
 import threading
 import time
 
 import numpy as np
 
 from .duetaspan.runtime.backend.context_db import ContextDB, ContextProfile
+
+# Wall-clock budget from <ret> to injection. The training corpus's ret->span delays (deploy_ret_delay.json,
+# live harness 2026-09-04) have p50 0.72 s, p99 2.3 s, max 2.4 s: a span later than that is outside what the
+# model was trained to wait for, and by then it has usually answered without it (ContextSpanning #12).
+RET_DEADLINE_S = float(os.environ.get("CS_RET_DEADLINE_S", "2.5"))
 
 
 def retrieve_for_ret(backend, asr, clip, sample_rate, ctx, db, said_text, events, on_question=None):
@@ -68,11 +74,14 @@ def run_stream(eng, backend, asr, pcm, ctx=None, asr_window_s=12.0, realtime=Tru
             ready = queue.pop(0) if queue else None
         if ready is not None:
             ready["t_inj"] = i / eng.frame_rate
+            ready["late"] = ready["inject"] is not None and (ready["t_inj"] - ready["t_ret"]) > RET_DEADLINE_S
+            if ready["late"]:
+                ready["inject"] = None
             ready["frames"] = eng.inject_context_span(ready["inject"]) if ready["inject"] else 0
             events.append(ready)
             if verbose:
                 print(f"[span @{ready['t_inj']:.1f}s] q={ready['question']!r} src={ready['src']} "
-                      f"-> {'(no span)' if ready['inject'] is None else ready['inject'][:100]!r}", flush=True)
+                      f"-> {('(late, dropped)' if ready['late'] else '(no span)') if ready['inject'] is None else ready['inject'][:100]!r}", flush=True)
         o = eng.step(pcm[i * fs:(i + 1) * fs])
         out.append(o["agent_pcm"] if o["agent_pcm"] is not None else np.zeros(fs, np.float32))
         tokens.append(o["text_token"])
