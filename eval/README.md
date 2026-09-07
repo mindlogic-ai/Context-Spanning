@@ -14,7 +14,8 @@ benchmark's official scorers run on the outputs unchanged. Nothing is scored on 
 | Full-Duplex-Bench v3 | tool calling under disfluency: tool selection, argument accuracy, pass rate | `eval.fdb.v3_run` | `eval/fdb/v3_score.sh` (official) |
 
 Servers: the same router / RAG / ASR servers as the runtime (see the top-level README) plus a judge LLM
-for the RAG suite (`JUDGE_LLM_URL`, `JUDGE_LLM_MODEL`; the paper used the same Gemma server).
+for the RAG suite (`JUDGE_LLM_URL`, `JUDGE_LLM_MODEL`; `scripts/env.sh` points it at the router server unless
+`JUDGE_MODEL` is set — the paper's RAG-suite judge was google/gemma-4-31B-it on its own server).
 
 ## Protocols: full and semi
 

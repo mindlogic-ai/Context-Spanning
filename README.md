@@ -54,7 +54,7 @@ repository was measured with, so a fresh machine gets the same span latency with
 
 ```bash
 pip install -e '.[asr-server]' vllm
-bash scripts/backends.sh start        # router LLM: vLLM Gemma-3-27B on GPUs 1,3 (TP=2); ASR: Qwen3-ASR on GPU 0
+bash scripts/backends.sh start        # router LLM: vLLM Gemma-4-26B-A4B on GPU 1; ASR: Qwen3-ASR on GPU 0
 source scripts/env.sh                 # MCP_ROUTER_* / MOSHICP_RAG_LLM_* / MOSHICP_ASR_URL / JUDGE_LLM_*
 ```
 
@@ -73,8 +73,8 @@ without an explicit place takes the timezone / city from the user profile instea
 tool HTTP call has a 4 s budget and a transport failure yields no span rather than a sentence about the
 failure; a span that would land more than `CS_RET_DEADLINE_S=2.5` s after `<ret>` is dropped (`late`
 event) — the training corpus's ret-to-span delays have p99 2.3 s, and a span that arrives after the model
-has already answered is worse than none. A smaller router model (`ROUTER_MODEL`) is the remaining lever:
-router decode is ~95% of a retrieval, and the benchmark numbers in this repository are with Gemma-3-27B.
+has already answered is worse than none. Router decode is ~95% of a retrieval, which is why the router is Gemma-4-26B-A4B (4B active parameters);
+`ROUTER_MODEL` swaps it for any OpenAI-compatible model.
 
 ## Inference
 

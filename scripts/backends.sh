@@ -4,8 +4,10 @@
 #   bash scripts/backends.sh start     # router LLM (vLLM) + ASR (Qwen3-ASR), waits until both answer
 #   bash scripts/backends.sh status
 #   bash scripts/backends.sh stop
-# GPUs: ROUTER_GPUS (default 1,3: Gemma-3-27B in bf16 needs two 80-96 GB GPUs at TP=2, or one GPU
-# with >= 80 GB free at TP=1 — set ROUTER_TP accordingly), ASR_GPU (default 0, ~4 GB).
+# Router model: Gemma-4-26B-A4B (26B MoE, 4B active) — the router's decision is a classification plus a
+# few argument strings and its cost is decode, so the 4B-active model answers in roughly a third of the
+# time of a dense 27B at the same quality on the tool-selection probes; one 80-96 GB GPU at TP=1.
+# GPUs: ROUTER_GPUS (default 1), ASR_GPU (default 0, ~4 GB). ROUTER_MODEL / ROUTER_TP override.
 #
 # Why these vLLM flags (measured on RTX PRO 6000 Blackwell, 2026-09):
 #   --max-model-len 8192           the router prompt carries the tool catalogue (~2.9k tokens at the first
@@ -18,8 +20,8 @@
 set -euo pipefail
 CMD="${1:-status}"
 ROUTER_PORT="${ROUTER_PORT:-8004}"; ASR_PORT="${ASR_PORT:-8990}"
-ROUTER_MODEL="${ROUTER_MODEL:-google/gemma-3-27b-it}"
-ROUTER_GPUS="${ROUTER_GPUS:-1,3}"; ROUTER_TP="${ROUTER_TP:-2}"; ASR_GPU="${ASR_GPU:-0}"
+ROUTER_MODEL="${ROUTER_MODEL:-google/gemma-4-26B-A4B-it}"
+ROUTER_GPUS="${ROUTER_GPUS:-1}"; ROUTER_TP="${ROUTER_TP:-1}"; ASR_GPU="${ASR_GPU:-0}"
 LOG="${BACKEND_LOG_DIR:-/tmp/contextspan_backends}"; mkdir -p "$LOG"
 PY="${PYTHON:-python}"
 
@@ -32,7 +34,7 @@ case "$CMD" in
       CUDA_VISIBLE_DEVICES="$ROUTER_GPUS" setsid nohup "$PY" -m vllm.entrypoints.openai.api_server \
         --model "$ROUTER_MODEL" --served-model-name "$ROUTER_MODEL" --port "$ROUTER_PORT" \
         --tensor-parallel-size "$ROUTER_TP" --gpu-memory-utilization 0.55 --max-model-len 8192 \
-        --enable-prefix-caching \
+        --enable-prefix-caching --trust-remote-code \
         --speculative-config '{"method":"ngram","num_speculative_tokens":6,"prompt_lookup_max":5,"prompt_lookup_min":2}' \
         > "$LOG/router.log" 2>&1 < /dev/null &
       echo "[backends] router starting (log $LOG/router.log)"
