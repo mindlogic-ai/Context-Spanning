@@ -43,6 +43,15 @@ def _backend_and_asr():
     from contextspan.duetaspan.align.asr import ASR
     from contextspan.duetaspan.runtime.backend.realtime import RealtimeBackend
     backend = RealtimeBackend(cache=False)
+    # A tool bank that failed to load (e.g. an incompatible `mcp` package: the servers do not start)
+    # would otherwise degrade silently into "every live-value request gets no span" (#9).
+    from contextspan.duetaspan.runtime.mcp.client import get_mcp_router
+    from contextspan.duetaspan.runtime.mcp.registry import get_registry
+    n_tools, n_bank = len(get_mcp_router().list_tools()), len(get_registry().supported())
+    if n_tools < n_bank:
+        raise RuntimeError(f"tool bank did not load: router sees {n_tools} tools, registry supports {n_bank} "
+                           f"(MCP servers failed to start? pip install 'mcp>=1.9,<2')")
+    print(f"[tools] router universe: {n_tools} tools ({n_bank} from the bank + MCP servers)", flush=True)
     t0 = time.time()
     for q in ("hello", "what time is it now?", "how is the weather today?"):
         try:
