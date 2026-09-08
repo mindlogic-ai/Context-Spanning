@@ -28,6 +28,25 @@ from qwen_asr import Qwen3ASRModel  # noqa: E402  (heavy import after banner)
 MODEL = Qwen3ASRModel.from_pretrained(MODEL_DIR, dtype=torch.bfloat16, device_map="cuda:0")
 print(f"[asr_server] ready on :{PORT}", flush=True)
 
+# Qwen3-ASR wants a language *name* ("Korean"), and the client passes MOSHICP_ASR_LANGUAGE
+# through untouched, so the natural setting "ko" was rejected on every request and the
+# client turned that into an empty transcript with no error in the runtime log.
+_LANG_NAMES = {"zh": "Chinese", "en": "English", "yue": "Cantonese", "ar": "Arabic", "de": "German",
+               "fr": "French", "es": "Spanish", "pt": "Portuguese", "id": "Indonesian",
+               "it": "Italian", "ko": "Korean", "ru": "Russian", "th": "Thai", "vi": "Vietnamese",
+               "ja": "Japanese"}
+
+
+def _norm_lang(value):
+    v = (value or "").strip()
+    if not v:
+        return "English"
+    key = v.lower().replace("_", "-").split("-")[0]
+    if key in _LANG_NAMES:
+        return _LANG_NAMES[key]
+    return v[0].upper() + v[1:].lower()        # "korean", "KOREAN" -> "Korean"
+
+
 
 def _extract_wav_bytes(headers, body: bytes):
     """(wav_bytes, fields) — the audio part plus the text fields (`language`)."""
@@ -76,7 +95,7 @@ class Handler(BaseHTTPRequestHandler):
                 pcm = pcm.mean(axis=1)
             if len(pcm) < sr * 0.2:                       # too short for ASR
                 return self._send(200, {"text": ""})
-            language = fields.get("language") or "English"
+            language = _norm_lang(fields.get("language"))
             res = MODEL.transcribe((np.ascontiguousarray(pcm), int(sr)), language=language)
             self._send(200, {"text": (res[0].text or "").strip()})
         except Exception as e:  # keep the server alive on any bad request
