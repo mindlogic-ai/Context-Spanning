@@ -9,13 +9,13 @@
 # time of a dense 27B at the same quality on the tool-selection probes; one 80-96 GB GPU at TP=1.
 # The same server also answers the RAG fallback (knowledge questions the tools cannot) and serves as the eval
 # judge unless RAG_MODEL points those at a second server. Footprint on one 96 GB GPU with everything on it:
-# router ~56 GB (ROUTER_MEM 0.58) + ASR ~5 GB + speech model ~20 GB = ~81 GB.
+# the router needs its own GPU (~82 GB at ROUTER_MEM 0.85); ASR (~5 GB) and the speech model (~20 GB) share another.
 # GPUs: ROUTER_GPUS (default 1), ASR_GPU (default 0, ~4 GB). ROUTER_MODEL / ROUTER_TP override.
 #
 # Why these vLLM flags (measured on RTX PRO 6000 Blackwell, 2026-09):
 #   --max-model-len 8192           the router prompt carries the tool catalogue (~2.9k tokens at the first
 #                                  stage, ~3.5k for the largest tool group) plus the conversation; 4k truncates.
-#   --gpu-memory-utilization ROUTER_MEM (0.58, ~56 GB) leaves room on the same GPU for the ASR and the speech model.
+#   --gpu-memory-utilization ROUTER_MEM (0.85, ~82 GB): the A4B weights are 48.5 GiB and the 8192-token KV cache needs the rest; 0.58 fails to start.
 #   --speculative-config ngram     the router's replies repeat the prompt (tool names, argument values,
 #                                  the sentence it copies from the Context DB): prompt-lookup speculation
 #                                  cut the router round trip by ~40% at temperature 0 with no output change.
@@ -25,7 +25,7 @@ CMD="${1:-status}"
 ROUTER_PORT="${ROUTER_PORT:-8004}"; ASR_PORT="${ASR_PORT:-8990}"
 ROUTER_MODEL="${ROUTER_MODEL:-google/gemma-4-26B-A4B-it}"
 ROUTER_GPUS="${ROUTER_GPUS:-1}"; ROUTER_TP="${ROUTER_TP:-1}"; ASR_GPU="${ASR_GPU:-0}"
-ROUTER_MEM="${ROUTER_MEM:-0.58}"          # fraction of the GPU: ~56 GB on a 96 GB card = weights (~52 GB bf16) + KV
+ROUTER_MEM="${ROUTER_MEM:-0.85}"          # fraction of the GPU. Measured: Gemma-4-26B-A4B weights alone take 48.5 GiB; at 0.58 on a 96 GB card the KV cache came out NEGATIVE and the engine refused to start
 # Optional second server for the knowledge jobs (RAG fallback answers, eval judge) so the router model can be
 # small: set RAG_MODEL (and RAG_GPUS / RAG_PORT). Unset = the router server does all of it (default).
 RAG_MODEL="${RAG_MODEL:-}"; RAG_PORT="${RAG_PORT:-8005}"; RAG_GPUS="${RAG_GPUS:-$ROUTER_GPUS}"; RAG_TP="${RAG_TP:-1}"; RAG_MEM="${RAG_MEM:-0.30}"
