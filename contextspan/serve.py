@@ -22,6 +22,7 @@ import numpy as np
 from aiohttp import WSMsgType, web
 
 from .duetaspan.runtime.backend.context_db import ContextDB, ContextProfile
+from .levelling import TARGET_LUFS, UserLeveller, load_enhancer, measure_lufs
 from .model import load_voice
 from .stream import RET_DEADLINE_S, RET_UTT_WAIT_S, UTT_CACHE_S, Utterances, retrieve_for_ret
 
@@ -49,6 +50,10 @@ async def ws_handler(request):
         pending = None
         heard, keep = [], int(request.app["listen_s"] * eng.frame_rate)
         said, shown, user, cloning, stepped = [], "", {}, False, 0
+        enh = request.app.get("enhancer")
+        leveller = None if request.app.get("raw_user_audio") else \
+            UserLeveller(sample_rate=int(eng.mimi.sample_rate), enhancer=enh() if enh else None)
+        raw_tail, raw_told = [], False
         db, events = ContextDB(ContextProfile(persona=persona)), []
         # continuous utterance ASR (DuetaSpan live server): `heard` is indexed by absolute frame via `base`
         utts, base, cache, ret_wait, t_ret = Utterances(), 0, {"text": None, "t": -1e9}, None, 0.0
@@ -140,6 +145,23 @@ async def ws_handler(request):
                     await ws.send_json({"type": "span", "text": r["inject"], "question": r["question"],
                                         "source": r["src"], "frames": n, "seconds": round(n / eng.frame_rate, 2)})
             frame = np.frombuffer(msg.data, dtype=np.float32).copy()
+            # The model is conditioned on this audio and the fine-tune's user channel sits in
+            # a narrow band, so a quiet microphone is off-distribution input rather than a
+            # merely faint one. The ASR hides that: it keeps transcribing while the model
+            # stops reacting (#18). Level it here, before both consumers.
+            if leveller is not None:
+                raw_tail.append(frame)
+                frame = leveller.process(frame)
+                # Once, after ~4 s of raw audio: the loudness the microphone actually delivered,
+                # by the same meter the training data was measured with.
+                if not raw_told and len(raw_tail) >= 50:
+                    raw_told = True
+                    lufs = measure_lufs(np.concatenate(raw_tail), int(eng.mimi.sample_rate))
+                    if np.isfinite(lufs):
+                        await ws.send_json({"type": "mic_level", "lufs": round(lufs, 1),
+                                            "target": TARGET_LUFS,
+                                            "quiet": bool(lufs < TARGET_LUFS - 10)})
+                    raw_tail.clear()
             heard.append(frame)
             if len(heard) > 2 * keep:
                 del heard[:keep]; base += keep
@@ -199,11 +221,13 @@ async def index(request):
     return web.FileResponse(WEB / "index.html")
 
 
-def serve(engine, backend, asr, persona, voice, host="127.0.0.1", port=8080, token="", listen_s=12.0):
+def serve(engine, backend, asr, persona, voice, host="127.0.0.1", port=8080, token="",
+          listen_s=12.0, raw_user_audio=False, enhance=""):
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     app = web.Application()
     app.update(engine=engine, backend=backend, asr=asr, persona=persona, voice=voice, token=token,
-               listen_s=listen_s, lock=asyncio.Lock())
+               listen_s=listen_s, raw_user_audio=raw_user_audio,
+               enhancer=load_enhancer(enhance) if enhance else None, lock=asyncio.Lock())
     app.add_routes([web.get("/", index), web.get("/health", health), web.get("/ws", ws_handler),
                     web.static("/static", WEB)])
     log.info("open http://%s:%s%s", host, port, "/?token=..." if token else "")

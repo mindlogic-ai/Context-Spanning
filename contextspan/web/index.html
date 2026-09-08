@@ -285,6 +285,12 @@ function connect() {
     else if (m.type === "late") { recEvent("late", { question: m.question, seconds: m.seconds, source: m.source }); status("listening", "live"); }
     else if (m.type === "no_span") { recEvent("no_span", { question: m.question }); status("listening", "live"); }
     else if (m.type === "span") { recEvent("span", { text: m.text, question: m.question, source: m.source, frames: m.frames, seconds: m.seconds }); notice(""); status("listening", "live"); }
+    else if (m.type === "mic_level") {
+      // The ASR is robust to a quiet microphone and the model is not, so without this the
+      // page shows your words back while the agent behaves as though you said nothing.
+      recEvent("mic_level", { lufs: m.lufs, quiet: m.quiet });
+      if (m.quiet) notice("Your microphone is quiet (" + m.lufs + " LUFS; the model was trained around " + m.target + "). It is being levelled, but speaking closer or raising the input gain works better than any levelling.");
+    }
     else if (m.type === "error") { recEvent("error", { stage: m.stage, message: m.message }); notice(`${m.stage}: ${m.message}`); status("listening", "live"); }
     else if (m.type === "cloned") {
       cloning = false;
