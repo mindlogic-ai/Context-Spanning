@@ -407,9 +407,11 @@ async function recordVoice() {
 }
 
 const PLAY_LEAD = 0.1;   // seconds of agent audio queued ahead of the clock; absorbs a late frame up to this size
-const LEAD_SLACK = 0.08; // lead beyond PLAY_LEAD + this is backlog from a hole, and gets drained (one frame of jitter is not)
-const DRAIN_RATE = 1.04; // playback rate while draining: -4% duration, pitch shift below what a listener notices
-const QUIET_RMS = 0.005; // a chunk under this (-46 dBFS) is an agent pause: dropped outright while draining
+const LEAD_SLACK = 0.08; // one frame of ordinary jitter above PLAY_LEAD is not backlog
+const DRAIN_TAU = 2.0;   // seconds: the excess lead decays as E(t) = E0 * exp(-t / tau) while the agent speaks
+const RATE_MAX = 1.06;   // cap on the playback rate (about one semitone); pauses drain the rest
+const QUIET_RMS = 0.005; // a chunk under this (-46 dBFS) is an agent pause, dropped outright while draining
+let leadLogAt = 0;
 function play(pcm) {
   if (!ctx || pcm.length === 0) return;
   if (playAt < ctx.currentTime + 0.02) {
@@ -419,26 +421,34 @@ function play(pcm) {
     recEvent("underrun", { late_ms: +((ctx.currentTime + 0.02 - playAt) * 1000).toFixed(0) });
     playAt = ctx.currentTime + PLAY_LEAD;
   }
-  // After a hole the server sends the backlog in a burst; played as-is, at 1x and back to back, every ms of
-  // that hole would stay as a fixed delay on every later word: the agent hears the user in real time while
-  // the user hears the agent late. Drain it: the agent's pauses are dropped outright, speech plays 4% faster,
-  // until the lead is back to its target.
-  const backlog = playAt - ctx.currentTime - PLAY_LEAD - LEAD_SLACK;
+  // After a hole the server sends its backlog in a burst. Queued contiguously at 1x, every ms of the hole would
+  // stay as a fixed delay on all later audio: the agent hears the user in real time, the user hears the agent
+  // late. So the excess lead E is drained:
+  //   pause chunk (RMS < QUIET_RMS): dropped, E falls by the chunk (80 ms per 80 ms of pause: 1 s per s);
+  //   speech chunk: played at r = min(RATE_MAX, 1 + E / tau), which removes d * (1 - 1/r) per chunk, i.e.
+  //   dE/dt = -E / tau for small E: exponential return to the target with time constant tau, no overshoot,
+  //   and r -> 1 as E -> 0. From 400 ms of excess: gone in 0.4 s of pause, or ~6 s of continuous speech.
+  const d = pcm.length / ctx.sampleRate;
+  const E = playAt - ctx.currentTime - PLAY_LEAD - LEAD_SLACK;
   let rate = 1;
-  if (backlog > 0) {
+  if (E > 0) {
     let e = 0; for (let i = 0; i < pcm.length; i++) e += pcm[i] * pcm[i];
     if (Math.sqrt(e / pcm.length) < QUIET_RMS) {
-      recEvent("drain", { dropped_ms: +(1000 * pcm.length / ctx.sampleRate).toFixed(0), backlog_ms: +(backlog * 1000).toFixed(0) });
+      recEvent("drain", { dropped_ms: +(d * 1000).toFixed(0), excess_ms: +(E * 1000).toFixed(0) });
       return;
     }
-    rate = DRAIN_RATE;
+    rate = Math.min(RATE_MAX, 1 + E / DRAIN_TAU);
   }
   const buf = ctx.createBuffer(1, pcm.length, ctx.sampleRate);
   buf.getChannelData(0).set(pcm);
   const s = ctx.createBufferSource();
   s.buffer = buf; s.playbackRate.value = rate; s.connect(ctx.destination);
   s.start(playAt);
-  playAt += buf.duration / rate;
+  playAt += d / rate;
+  if (ctx.currentTime >= leadLogAt) {   // once a second: how far ahead of the clock the queue is
+    leadLogAt = ctx.currentTime + 1;
+    recEvent("lead", { ms: +((playAt - ctx.currentTime) * 1000).toFixed(0), rate: +rate.toFixed(3) });
+  }
 }
 
 function wav16(left, right, sr) {
