@@ -27,8 +27,11 @@ Binary frames are float32 PCM at the sample rate given in `ready`, one frame (`f
 | `ret` | the model asked for external information |
 | `question {text, ms}` | the transcript that was sent to the router (`ms` = ASR latency) |
 | `span {text, question, source, frames, seconds, prefill_ms}` | the Context Span that was injected; `source` = `mcp:<tool>` or the router's direct answer; `prefill_ms` = wall clock of the block read |
-| `drain {dropped_ms, excess_ms}` (page-side, transcript only) | a near-silent agent chunk dropped to drain the playback backlog a hole left |
-| `lead {ms, rate}` (page-side, transcript only) | once a second: agent audio queued ahead of the clock, and the playback rate in use |
+| `lead {ms, target_ms, rate}` (page-side, transcript only) | once a second: agent audio queued when a chunk arrived, the jitter-measured target, the playback rate in use |
+| `underrun {late_ms, target_ms}` (page-side) | the playback queue ran dry; `late_ms` = silence until it refilled |
+| `grow {from_ms, target_ms}` (page-side) | output held inside an agent pause to bring the queue up to the target |
+| `drain {dropped_ms, excess_ms}` (page-side) | a pause chunk dropped to drain backlog a hole left |
+| `cut {cut_ms}` (page-side) | pathological backlog cut to the target (oldest audio removed) |
 | `slot {prefill_ms, step_ms, total_ms, over_budget}` | the frame right after a span read: block read + that frame's step against the 80 ms slot |
 | `no_span {question}` | the router had nothing to look up: nothing injected, not a failure |
 | `late {question, seconds, source}` | the answer arrived after the deadline and was dropped |

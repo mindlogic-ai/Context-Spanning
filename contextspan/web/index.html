@@ -143,7 +143,7 @@ body:not(.talking) #thread, body:not(.talking) .meters { display: none; }
 <script>
 const $ = (id) => document.getElementById(id);
 if (new URLSearchParams(location.search).get("theme") === "light") document.documentElement.dataset.theme = "light";
-let ws, ctx, node, stream, mic, playAt = 0, running = false;
+let ws, ctx, node, player, stream, mic, running = false;
 let micOn = false, mode = "talk", fmt = null;   // fmt = {sampleRate, frameSize} from the server's `ready`
 let queuedVoice = null;                          // {name} or {pcm} to apply once the connection is ready
 let geo = null;                          // {lat, lon} once the user allowed it
@@ -344,6 +344,7 @@ async function openMic(sampleRate, frameSize, forClone = false) {
                channelCount: 1 } });
     if (raw) notice("Raw microphone: the browser's noise suppression is off.");
     await ctx.audioWorklet.addModule("/static/mic.js");
+    await ctx.audioWorklet.addModule("/static/player.js");
   } catch (e) {
     notice("Microphone unavailable: " + (e && e.message ? e.message : e));
     stop("idle");
@@ -352,6 +353,9 @@ async function openMic(sampleRate, frameSize, forClone = false) {
   const src = ctx.createMediaStreamSource(stream);
   node = new AudioWorkletNode(ctx, "mic-frames", { processorOptions: { frameSize } });
   node.port.onmessage = (e) => frame(new Float32Array(e.data));
+  player = new AudioWorkletNode(ctx, "agent-player", { processorOptions: { frameSize }, outputChannelCount: [1] });
+  player.port.onmessage = (e) => { const m = e.data; const t = m.type; delete m.type; recEvent(t, m); };
+  player.connect(ctx.destination);
   src.connect(node);
   micOn = true;
   begin(sampleRate, forClone);
@@ -373,7 +377,7 @@ function begin(sampleRate, forClone) {
   $("thread").textContent = ""; turns.length = 0; agentBubble = null;
   for (const k of Object.keys(youBubbles)) delete youBubbles[k];
   document.body.classList.add("talking");
-  running = true; leadTarget = PLAY_LEAD; played = 0; playAt = ctx ? ctx.currentTime + PLAY_LEAD : 0;
+  running = true; if (player) player.port.postMessage({ type: "reset" });
   status("listening", "live");
   $("go").textContent = "Stop"; $("go").disabled = false;
   $("go").onclick = () => stop("idle");
@@ -384,8 +388,9 @@ function closeMic() {
   if (mic) mic.stop();
   if (stream) stream.getTracks().forEach((t) => t.stop());
   if (node) node.disconnect();
+  if (player) player.disconnect();
   if (ctx) { try { ctx.close(); } catch (e) {} }
-  mic = stream = node = ctx = null;
+  mic = stream = node = player = ctx = null;
 }
 
 async function recordVoice() {
@@ -406,63 +411,12 @@ async function recordVoice() {
   ws.send(pcm.buffer);
 }
 
-const PLAY_LEAD = 0.1;   // seconds of agent audio queued ahead of the clock at start; absorbs a late frame up to this size
-const LEAD_MAX = 0.35;   // the target lead never grows past this, whatever the network does
-const LEAD_DECAY = 0.04; // every 10 s without an underrun the target comes down by this, back towards PLAY_LEAD
-let leadTarget = PLAY_LEAD, leadDecayAt = 0, played = 0;
-const LEAD_SLACK = 0.08; // one frame of ordinary jitter above PLAY_LEAD is not backlog
-const DRAIN_TAU = 2.0;   // seconds: the excess lead decays as E(t) = E0 * exp(-t / tau) while the agent speaks
-const RATE_MAX = 1.06;   // cap on the playback rate (about one semitone); pauses drain the rest
-const QUIET_RMS = 0.005; // a chunk under this (-46 dBFS) is an agent pause, dropped outright while draining
-let leadLogAt = 0;
 function play(pcm) {
-  if (!ctx || pcm.length === 0) return;
-  if (played === 0) {
-    // First chunk of the conversation: the server's first frame is slow (persona prefill), nothing was
-    // playing yet, so this is a start, not an underrun.
-    playAt = ctx.currentTime + leadTarget;
-  } else if (playAt < ctx.currentTime + 0.02) {
-    // The queue ran dry: a frame came later than the lead could cover (a span read plus its step, network
-    // jitter). Re-open the full lead rather than restarting 20 ms ahead, so one late frame costs one gap and
-    // not a permanently shorter lead in which every later hiccup is audible.
-    // A jitter buffer: the target lead grows to cover what was just seen (bounded), and decays while the
-    // path is clean, so a jittery path costs latency only while it is jittery.
-    const late = ctx.currentTime + 0.02 - playAt;
-    leadTarget = Math.min(LEAD_MAX, Math.max(leadTarget, late + 0.03));
-    leadDecayAt = ctx.currentTime + 10;
-    recEvent("underrun", { late_ms: +(late * 1000).toFixed(0), target_ms: +(leadTarget * 1000).toFixed(0) });
-    playAt = ctx.currentTime + leadTarget;
-  } else if (leadTarget > PLAY_LEAD && ctx.currentTime >= leadDecayAt) {
-    leadTarget = Math.max(PLAY_LEAD, leadTarget - LEAD_DECAY); leadDecayAt = ctx.currentTime + 10;
-  }
-  // After a hole the server sends its backlog in a burst. Queued contiguously at 1x, every ms of the hole would
-  // stay as a fixed delay on all later audio: the agent hears the user in real time, the user hears the agent
-  // late. So the excess lead E is drained:
-  //   pause chunk (RMS < QUIET_RMS): dropped, E falls by the chunk (80 ms per 80 ms of pause: 1 s per s);
-  //   speech chunk: played at r = min(RATE_MAX, 1 + E / tau), which removes d * (1 - 1/r) per chunk, i.e.
-  //   dE/dt = -E / tau for small E: exponential return to the target with time constant tau, no overshoot,
-  //   and r -> 1 as E -> 0. From 400 ms of excess: gone in 0.4 s of pause, or ~6 s of continuous speech.
-  const d = pcm.length / ctx.sampleRate;
-  const E = playAt - ctx.currentTime - leadTarget - LEAD_SLACK;
-  let rate = 1;
-  if (E > 0) {
-    let e = 0; for (let i = 0; i < pcm.length; i++) e += pcm[i] * pcm[i];
-    if (Math.sqrt(e / pcm.length) < QUIET_RMS) {
-      recEvent("drain", { dropped_ms: +(d * 1000).toFixed(0), excess_ms: +(E * 1000).toFixed(0) });
-      return;
-    }
-    rate = Math.min(RATE_MAX, 1 + E / DRAIN_TAU);
-  }
-  const buf = ctx.createBuffer(1, pcm.length, ctx.sampleRate);
-  buf.getChannelData(0).set(pcm);
-  const s = ctx.createBufferSource();
-  s.buffer = buf; s.playbackRate.value = rate; s.connect(ctx.destination);
-  s.start(playAt);
-  playAt += d / rate; played++;
-  if (ctx.currentTime >= leadLogAt) {   // once a second: how far ahead of the clock the queue is
-    leadLogAt = ctx.currentTime + 1;
-    recEvent("lead", { ms: +((playAt - ctx.currentTime) * 1000).toFixed(0), target_ms: +(leadTarget * 1000).toFixed(0), rate: +rate.toFixed(3) });
-  }
+  // Playback lives on the audio thread (static/player.js): queue, jitter-measured lead, underrun
+  // re-buffering, backlog drain. Its events (lead/underrun/grow/drain/cut) come back on the port.
+  if (!player || pcm.length === 0) return;
+  const copy = pcm.slice(0);                                 // the recording keeps `pcm`
+  player.port.postMessage(copy.buffer, [copy.buffer]);
 }
 
 function wav16(left, right, sr) {
