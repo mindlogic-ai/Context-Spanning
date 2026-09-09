@@ -52,6 +52,7 @@ async def ws_handler(request):
         db, events = ContextDB(ContextProfile(persona=persona)), []
         # continuous utterance ASR (DuetaSpan live server): `heard` is indexed by absolute frame via `base`
         utts, base, cache, ret_wait, t_ret = Utterances(), 0, {"text": None, "t": -1e9}, None, 0.0
+        slot = None                      # the span read whose following frame is still to be timed
         sr = int(eng.mimi.sample_rate)
 
         def uslice(f0, f1):
@@ -64,6 +65,36 @@ async def ws_handler(request):
             notify = lambda ev: asyncio.run_coroutine_threadsafe(ws.send_json(ev), loop)
             pending = loop.run_in_executor(None, _retrieve, request.app, uslice(max(0, i + 1 - keep), i), sr,
                                            dict(user), db, shown, list(events), notify, question)
+            # Read the span the moment the backend returns, not at the next frame head. The loop thread is
+            # idle for ~48 ms of every 80 ms frame (a step is ~32 ms), and a block read costs 27-41 ms
+            # (2026-09-09, up to 400 tokens), so the read usually lands in that gap and the next frame
+            # pays nothing. The KV sequence is the same either way: the block sits between the last
+            # stepped frame and the next one.
+            pending.add_done_callback(lambda fut: asyncio.ensure_future(on_retrieved(fut)))
+
+        async def on_retrieved(fut):
+            nonlocal pending, slot
+            if fut is not pending or fut.cancelled():
+                return
+            pending = None
+            r = fut.result()
+            took = time.monotonic() - t_ret
+            if r.get("error"):
+                await ws.send_json({"type": "error", "stage": r["error"], "message": r["message"]})
+            elif r["inject"] is not None and took > RET_DEADLINE_S:   # too late to be the answer's ground
+                r["inject"] = None; r["late"] = True; events.append(r)
+                await ws.send_json({"type": "late", "question": r["question"], "seconds": round(took, 2),
+                                    "source": r["src"]})
+            elif r["inject"] is None:      # nothing to ground on: no span, and not a failure
+                events.append(r)
+                await ws.send_json({"type": "no_span", "question": r["question"]})
+            else:
+                n = eng.inject_context_span(r["inject"])
+                r["prefill_ms"] = round(eng.last_prefill_ms, 1); events.append(r)
+                slot = {"prefill_ms": r["prefill_ms"], "t": time.monotonic()}
+                await ws.send_json({"type": "span", "text": r["inject"], "question": r["question"],
+                                    "source": r["src"], "frames": n, "seconds": round(n / eng.frame_rate, 2),
+                                    "prefill_ms": r["prefill_ms"]})
 
         async def transcribe_utt(kind, u0, u1):
             nonlocal ret_wait
@@ -122,23 +153,6 @@ async def ws_handler(request):
                 await ws.send_json({"type": "cloned", "frames": int(voice.shape[1]),
                                     "seconds": round(voice.shape[1] / eng.frame_rate, 1)})
                 continue
-            if pending is not None and pending.done():
-                r = pending.result(); pending = None
-                took = time.monotonic() - t_ret
-                if r.get("error"):
-                    await ws.send_json({"type": "error", "stage": r["error"], "message": r["message"]})
-                elif r["inject"] is not None and took > RET_DEADLINE_S:   # too late to be the answer's ground
-                    r["inject"] = None; r["late"] = True; events.append(r)
-                    await ws.send_json({"type": "late", "question": r["question"], "seconds": round(took, 2),
-                                        "source": r["src"]})
-                elif r["inject"] is None:      # nothing to ground on: no span, and not a failure
-                    events.append(r)
-                    await ws.send_json({"type": "no_span", "question": r["question"]})
-                else:
-                    n = eng.inject_context_span(r["inject"])
-                    events.append(r)
-                    await ws.send_json({"type": "span", "text": r["inject"], "question": r["question"],
-                                        "source": r["src"], "frames": n, "seconds": round(n / eng.frame_rate, 2)})
             frame = np.frombuffer(msg.data, dtype=np.float32).copy()
             heard.append(frame)
             if len(heard) > 2 * keep:
@@ -148,10 +162,20 @@ async def ws_handler(request):
             if ret_wait is not None and (stepped - ret_wait) / eng.frame_rate >= RET_UTT_WAIT_S:
                 waiting, ret_wait = ret_wait, None
                 kick(waiting)                           # the sentence did not end in time: transcribe the window
+            t_step = time.monotonic()
             out = eng.step(frame)
             stepped += 1
             if out["agent_pcm"] is not None:
                 await ws.send_bytes(out["agent_pcm"].astype(np.float32).tobytes())
+            if slot is not None:
+                # The frame right after a span read: what the read and this step cost together, against the
+                # 80 ms slot. Nothing else changes on an overrun - the server catches up at one step per
+                # queued frame, the client absorbs it with its playback lead (see web/index.html play()).
+                step_ms = (time.monotonic() - t_step) * 1e3
+                slot.update(step_ms=round(step_ms, 1), total_ms=round(slot["prefill_ms"] + step_ms, 1))
+                await ws.send_json({"type": "slot", "prefill_ms": slot["prefill_ms"], "step_ms": slot["step_ms"],
+                                    "total_ms": slot["total_ms"], "over_budget": slot["total_ms"] > 1000.0 / eng.frame_rate})
+                slot = None
             if out["text_token"] is not None:
                 said.append(int(out["text_token"]))
                 full = eng.decode_text(said)

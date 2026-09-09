@@ -26,12 +26,13 @@ Binary frames are float32 PCM at the sample rate given in `ready`, one frame (`f
 | `user_text {utt, final, t, text}` | what the ASR heard, per utterance: partial (updates) then final |
 | `ret` | the model asked for external information |
 | `question {text, ms}` | the transcript that was sent to the router (`ms` = ASR latency) |
-| `span {text, question, source, frames, seconds}` | the Context Span that was injected; `source` = `mcp:<tool>` or the router's direct answer |
+| `span {text, question, source, frames, seconds, prefill_ms}` | the Context Span that was injected; `source` = `mcp:<tool>` or the router's direct answer; `prefill_ms` = wall clock of the block read |
+| `slot {prefill_ms, step_ms, total_ms, over_budget}` | the frame right after a span read: block read + that frame's step against the 80 ms slot |
 | `no_span {question}` | the router had nothing to look up: nothing injected, not a failure |
 | `late {question, seconds, source}` | the answer arrived after the deadline and was dropped |
 | `error {stage, message}` | a real failure (asr / retrieval / persona / voice) |
 
 Turn structure for a chat-style rendering: a `user_text` with `final:true` closes a user utterance;
 agent `text` deltas between user utterances belong to the agent's turn (full-duplex: both can be open at
-once); `question`/`span`/`no_span`/`late` are diagnostics tied to the preceding `ret` and can be hidden
+once); `question`/`span`/`slot`/`no_span`/`late` are diagnostics tied to the preceding `ret` and can be hidden
 behind a debug switch. Everything a session produced is also in the JSON transcript offered by Stop.
