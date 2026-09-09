@@ -64,6 +64,12 @@ class Engine:
         with torch.no_grad():
             for _ in range(4):
                 self.lm_gen.step(input_tokens=self._sine)
+            # The span block is read through `forward_codes`, a batched path the per-frame
+            # loop never touches, so its one-time initialisation (~0.5 s on an RTX PRO 6000) would otherwise
+            # land on the first span of every conversation as a hole in the agent's audio
+            # (#28). Read one throwaway block here; reset() below leaves no trace of it.
+            self.lm.forward_codes(torch.zeros(1, self.lm.num_codebooks, 32,
+                                              dtype=torch.long, device=device))
         self.reset()
 
     def reset(self):

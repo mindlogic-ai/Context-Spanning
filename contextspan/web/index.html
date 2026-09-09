@@ -284,7 +284,7 @@ function connect() {
     // none of them is drawn: the screen is the conversation, they are the JSON.
     else if (m.type === "late") { recEvent("late", { question: m.question, seconds: m.seconds, source: m.source }); status("listening", "live"); }
     else if (m.type === "no_span") { recEvent("no_span", { question: m.question }); status("listening", "live"); }
-    else if (m.type === "span") { recEvent("span", { text: m.text, question: m.question, source: m.source, frames: m.frames, seconds: m.seconds }); notice(""); status("listening", "live"); }
+    else if (m.type === "span") { recEvent("span", { text: m.text, question: m.question, source: m.source, frames: m.frames, seconds: m.seconds, read_ms: m.read_ms }); notice(""); status("listening", "live"); }
     else if (m.type === "error") { recEvent("error", { stage: m.stage, message: m.message }); notice(`${m.stage}: ${m.message}`); status("listening", "live"); }
     else if (m.type === "cloned") {
       cloning = false;

@@ -78,7 +78,12 @@ async def ws_handler(request):
                 waiting, ret_wait = ret_wait, None
                 kick(waiting, text.strip() or None)
         app_asr = request.app["asr"]
+        t_end = time.monotonic(); t_step = t_read_ms = 0.0
         async for msg in ws:
+            # One frame every 80 ms. `wait` is how long this loop sat waiting for the client's
+            # next frame (page, network); `body` is the server's own work on it. A long body is a
+            # hole in the agent's audio that this process caused (#28).
+            t_top = time.monotonic(); wait_ms = (t_top - t_end) * 1000
             if msg.type == WSMsgType.TEXT:
                 m = json.loads(msg.data)
                 if m.get("type") == "reset":
@@ -135,10 +140,13 @@ async def ws_handler(request):
                     events.append(r)
                     await ws.send_json({"type": "no_span", "question": r["question"]})
                 else:
+                    t_read = time.monotonic()
                     n = eng.inject_context_span(r["inject"])
+                    r["read_ms"] = t_read_ms = round((time.monotonic() - t_read) * 1000, 1)
                     events.append(r)
                     await ws.send_json({"type": "span", "text": r["inject"], "question": r["question"],
-                                        "source": r["src"], "frames": n, "seconds": round(n / eng.frame_rate, 2)})
+                                        "source": r["src"], "frames": n, "seconds": round(n / eng.frame_rate, 2),
+                                        "read_ms": r["read_ms"]})
             frame = np.frombuffer(msg.data, dtype=np.float32).copy()
             heard.append(frame)
             if len(heard) > 2 * keep:
@@ -148,7 +156,9 @@ async def ws_handler(request):
             if ret_wait is not None and (stepped - ret_wait) / eng.frame_rate >= RET_UTT_WAIT_S:
                 waiting, ret_wait = ret_wait, None
                 kick(waiting)                           # the sentence did not end in time: transcribe the window
+            t_step = time.monotonic()
             out = eng.step(frame)
+            t_step = time.monotonic() - t_step
             stepped += 1
             if out["agent_pcm"] is not None:
                 await ws.send_bytes(out["agent_pcm"].astype(np.float32).tobytes())
@@ -166,6 +176,11 @@ async def ws_handler(request):
                     ret_wait = i                        # mid-sentence: wait for the utterance to end (bounded)
                 else:
                     kick(i)                             # no utterance around: the fixed window
+            t_end = time.monotonic(); body_ms = (t_end - t_top) * 1000
+            if stepped > 1 and (body_ms > 120 or wait_ms > 300):
+                log.warning("frame %d: body %.0f ms (model step %.0f, span read %.0f), waited %.0f ms for the frame",
+                            stepped, body_ms, t_step * 1000, t_read_ms, wait_ms)
+            t_read_ms = 0.0
     return ws
 
 
