@@ -407,12 +407,11 @@ async function recordVoice() {
 }
 
 const PLAY_LEAD = 0.1;   // seconds of agent audio queued ahead of the clock; absorbs a late frame up to this size
+const LEAD_SLACK = 0.08; // lead beyond PLAY_LEAD + this is backlog from a hole, and gets drained (one frame of jitter is not)
+const DRAIN_RATE = 1.04; // playback rate while draining: -4% duration, pitch shift below what a listener notices
+const QUIET_RMS = 0.005; // a chunk under this (-46 dBFS) is an agent pause: dropped outright while draining
 function play(pcm) {
   if (!ctx || pcm.length === 0) return;
-  const buf = ctx.createBuffer(1, pcm.length, ctx.sampleRate);
-  buf.getChannelData(0).set(pcm);
-  const s = ctx.createBufferSource();
-  s.buffer = buf; s.connect(ctx.destination);
   if (playAt < ctx.currentTime + 0.02) {
     // The queue ran dry: a frame came later than the lead could cover (a span read plus its step, network
     // jitter). Re-open the full lead rather than restarting 20 ms ahead, so one late frame costs one gap and
@@ -420,8 +419,26 @@ function play(pcm) {
     recEvent("underrun", { late_ms: +((ctx.currentTime + 0.02 - playAt) * 1000).toFixed(0) });
     playAt = ctx.currentTime + PLAY_LEAD;
   }
+  // After a hole the server sends the backlog in a burst; played as-is, at 1x and back to back, every ms of
+  // that hole would stay as a fixed delay on every later word: the agent hears the user in real time while
+  // the user hears the agent late. Drain it: the agent's pauses are dropped outright, speech plays 4% faster,
+  // until the lead is back to its target.
+  const backlog = playAt - ctx.currentTime - PLAY_LEAD - LEAD_SLACK;
+  let rate = 1;
+  if (backlog > 0) {
+    let e = 0; for (let i = 0; i < pcm.length; i++) e += pcm[i] * pcm[i];
+    if (Math.sqrt(e / pcm.length) < QUIET_RMS) {
+      recEvent("drain", { dropped_ms: +(1000 * pcm.length / ctx.sampleRate).toFixed(0), backlog_ms: +(backlog * 1000).toFixed(0) });
+      return;
+    }
+    rate = DRAIN_RATE;
+  }
+  const buf = ctx.createBuffer(1, pcm.length, ctx.sampleRate);
+  buf.getChannelData(0).set(pcm);
+  const s = ctx.createBufferSource();
+  s.buffer = buf; s.playbackRate.value = rate; s.connect(ctx.destination);
   s.start(playAt);
-  playAt += buf.duration;
+  playAt += buf.duration / rate;
 }
 
 function wav16(left, right, sr) {
