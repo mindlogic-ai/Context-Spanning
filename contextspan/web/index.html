@@ -352,6 +352,7 @@ async function openMic(sampleRate, frameSize, forClone = false) {
   }
   const src = ctx.createMediaStreamSource(stream);
   node = new AudioWorkletNode(ctx, "mic-frames", { processorOptions: { frameSize } });
+  checkOutputDevice();
   node.port.onmessage = (e) => frame(new Float32Array(e.data));
   player = new AudioWorkletNode(ctx, "agent-player", { processorOptions: { frameSize }, outputChannelCount: [1] });
   player.port.onmessage = (e) => { const m = e.data; const t = m.type; delete m.type; recEvent(t, m); };
@@ -381,6 +382,21 @@ function begin(sampleRate, forClone) {
   status("listening", "live");
   $("go").textContent = "Stop"; $("go").disabled = false;
   $("go").onclick = () => stop("idle");
+}
+
+async function checkOutputDevice() {
+  // With the microphone granted, output device labels are readable. If the system default output is
+  // a virtual loopback device (BlackHole, Soundflower, Loopback, an OBS/monitor device), the browser
+  // sends the agent's voice there and nothing reaches the speakers: say so before the first word.
+  try {
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    const outs = devs.filter((d) => d.kind === "audiooutput");
+    const def = outs.find((d) => d.deviceId === "default") || outs[0];
+    const label = def ? def.label : "";
+    recEvent("output_device", { label, outputs: outs.length });
+    if (/blackhole|soundflower|loopback|virtual|obs|vb-audio|monitor/i.test(label))
+      notice("Your system's default audio output is \"" + label.replace(/^Default - /, "") + "\", a virtual device: you will not hear the agent. Pick the speakers or headphones in the system sound settings, then start again.");
+  } catch (e) { console.warn("output device check", e); }
 }
 
 function closeMic() {
