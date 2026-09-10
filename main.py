@@ -101,7 +101,10 @@ def serve_cmd(a):
     eng = Engine(a.checkpoint, temp=a.temp, temp_text=a.temp_text)
     backend, asr = _backend_and_asr()
     serve(eng, backend, asr, a.text_prompt, load_voice(a.voice),
-          host=a.host, port=a.port, token=a.token, listen_s=a.listen_s)
+          host=a.host, port=a.port, token=a.token, listen_s=a.listen_s, raw_user_audio=a.raw_user_audio, enhance=a.enhance)
+
+
+from contextspan.personas import DEFAULT_PERSONA
 
 
 def main(argv=None):
@@ -114,7 +117,7 @@ def main(argv=None):
     p.add_argument("--output-text", default=None)
     p.add_argument("--checkpoint", default=None, help="local .pt; default downloads the released weights")
     p.add_argument("--voice", default="f0", help="voice: f0 / f1 / f2 from the weights repo, or a local .pt of agent-voice Mimi codes")
-    p.add_argument("--text-prompt", default="You are a helpful and friendly voice assistant.")
+    p.add_argument("--text-prompt", default=DEFAULT_PERSONA)
     p.add_argument("--lead-silence", type=float, default=4.0)
     p.add_argument("--tail-silence", type=float, default=8.0)
     p.add_argument("--listen-s", type=float, default=12.0, help="seconds of user audio transcribed on <ret>")
@@ -129,10 +132,14 @@ def main(argv=None):
     p = sub.add_parser("serve", help="live conversation in the browser")
     p.add_argument("--checkpoint", default=None)
     p.add_argument("--voice", default="f0")
-    p.add_argument("--text-prompt", default="You are a helpful and friendly voice assistant.")
+    p.add_argument("--text-prompt", default=DEFAULT_PERSONA)
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8080)
     p.add_argument("--token", default="", help="if set, /ws requires ?token=<this>")
+    p.add_argument("--raw-user-audio", action="store_true",
+                   help="do not level the user channel to the training level (debugging)")
+    p.add_argument("--enhance", default="", metavar="MODULE:CALLABLE",
+                   help="denoiser factory run before the leveller; default noisereduce")
     p.add_argument("--listen-s", type=float, default=12.0)
     p.add_argument("--temp", type=float, default=0.8)
     p.add_argument("--temp-text", type=float, default=0.7)
