@@ -148,6 +148,7 @@ def run_stream(eng, backend, asr, pcm, ctx=None, asr_window_s=12.0, realtime=Tru
             if ready["late"]:
                 ready["inject"] = None
             ready["frames"] = eng.inject_context_span(ready["inject"]) if ready["inject"] else 0
+            ready["prefill_ms"] = round(eng.last_prefill_ms, 1) if ready["inject"] else 0.0
             events.append(ready)
             if verbose:
                 print(f"[span @{ready['t_inj']:.1f}s] q={ready['question']!r} src={ready['src']} "

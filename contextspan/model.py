@@ -1,5 +1,6 @@
 """Model loading and the streaming engine (PersonaPlex base + Context Spanning checkpoint)."""
 import os
+import time
 import numpy as np
 import sentencepiece
 import torch
@@ -60,10 +61,15 @@ class Engine:
         self._sine = torch.tensor(SINE_TOKENS, device=device)[None, :, None]
         self._pending_exit_cb0 = None
         self.frames = 0
+        self.last_prefill_ms = 0.0
         self.reset()
         with torch.no_grad():
             for _ in range(4):
                 self.lm_gen.step(input_tokens=self._sine)
+            # The block forward (inject.prefill) is a multi-position path the single-step loop never
+            # exercises; its first call in a process costs ~0.7 s (measured 741 ms vs 58 ms for the
+            # second call, 2026-09-09). Pay it here, not on the first span of a conversation.
+            inject_mod.prefill(self.lm_gen, [SPAN_TOKEN_ID] + [TEXT_PAD] * 6 + [SPAN_TOKEN_ID], self._sil, self._sine)
         self.reset()
 
     def reset(self):
@@ -118,10 +124,17 @@ class Engine:
     @torch.no_grad()
     def inject_context_span(self, reference: str) -> int:
         """Read the reference into the stream as a masked Context Span block in one batched forward.
-        Returns the number of frames the block consumed."""
+        Returns the number of frames the block consumed; `last_prefill_ms` holds its wall-clock cost.
+        Measured 2026-09-09 (RTX PRO 6000 Blackwell): 27 ms up to 250 tokens, 32/38/41 ms at 300/350/400,
+        so prefill + the next 32 ms step stays inside the 80 ms frame up to 400 tokens."""
         ids = inject_mod.span_ids(reference, self.spm)
         self._pending_exit_cb0 = inject_mod.pending_exit_cb0(self.lm_gen)
-        return inject_mod.prefill(self.lm_gen, ids, self._sil, self._sine)
+        t0 = time.perf_counter()
+        n = inject_mod.prefill(self.lm_gen, ids, self._sil, self._sine)
+        if self.device != "cpu":
+            torch.cuda.synchronize()
+        self.last_prefill_ms = (time.perf_counter() - t0) * 1e3     # wall clock of the block read
+        return n
 
     @torch.no_grad()
     def clone_voice(self, pcm, sample_rate: int) -> torch.Tensor:

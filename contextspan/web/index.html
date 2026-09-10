@@ -282,6 +282,7 @@ function connect() {
     else if (m.type === "question") { recEvent("question", { text: m.text, ms: m.ms }); markRouted(m.text); }
     // A span, a dropped span and a turn that needed none are all recorded and
     // none of them is drawn: the screen is the conversation, they are the JSON.
+    else if (m.type === "slot") { recEvent("slot", { prefill_ms: m.prefill_ms, step_ms: m.step_ms, total_ms: m.total_ms, over_budget: m.over_budget }); }
     else if (m.type === "late") { recEvent("late", { question: m.question, seconds: m.seconds, source: m.source }); status("listening", "live"); }
     else if (m.type === "no_span") { recEvent("no_span", { question: m.question }); status("listening", "live"); }
     else if (m.type === "span") { recEvent("span", { text: m.text, question: m.question, source: m.source, frames: m.frames, seconds: m.seconds }); notice(""); status("listening", "live"); }
@@ -384,7 +385,7 @@ function begin(sampleRate, forClone) {
   $("thread").textContent = ""; turns.length = 0; agentBubble = null;
   for (const k of Object.keys(youBubbles)) delete youBubbles[k];
   document.body.classList.add("talking");
-  running = true; playAt = ctx ? ctx.currentTime + 0.1 : 0;
+  running = true; playAt = ctx ? ctx.currentTime + PLAY_LEAD : 0;
   status("listening", "live");
   $("go").textContent = "Stop"; $("go").disabled = false;
   $("go").onclick = () => stop("idle");
@@ -417,13 +418,20 @@ async function recordVoice() {
   ws.send(pcm.buffer);
 }
 
+const PLAY_LEAD = 0.1;   // seconds of agent audio queued ahead of the clock; absorbs a late frame up to this size
 function play(pcm) {
   if (!ctx || pcm.length === 0) return;
   const buf = ctx.createBuffer(1, pcm.length, ctx.sampleRate);
   buf.getChannelData(0).set(pcm);
   const s = ctx.createBufferSource();
   s.buffer = buf; s.connect(ctx.destination);
-  playAt = Math.max(playAt, ctx.currentTime + 0.02);   // keep the queue just ahead of the clock
+  if (playAt < ctx.currentTime + 0.02) {
+    // The queue ran dry: a frame came later than the lead could cover (a span read plus its step, network
+    // jitter). Re-open the full lead rather than restarting 20 ms ahead, so one late frame costs one gap and
+    // not a permanently shorter lead in which every later hiccup is audible.
+    recEvent("underrun", { late_ms: +((ctx.currentTime + 0.02 - playAt) * 1000).toFixed(0) });
+    playAt = ctx.currentTime + PLAY_LEAD;
+  }
   s.start(playAt);
   playAt += buf.duration;
 }
