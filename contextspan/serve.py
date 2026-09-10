@@ -73,6 +73,7 @@ async def ws_handler(request):
         async def transcribe_utt(kind, u0, u1):
             nonlocal ret_wait
             text = await loop.run_in_executor(None, lambda: app_asr.transcribe(uslice(u0, u1), sr) or "")
+            log.info("heard (%s, %.1fs): %s", kind, (u1 - u0) / eng.frame_rate, text.strip() or "<nothing>")
             if text.strip():
                 cache.update(text=text, t=u1 / eng.frame_rate)
                 if kind == "final" and text != db.last_user_text():
@@ -83,6 +84,7 @@ async def ws_handler(request):
                 waiting, ret_wait = ret_wait, None
                 kick(waiting, text.strip() or None)
         app_asr = request.app["asr"]
+        lvl_peak = lvl_peak2 = 0.0; said_logged = 0
         async for msg in ws:
             if msg.type == WSMsgType.TEXT:
                 m = json.loads(msg.data)
@@ -149,9 +151,15 @@ async def ws_handler(request):
             # a narrow band, so a quiet microphone is off-distribution input rather than a
             # merely faint one. The ASR hides that: it keeps transcribing while the model
             # stops reacting (#18). Level it here, before both consumers.
+            raw_peak = float(np.sqrt(np.mean(frame * frame))) if frame.size else 0.0
             if leveller is not None:
                 raw_tail.append(frame)
                 frame = leveller.process(frame)
+            lvl_peak = max(lvl_peak, raw_peak); lvl_peak2 = max(lvl_peak2, float(np.sqrt(np.mean(frame * frame))) if frame.size else 0.0)
+            if stepped and stepped % 63 == 0:      # every ~5 s: loudest frame the user sent, raw and levelled, dBFS RMS
+                log.info("user audio: peak frame raw %.1f dBFS, levelled %.1f dBFS, gain x%.1f", 20 * np.log10(max(lvl_peak, 1e-9)),
+                         20 * np.log10(max(lvl_peak2, 1e-9)), getattr(leveller, "gain", 1.0))
+                lvl_peak = lvl_peak2 = 0.0
                 # Once, after ~4 s of raw audio: the loudness the microphone actually delivered,
                 # by the same meter the training data was measured with.
                 if not raw_told and len(raw_tail) >= 50:
@@ -179,6 +187,8 @@ async def ws_handler(request):
                 full = eng.decode_text(said)
                 if full != shown:
                     await ws.send_json({"type": "text", "delta": full[len(shown):]}); shown = full
+                    if full[-1:] in ".?!" and len(full) > said_logged:
+                        log.info("agent: %s", full[said_logged:].strip()); said_logged = len(full)
             if out["is_ret"] and pending is None and ret_wait is None:
                 await ws.send_json({"type": "ret"})
                 i = stepped - 1

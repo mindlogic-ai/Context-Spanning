@@ -350,8 +350,12 @@ async function openMic(sampleRate, frameSize, forClone = false) {
   try {
     ctx = new AudioContext({ sampleRate });
     const raw = new URLSearchParams(location.search).get("raw") === "1";
+    const aec = new URLSearchParams(location.search).get("aec") !== "0";   // ?aec=0: no echo cancellation (testing with a loudspeaker source)
     stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: !raw, autoGainControl: false,
+      // autoGainControl on: the browser's WebRTC AGC brings a talker to about -20 dBFS whatever the
+      // distance. Off, a MacBook microphone delivered -40 to -55 dBFS peaks to the server even when
+      // shouted at, beyond what the server-side leveller can recover (#24).
+      audio: { echoCancellation: aec, noiseSuppression: !raw, autoGainControl: !raw,
                channelCount: 1 } });
     if (raw) notice("Raw microphone: the browser's noise suppression is off.");
     await ctx.audioWorklet.addModule("/static/mic.js");
