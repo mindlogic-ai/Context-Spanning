@@ -74,8 +74,9 @@ def _ctx(a):
 def infer(a):
     from contextspan.model import Engine, load_voice
     from contextspan.stream import run_stream
+    from contextspan.spans import persona_text
     eng = Engine(a.checkpoint, temp=a.temp, temp_text=a.temp_text, cpu_offload=a.cpu_offload)
-    eng.set_persona(a.text_prompt, load_voice(a.voice))
+    eng.set_persona(persona_text(a.text_prompt, _ctx(a)), load_voice(a.voice))   # name/city as in training
     pcm, sr = sf.read(a.input_wav, dtype="float32")
     if pcm.ndim == 2:
         pcm = pcm[:, 0]

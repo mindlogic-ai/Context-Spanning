@@ -23,6 +23,7 @@ from aiohttp import WSMsgType, web
 
 from .duetaspan.runtime.backend.context_db import ContextDB, ContextProfile
 from .model import load_voice
+from .spans import persona_text
 from .stream import RET_DEADLINE_S, RET_UTT_WAIT_S, UTT_CACHE_S, Utterances, retrieve_for_ret
 
 WEB = Path(__file__).parent / "web"
@@ -42,7 +43,8 @@ async def ws_handler(request):
         return ws
     async with lock:
         persona, voice = request.app["persona"], request.app["voice"]
-        eng.reset(); eng.set_persona(persona, voice)
+        prefix = persona_text(persona)            # what the model is given: persona + the user's name/city
+        eng.reset(); eng.set_persona(prefix, voice)
         await ws.send_json({"type": "ready", "sample_rate": int(eng.mimi.sample_rate),
                             "frame_size": eng.frame_size, "persona": persona})
         loop = asyncio.get_running_loop()
@@ -82,7 +84,7 @@ async def ws_handler(request):
             if msg.type == WSMsgType.TEXT:
                 m = json.loads(msg.data)
                 if m.get("type") == "reset":
-                    eng.reset(); eng.set_persona(persona, voice); heard.clear(); stepped = 0
+                    eng.reset(); eng.set_persona(prefix, voice); heard.clear(); stepped = 0
                     db, events = ContextDB(ContextProfile(persona=persona, **user)), []
                 elif m.get("type") == "clone":          # the next binary message is the recording
                     cloning = True
@@ -96,29 +98,34 @@ async def ws_handler(request):
                             await ws.send_json({"type": "error", "stage": "voice", "message": "unknown voice"}); continue
                         try:
                             voice = load_voice(name)
-                            eng.reset(); eng.set_persona(persona, voice)
+                            eng.reset(); eng.set_persona(prefix, voice)
                             await ws.send_json({"type": "voice", "name": m.get("name"), "frames": int(voice.shape[1])})
                         except Exception as e:
                             await ws.send_json({"type": "error", "stage": "voice", "message": str(e)})
                 elif m.get("type") == "context":
                     # page fields -> Context DB profile (duetaspan ContextProfile): the "Knowledge" text
-                    # is the profile's notes, so the router sees it in the working text.
+                    # is the profile's notes, so the router sees it in the working text. The name and
+                    # location also go into the model's prefix, phrased as in the training corpus
+                    # (`The user's name is {name}. The user is in {city}.`), so a change to either
+                    # resets the engine exactly like a persona change.
                     keys = {"name": "name", "location": "city", "lat": "lat", "lon": "lon", "tz": "timezone", "db": "notes"}
                     user = {keys[k]: m[k] for k in keys if m.get(k) not in (None, "")}
                     db = ContextDB(ContextProfile(persona=m.get("persona") or persona, **user))
-                    if "persona" in m and m["persona"] != persona:
+                    want = persona_text(m["persona"] if "persona" in m else persona, user)
+                    if want != prefix:
                         if stepped:
                             await ws.send_json({"type": "error", "stage": "persona",
                                                 "message": "already talking; press Stop, then Start to apply it"})
                         else:
-                            persona = m["persona"]; eng.reset(); eng.set_persona(persona, voice)
+                            persona = m["persona"] if "persona" in m else persona
+                            prefix = want; eng.reset(); eng.set_persona(prefix, voice)
                 continue
             if msg.type != WSMsgType.BINARY:
                 continue
             if cloning:
                 cloning = False
                 voice = eng.clone_voice(np.frombuffer(msg.data, dtype=np.float32), int(eng.mimi.sample_rate))
-                eng.set_persona(persona, voice); stepped = 0
+                eng.set_persona(prefix, voice); stepped = 0
                 await ws.send_json({"type": "cloned", "frames": int(voice.shape[1]),
                                     "seconds": round(voice.shape[1] / eng.frame_rate, 1)})
                 continue
