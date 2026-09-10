@@ -149,7 +149,7 @@ body:not(.talking) #thread, body:not(.talking) .meters { display: none; }
 <script>
 const $ = (id) => document.getElementById(id);
 if (new URLSearchParams(location.search).get("theme") === "light") document.documentElement.dataset.theme = "light";
-let ws, ctx, node, stream, mic, playAt = 0, running = false;
+let ws, ctx, node, player, stream, mic, running = false;
 let micOn = false, mode = "talk", fmt = null;   // fmt = {sampleRate, frameSize} from the server's `ready`
 let queuedVoice = null;                          // {name} or {pcm} to apply once the connection is ready
 let geo = null;                          // {lat, lon} once the user allowed it
@@ -356,6 +356,7 @@ async function openMic(sampleRate, frameSize, forClone = false) {
                channelCount: 1 } });
     if (raw) notice("Raw microphone: the browser's noise suppression is off.");
     await ctx.audioWorklet.addModule("/static/mic.js");
+    await ctx.audioWorklet.addModule("/static/player.js");
   } catch (e) {
     notice("Microphone unavailable: " + (e && e.message ? e.message : e));
     stop("idle");
@@ -363,7 +364,11 @@ async function openMic(sampleRate, frameSize, forClone = false) {
   }
   const src = ctx.createMediaStreamSource(stream);
   node = new AudioWorkletNode(ctx, "mic-frames", { processorOptions: { frameSize } });
+  checkOutputDevice();
   node.port.onmessage = (e) => frame(new Float32Array(e.data));
+  player = new AudioWorkletNode(ctx, "agent-player", { processorOptions: { frameSize }, outputChannelCount: [1] });
+  player.port.onmessage = (e) => { const m = e.data; const t = m.type; delete m.type; recEvent(t, m); };
+  player.connect(ctx.destination);
   src.connect(node);
   micOn = true;
   begin(sampleRate, forClone);
@@ -385,10 +390,25 @@ function begin(sampleRate, forClone) {
   $("thread").textContent = ""; turns.length = 0; agentBubble = null;
   for (const k of Object.keys(youBubbles)) delete youBubbles[k];
   document.body.classList.add("talking");
-  running = true; playAt = ctx ? ctx.currentTime + PLAY_LEAD : 0;
+  running = true; if (player) player.port.postMessage({ type: "reset" });
   status("listening", "live");
   $("go").textContent = "Stop"; $("go").disabled = false;
   $("go").onclick = () => stop("idle");
+}
+
+async function checkOutputDevice() {
+  // With the microphone granted, output device labels are readable. If the system default output is
+  // a virtual loopback device (BlackHole, Soundflower, Loopback, an OBS/monitor device), the browser
+  // sends the agent's voice there and nothing reaches the speakers: say so before the first word.
+  try {
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    const outs = devs.filter((d) => d.kind === "audiooutput");
+    const def = outs.find((d) => d.deviceId === "default") || outs[0];
+    const label = def ? def.label : "";
+    recEvent("output_device", { label, outputs: outs.length });
+    if (/blackhole|soundflower|loopback|virtual|obs|vb-audio|monitor/i.test(label))
+      notice("Your system's default audio output is \"" + label.replace(/^Default - /, "") + "\", a virtual device: you will not hear the agent. Pick the speakers or headphones in the system sound settings, then start again.");
+  } catch (e) { console.warn("output device check", e); }
 }
 
 function closeMic() {
@@ -396,8 +416,9 @@ function closeMic() {
   if (mic) mic.stop();
   if (stream) stream.getTracks().forEach((t) => t.stop());
   if (node) node.disconnect();
+  if (player) player.disconnect();
   if (ctx) { try { ctx.close(); } catch (e) {} }
-  mic = stream = node = ctx = null;
+  mic = stream = node = player = ctx = null;
 }
 
 async function recordVoice() {
@@ -418,22 +439,12 @@ async function recordVoice() {
   ws.send(pcm.buffer);
 }
 
-const PLAY_LEAD = 0.1;   // seconds of agent audio queued ahead of the clock; absorbs a late frame up to this size
 function play(pcm) {
-  if (!ctx || pcm.length === 0) return;
-  const buf = ctx.createBuffer(1, pcm.length, ctx.sampleRate);
-  buf.getChannelData(0).set(pcm);
-  const s = ctx.createBufferSource();
-  s.buffer = buf; s.connect(ctx.destination);
-  if (playAt < ctx.currentTime + 0.02) {
-    // The queue ran dry: a frame came later than the lead could cover (a span read plus its step, network
-    // jitter). Re-open the full lead rather than restarting 20 ms ahead, so one late frame costs one gap and
-    // not a permanently shorter lead in which every later hiccup is audible.
-    recEvent("underrun", { late_ms: +((ctx.currentTime + 0.02 - playAt) * 1000).toFixed(0) });
-    playAt = ctx.currentTime + PLAY_LEAD;
-  }
-  s.start(playAt);
-  playAt += buf.duration;
+  // Playback lives on the audio thread (static/player.js): queue, jitter-measured lead, underrun
+  // re-buffering, backlog drain. Its events (lead/underrun/grow/drain/cut) come back on the port.
+  if (!player || pcm.length === 0) return;
+  const copy = pcm.slice(0);                                 // the recording keeps `pcm`
+  player.port.postMessage(copy.buffer, [copy.buffer]);
 }
 
 function wav16(left, right, sr) {
