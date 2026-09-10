@@ -28,6 +28,7 @@ RET_DEADLINE_S = float(os.environ.get("CS_RET_DEADLINE_S", "2.5"))
 # waits for the utterance to end, at most RET_UTT_WAIT_S (MoshiRAG waits a fixed second; here the wait ends
 # with the sentence). Only with no utterance at all does the old fixed window get transcribed.
 RMS_SPEECH = 0.01
+RMS_FLOOR = 0.008      # -42 dBFS after levelling: below this nothing is speech, whatever the VAD says
 UTT_END_F = 9
 PARTIAL_EVERY_F = 20
 UTT_CACHE_S = 3.0
@@ -38,17 +39,38 @@ class Utterances:
     """Causal utterance segmentation over user frames. `feed(i, frame)` returns the events due at frame i:
     ("partial", u0, i) while an utterance runs, ("final", u0, u1) when it has ended."""
 
-    def __init__(self, min_len_f=3):
+    def __init__(self, min_len_f=3, sample_rate=24000):
         self.u0, self.usil, self.last_partial, self.min_len_f = None, 0, 0, min_len_f
+        self.sr = sample_rate
+        # WebRTC VAD (mode 3, the most selective) on 20 ms sub-frames at 16 kHz. An absolute RMS
+        # threshold cannot tell amplified room noise from speech once the channel is levelled; the
+        # VAD can. Falls back to the RMS rule if the library is missing.
+        try:
+            import webrtcvad
+            self.vad = webrtcvad.Vad(3)
+        except Exception:
+            self.vad = None
 
     @property
     def speaking(self):
         return self.u0 is not None
 
+    def voiced(self, frame):
+        rms = float(np.sqrt(np.mean(frame * frame))) if len(frame) else 0.0
+        if self.vad is None or rms < RMS_FLOOR:
+            return rms >= RMS_SPEECH
+        from scipy.signal import resample_poly
+        x = resample_poly(frame.astype(np.float32), 2, 3) if self.sr == 24000 else frame  # 24 kHz -> 16 kHz
+        pcm = (np.clip(x, -1, 1) * 32767).astype(np.int16).tobytes()
+        n, hits = 0, 0
+        for off in range(0, len(pcm) - 640 + 1, 640):            # 20 ms = 320 samples = 640 bytes
+            n += 1
+            hits += self.vad.is_speech(pcm[off:off + 640], 16000)
+        return n > 0 and hits * 2 >= n                            # at least half the sub-frames
+
     def feed(self, i, frame):
         out = []
-        rms = float(np.sqrt(np.mean(frame * frame))) if len(frame) else 0.0
-        if rms >= RMS_SPEECH:
+        if self.voiced(frame):
             if self.u0 is None:
                 self.u0, self.last_partial = i, i
             self.usil = 0

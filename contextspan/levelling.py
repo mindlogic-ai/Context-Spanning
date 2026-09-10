@@ -31,7 +31,7 @@ import pyloudnorm as pyln
 
 TARGET_LUFS = float(os.environ.get("CS_USER_TARGET_LUFS", "-24.0"))
 WINDOW_S = 3.0          # EBU R128 short-term loudness window
-MAX_GAIN_DB = 24.0
+MAX_GAIN_DB = 30.0
 MIN_GAIN_DB = -24.0
 
 
@@ -80,7 +80,7 @@ class UserLeveller:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 lufs = self.meter.integrated_loudness(self.window)
-            if np.isfinite(lufs) and lufs > -60.0:                # -inf / very low = silence: hold
+            if np.isfinite(lufs) and lufs > -70.0:                # -inf / very low = silence: hold
                 self.lufs = float(lufs)
                 want = float(np.clip(10.0 ** ((self.target - lufs) / 20.0),
                                      10.0 ** (MIN_GAIN_DB / 20.0), 10.0 ** (MAX_GAIN_DB / 20.0)))
