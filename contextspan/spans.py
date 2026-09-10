@@ -18,6 +18,22 @@ def persona_prompt(text: str) -> str:
     return t if t.startswith("<system>") else f"<system> {t} <system>"
 
 
+def persona_text(persona: str, user: dict | None = None) -> str:
+    """Persona followed by the user's name and city in the training corpus's exact phrasing.
+
+    Dialogues where the agent addresses the user by name carry
+    `<system> {persona} The user's name is {name}. The user is in {city}. <system>`; a prefix that
+    names nobody teaches the model to invent a name (#33). `user` uses the ContextProfile keys.
+    """
+    t = (persona or "").strip()
+    user = user or {}
+    for key, phrase in (("name", "The user's name is {}."), ("city", "The user is in {}.")):
+        v = str(user.get(key) or "").strip()
+        if v:
+            t = f"{t} {phrase.format(v)}" if t else phrase.format(v)
+    return t
+
+
 def context_span_ids(ref: str, spm) -> list:
     return [SPAN_TOKEN_ID] + list(spm.encode(ref)) + [SPAN_TOKEN_ID]
 
