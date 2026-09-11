@@ -16,6 +16,18 @@ _GEO_URL = "https://geocoding-api.open-meteo.com/v1/search"
 _geo_cache: dict = {}          # city(lower) → geocoding results[0]; coordinates never change, no TTL
 _wx_cache: dict = {}           # (lat,lon) → (ts, forecast json); 60s TTL
 _FC_URL = "https://api.open-meteo.com/v1/forecast"
+_TIMEOUT_S = 2          # per request; the span deadline is 2.5 s, a slower answer is dropped anyway
+_WTTR_URL = "https://wttr.in/{}"   # fallback provider (key-free) when open-meteo is unreachable
+
+
+def _wttr(city: str) -> str:
+    """Same surface form as the open-meteo path, from wttr.in's JSON."""
+    d = _http.get(_WTTR_URL.format(city), params={"format": "j1"}, timeout=_TIMEOUT_S).json()
+    c = d["current_condition"][0]
+    place = city
+    parts = [f"{place}: {float(c['temp_C']):.1f}\u00b0C", f"humidity {int(c['humidity'])}%",
+             f"wind {float(c['windspeedKmph']):.1f} km/h", (c.get("weatherDesc") or [{}])[0].get("value", "").lower() or "unclear conditions"]
+    return "(tool result) " + ", ".join(parts) + "."
 
 # open-meteo WMO weather interpretation codes -> spoken condition.
 _WMO = {
@@ -54,11 +66,10 @@ def _condition(code: int) -> str:
     return _WMO.get(int(code), "unclear conditions")
 
 
-@mcp.tool()
-def get_weather(
+def _open_meteo(
     city: str = "", lat: Optional[float] = None, lon: Optional[float] = None
 ) -> str:
-    """Get the current weather for a city OR explicit latitude/longitude.
+    """open-meteo path (geocode the city, then the forecast API).
 
     Args:
         city: City name to geocode (e.g. "Tokyo"). Ignored if lat/lon are given.
@@ -76,7 +87,7 @@ def get_weather(
                 geo = _http.get(
                     _GEO_URL,
                     params={"name": city, "count": 1, "language": "en", "format": "json"},
-                    timeout=4,
+                    timeout=_TIMEOUT_S,
                 ).json()
                 results = geo.get("results") or []
                 if not results:
@@ -126,6 +137,42 @@ def get_weather(
         return "(tool result) " + ", ".join(parts) + "."
     except Exception:  # pragma: no cover - network failure path
         return ""   # a transport failure is not something to say aloud: no span (ContextSpanning #10)
+
+
+@mcp.tool()
+def get_weather(
+    city: str = "", lat: Optional[float] = None, lon: Optional[float] = None
+) -> str:
+    """Get the current weather for a city OR explicit latitude/longitude.
+
+    Args:
+        city: City name to geocode (e.g. "Tokyo"). Ignored if lat/lon are given.
+        lat: Latitude in decimal degrees.
+        lon: Longitude in decimal degrees.
+    """
+    if not city or (lat is not None and lon is not None):
+        return _open_meteo(city=city, lat=lat, lon=lon)
+    # Two providers at once, first good answer wins. open-meteo is unreachable from some hosts (the
+    # TCP connect hangs until the timeout), and asking a second provider only after that would already
+    # be past the 2.5 s span deadline. Both answers carry the same surface form.
+    from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
+    ex = ThreadPoolExecutor(max_workers=2)
+    pending = {ex.submit(_open_meteo, city=city), ex.submit(_wttr, city)}
+    try:
+        while pending:
+            done, pending = wait(pending, timeout=_TIMEOUT_S + 0.5, return_when=FIRST_COMPLETED)
+            if not done:
+                break
+            for f in done:
+                try:
+                    r = f.result()
+                except Exception:
+                    r = ""
+                if r:
+                    return r
+        return ""   # a transport failure is not something to say aloud: no span (ContextSpanning #10)
+    finally:
+        ex.shutdown(wait=False)
 
 
 if __name__ == "__main__":
