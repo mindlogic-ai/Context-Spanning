@@ -156,7 +156,7 @@ def search(query: str = "", max_results: int = 5, **_: Any) -> str:
     lines = [answer] if answer else []
     lines += [f"{h['title']} — {h['url']}: {h['snippet'][:120]}" for h in hits]
     # One line, " ; "-separated: a span is a single REF line in the voice pipeline, so the
-    # answer + hit rows must not span multiple lines (조율: span = backend output as-is).
+    # answer + hit rows must not span multiple lines (owner tuning: span = backend output as-is).
     return " ; ".join(lines)
 
 

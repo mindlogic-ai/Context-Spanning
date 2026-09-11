@@ -20,7 +20,7 @@ Span latency is part of what is measured, so the machine state is part of the pr
 
 - **Warm.** Every model is loaded and has served at least one request before the first scored item:
   the speech engine, the router / RAG LLM, the ASR, the tool servers. The runners prewarm the backend
-  and the ASR themselves (`eval/common.py`); start the LLM server well before the run and send it one
+  and the ASR themselves (`eval/stack.py`); start the LLM server well before the run and send it one
   request. A cold first item is a measurement of loading time, not of the system.
 - **No parallelism.** One benchmark process at a time, one item at a time, one engine. No sharding
   across GPUs, no concurrent runs of another suite, no other inference job on the GPUs the run uses.
@@ -30,6 +30,9 @@ Span latency is part of what is measured, so the machine state is part of the pr
   replies, speculative decoding, prefix caching, bounded decode); the engine steps at the 1.0x frame
   clock; retrieval is never delayed or batched to make a span "arrive on time". The system is measured
   as it is deployed.
+- **Direct path for the live session.** `eval/live` talks to the page over the network, so the transport
+  is part of what it measures: run it on the box or over `ssh -L`, never through a Cloudflare quick tunnel,
+  which stalls the microphone leg ~0.5 s every 13-20 s on a 280 ms RTT path (#31).
 
 Servers: the same router / RAG / ASR servers as the runtime (see the top-level README) plus a judge LLM
 for the RAG suite (`JUDGE_LLM_URL`, `JUDGE_LLM_MODEL`; `scripts/env.sh` points it at the router server unless

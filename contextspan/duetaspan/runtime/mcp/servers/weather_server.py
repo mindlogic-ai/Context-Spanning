@@ -10,10 +10,10 @@ from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("weather")
 
-_http = requests.Session()   # TLS 재사용: 콜당 ~800ms 절감(실측 1018→239ms)
+_http = requests.Session()   # TLS reuse: ~800ms saved per call (measured 1018 -> 239ms)
 
 _GEO_URL = "https://geocoding-api.open-meteo.com/v1/search"
-_geo_cache: dict = {}          # city(lower) → geocoding results[0]; 좌표는 불변이라 무TTL
+_geo_cache: dict = {}          # city(lower) → geocoding results[0]; coordinates never change, no TTL
 _wx_cache: dict = {}           # (lat,lon) → (ts, forecast json); 60s TTL
 _FC_URL = "https://api.open-meteo.com/v1/forecast"
 
@@ -71,7 +71,7 @@ def get_weather(
             if not city:
                 return "I need a city name or coordinates to check the weather."
             ck = city.strip().lower()
-            top = _geo_cache.get(ck)          # 도시명→좌표는 불변 — 콜당 geocode ~1.2s 제거
+            top = _geo_cache.get(ck)          # city name -> coords never changes — drops ~1.2s geocode per call
             if top is None:
                 geo = _http.get(
                     _GEO_URL,
@@ -90,7 +90,7 @@ def get_weather(
                 place = f"{place}, {country}"
 
         wk = (round(float(lat), 2), round(float(lon), 2))
-        hit = _wx_cache.get(wk)                # 현재날씨 60s TTL — forecast API ~1.1s 제거
+        hit = _wx_cache.get(wk)                # current weather, 60s TTL — drops ~1.1s of forecast API
         if hit and time.time() - hit[0] < 60:
             fc = hit[1]
         else:
@@ -110,10 +110,11 @@ def get_weather(
         if temp is None:
             return f"I could not get the current weather for {place}."
         cond = _condition(code)
-        # 표면형 파리티 (2026-08-03): 학습 span 의 날씨 정식은
-        #   "(tool result) Busan: 26.1°C, humidity 68%, wind 3.8 km/h, clear skies."  (13,856건)
-        # 이전의 "It's N degrees Celsius and COND in CITY right now." 는 학습에 0건 —
-        # 모델이 한 번도 본 적 없는 문장을 주고 있었다. 학습 == 추론 표면형 일치가 원칙.
+        # Surface-form parity (2026-08-03): the canonical weather form in the training spans is
+        #   "(tool result) Busan: 26.1°C, humidity 68%, wind 3.8 km/h, clear skies."  (13,856 cases)
+        # The earlier "It's N degrees Celsius and COND in CITY right now." appeared 0 times in
+        # training — we were feeding the model a sentence it had never seen. The principle is
+        # training surface form == inference surface form.
         hum = cur.get("relative_humidity_2m")
         wind = cur.get("wind_speed_10m")
         parts = [f"{place}: {float(temp):.1f}\u00b0C"]
@@ -123,7 +124,7 @@ def get_weather(
             parts.append(f"wind {float(wind):.1f} km/h")
         parts.append(cond)
         return "(tool result) " + ", ".join(parts) + "."
-    except Exception as exc:  # pragma: no cover - network failure path
+    except Exception:  # pragma: no cover - network failure path
         return ""   # a transport failure is not something to say aloud: no span (ContextSpanning #10)
 
 

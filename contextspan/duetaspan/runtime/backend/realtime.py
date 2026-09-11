@@ -109,8 +109,8 @@ def _personal_from_ctx(q, ctx):
         return f"Your timezone is {ctx.get('timezone')}." if ctx.get("timezone") else None
     # Korean — the [a-z'] tokenizer above yields NOTHING for Korean speech, so every Korean
     # personal question silently fell through to tools/web. Same phrase-level strictness: a
-    # self-referential subject (나/내/저) must be present, so "여기 어디야" (a reverse-geocode
-    # question about a place) does NOT match.
+    # self-referential subject (나/내/저, "I/my") must be present, so "여기 어디야" ("where is
+    # this place?", a reverse-geocode question about a place) does NOT match.
     qk = q or ""
     if persona and re.search(r"[너넌]\s*(는|은)?\s*(누구|뭐\s*하는|뭐[야니냐]|정체)|[너네니]\s*이름", qk):
         return f"저는 {persona}입니다."
@@ -203,7 +203,7 @@ class RealtimeBackend:
                 payload["max_completion_tokens"] = max(self.llm_max_tokens, 256)
             else:
                 payload.update({"temperature": 0, "max_tokens": self.llm_max_tokens,
-                                "keep_alive": -1})   # 모델 상주 고정(콜드 방지)
+                                "keep_alive": -1})   # keep the model resident (no cold starts)
             r = self.sess.post(self.llm_url, json=payload, timeout=self.llm_timeout)
             txt = ((r.json().get("choices") or [{}])[0].get("message", {}).get("content") or "").strip()
             txt = txt.strip('"').strip()
@@ -328,8 +328,9 @@ class RealtimeBackend:
                 return self._maybe_summarize(ref, q)
             if ref == NO_INFO:
                 # LLM abstained. For LONG-TAIL ENTITIES (new group, niche place) the abstain is a
-                # knowledge-cutoff artifact and the web has the answer (owner 2026-08-12: "구글
-                # 기준으로는 매우 쉽게 찾긴 했어"). Try the web chain — but gate on RELEVANCE:
+                # knowledge-cutoff artifact and the web has the answer (owner 2026-08-12: "by
+                # Google's standards it was very easy to find"). Try the web chain — but gate on
+                # RELEVANCE:
                 # the wiki source's high-recall failure mode returned a generic list page for a
                 # concert query (measured: "2026 in music in South Korea"), and junk is worse
                 # than a clean abstain. Require a rare query token to appear in the result.
@@ -379,24 +380,29 @@ class RealtimeBackend:
         if _to_agent:
             q = self._resolve_agent_subject(q, _pers)
         # personal questions answered from context (no web, never cached)
-        # (2026-08-25 단일 결정자: 서빙에선 이 선행 층도 안 탄다 — "do you remember what i
-        # asked?" 같은 기억 질문을 가로채 페르소나 원문을 통짜 주입한 실사고. 프로필·이력은
-        # convo로 라우터에 이미 제공되므로 정체성/개인 질문도 라우터 llm-direct가 답한다.)
+        # (2026-08-25 single decider: serving does not run this pre-layer either — a real
+        # incident where memory questions such as "do you remember what i asked?" were
+        # intercepted here and the raw persona text was injected wholesale. Profile and history
+        # already reach the router through convo, so identity/personal questions are answered by
+        # the router's llm-direct path too.)
         if ctx and not self.fast:
             pa = _personal_from_ctx(q, ctx)
             if pa:
                 self._trace("context-db(profile)", True, pa)
                 return pa
-        # MULTI-INTENT fast path (2026-08-13, owner "둘 다 잘 대답"): time+weather in ONE utterance
+        # MULTI-INTENT fast path (2026-08-13, owner: "answer both well"): time+weather in ONE utterance
         # ("what time is it? and how's the weather?") — the router picks a single tool and the old
         # _route elif suppressed time under weather. Both are keyless REAL lookups, so serve one
         # COMBINED span directly, before the router. (This lives in retrieve(), the LIVE path —
         # the twin patch in _route() turned out to be a dead branch for serving.)
-        # (2026-08-25 유저 설계: "router LLM에게 정보를 줘서 툴콜링하게 — 지엽 구현 금지")
-        # 종전의 시계/날씨 선행 결정 분기는 라우터보다 먼저 실행돼 누적 전사의 'time' 토큰이
-        # 모든 질문을 하이재킹했다(주가 질문에 시각 주입 실사고). 이제 라우터 LLM이 1순위로
-        # 도구·인자(프로필 기반 city/timezone 포함)를 채우고, 이 결정 분기는 **라우터가 아예
-        # 없는 배포**(mcp_on=False)의 최후 안전망으로만 남는다 (2026-08-13 실사고 대비).
+        # (2026-08-25 owner design: "feed the information to the router LLM and let it do the
+        # tool calling — no peripheral implementations")
+        # The former time/weather pre-decision branch ran before the router, so a stray 'time'
+        # token in the accumulated transcript hijacked every question (real incident: a clock
+        # reading injected into a stock-price question). The router LLM now fills tool+arguments
+        # first (including profile-based city/timezone), and this decision branch survives only
+        # as the last-resort safety net for deployments with NO router at all (mcp_on=False),
+        # guarding against the 2026-08-13 incident.
         _tq = _tok(q)
         if not self.mcp_on:
             if (_tq & _WEATHER_WORDS) and (_tq & _TIME_WORDS):
@@ -423,8 +429,9 @@ class RealtimeBackend:
             try:
                 from contextspan.duetaspan.runtime.mcp.client import (
                     mcp_route as _mcp_route, _has_search_intent as _has_search_intent_q)
-                # convo = Context DB working_text() 스냅샷(대화 누적 상태) — 라우터·인자
-                # 채움의 1급 입력: ASR 윈도우 밖의 앞선 도구 결과/값을 체인이 참조한다.
+                # convo = Context DB working_text() snapshot (accumulated conversation state)
+                # — a first-class input for routing and argument filling: it lets the chain refer
+                # to earlier tool results/values that lie outside the ASR window.
                 m = _mcp_route(q, ctx, history, aux=aux_context, convo=convo)
                 if m and m.get("answer"):
                     # NON-CANONICAL ABSTAIN NORMALIZATION (2026-08-12, ritsuje session 5): the
@@ -441,9 +448,10 @@ class RealtimeBackend:
                     else:
                         self._trace("llm-direct(1call)", _ans != NO_INFO, _ans)
                         return _ans
-                # web_search는 일반지식 오남용 방지로 제외해 왔지만, 사용자가 명시적으로
-                # 검색을 요청한 경우("검색해줘", "search the web")는 그 결과가 곧 정답이다 —
-                # 제외하면 _rag의 뉴스-abstain 규칙에 걸려 명시 요청까지 죽는다.
+                # web_search used to be excluded to stop it being misused for general
+                # knowledge, but when the user explicitly asks for a search ("검색해줘",
+                # "search the web") its result IS the answer — excluding it lets _rag's
+                # news-abstain rule kill even an explicit request.
                 if m and m.get("tool") and (m.get("tool") != "web_search"
                                             or _has_search_intent_q(q)):
                     self._trace(f"mcp:{m['tool']}", True, m.get("reference", ""))
@@ -456,12 +464,13 @@ class RealtimeBackend:
                     return self._as_tool_result(m["reference"])
             except Exception as e:
                 self._trace("mcp(unavailable)", False, str(e))
-            # ── 단일 결정자 (2026-08-25 유저 설계 확정: "router LLM에게 맡겨라, 레이어를
-            # 부풀리지 마라"): 서빙 경로에서 라우팅 결정은 라우터 LLM이 유일하게 내린다 —
-            # 툴콜 / 직접답변 / 아무것도 안 함(NO_INFO→빈쌍). 아래의 RAG·웹 레이스 폴백은
-            # 라우터의 옳은 no-tool 결정을 뒤집고 무관 스팬을 물어온 실사고(뉴욕 시간 재질의
-            # → 위키 O.J. Simpson 주입)의 근원이라 서빙에선 타지 않는다. 오프라인 데이터젠
-            # (fast=False)은 종전 전체 체인 유지.
+            # ── SINGLE DECIDER (2026-08-25 owner decision: "leave it to the router LLM, do not
+            # inflate the layers"): on the serving path the router LLM is the only thing that
+            # makes the routing decision — tool call / direct answer / nothing at all
+            # (NO_INFO → empty pair). The RAG/web race fallback below caused a real incident by
+            # overriding the router's correct no-tool decision and fetching an irrelevant span
+            # (a re-asked "time in New York" pulled in a Wikipedia O.J. Simpson span), so
+            # serving does not run it. Offline datagen (fast=False) keeps the full chain.
             if self.fast:
                 self._trace("router-final(no-tool)", False, q[:60])
                 return NO_INFO
@@ -503,10 +512,12 @@ class RealtimeBackend:
     # ── routing ──────────────────────────────────────────────────────────────────────────
     @staticmethod
     def _last_question(q):
-        """누적 전사 방어 (2026-08-25 실사고: 40s 연속발화의 전사 전체가 들어와 첫 질문의
-        'time' 토큰이 인텐트 게이트를 선점 → 주가 질문에 시각이 주입됨). 라우팅 대상은 항상
-        '가장 최근 질문' 하나다(유저 지시) — 마지막 문장부호 뒤 꼬리가 실질 질문이면 그것,
-        아니면(꼬리가 공백/한두 단어) 마지막 완결 문장을 쓴다. 단문 입력은 그대로 통과."""
+        """Accumulated-transcript guard (2026-08-25 incident: the full transcript of a 40s
+        continuous utterance arrived and the 'time' token of its first question pre-empted the
+        intent gate, injecting a clock reading into a stock-price question). The routing target
+        is always ONE 'most recent question' (owner instruction) — the tail after the last
+        punctuation mark if that tail is a real question, otherwise (tail blank or one or two
+        words) the last complete sentence. Short single-sentence input passes through as is."""
         parts = [p.strip() for p in re.split(r"[?!.]", q or "") if p.strip()]
         if len(parts) <= 1:
             return q
@@ -548,11 +559,11 @@ class RealtimeBackend:
                     return self._normalize(nr)
             elif (toks & _TIME_WORDS) and not (toks & _WEATHER_WORDS):
                 return self._tool_time(q, ctx)
-            if toks & _STOCK_WORDS:                    # 실시간 주가 (Yahoo Finance, 무키)
+            if toks & _STOCK_WORDS:                    # live stock price (Yahoo Finance, keyless)
                 r = self._tool_stock(q)
                 if r:
                     return r
-            if toks & self._MUSIC_WORDS:               # 최신곡/발매 (iTunes Search, 무키 실API)
+            if toks & self._MUSIC_WORDS:               # new songs/releases (iTunes Search, keyless real API)
                 r = self._tool_music(q)
                 if r:
                     return r
@@ -586,10 +597,11 @@ class RealtimeBackend:
             if s:
                 self._trace(f"local-clock(ctx-tz:{ctx.get('timezone')})", True, s)
                 return s
-        # (2026-08-25 유저 설계 확정: "기본 tz는 UTC로 하되, '내' 정보(Context DB 프로필)가
-        # 명확하게 들어가서 한국시간으로 '바꿔서' 가져오는 능력을 기르게") — 특정 지역을
-        # 하드코딩하지 않는다. 유저 tz는 위의 ctx(ContextProfile.timezone) 경로가 정본이고,
-        # 도시·ctx가 전무한 마지막 폴백만 UTC로 명시해 답한다(서버 소재지 시계 금지).
+        # (2026-08-25 owner decision: "keep the default tz as UTC, but when 'my' information
+        # (the Context DB profile) is clearly supplied, train the ability to CONVERT it and
+        # report Korean time") — no region is hardcoded. The canonical source for the user's tz
+        # is the ctx (ContextProfile.timezone) path above; only the last fallback, with no city
+        # and no ctx at all, answers with an explicit UTC clock (never the server's own clock).
         _dtz = os.environ.get("MOSHICP_DEFAULT_TZ", "UTC")
         if _dtz:
             s = _fmt_time(_dtz, "UTC" if _dtz == "UTC" else "")
@@ -821,7 +833,8 @@ class RealtimeBackend:
         s = re.sub(r"\b(voiced|voice of|played|starred in|located|right now|currently)\b", "", s, flags=re.I)
         if re.search(r"[가-힣]", s):
             # Korean: drop interrogative/function words so full-text search sees the entity
-            # ("베수비오 화산이 마지막으로 분화한 게 언제야?" -> "베수비오 화산이 마지막으로 분화한").
+            # ("베수비오 화산이 마지막으로 분화한 게 언제야?", i.e. "when did Mt. Vesuvius last erupt?"
+            # -> "베수비오 화산이 마지막으로 분화한").
             drop = re.compile(r"^(언제|어디|누구|뭐|무엇|몇|얼마|어때|왜|게|건|거|그게|이게|지금|혹시|좀|요즘|어떻게)")
             s = " ".join(w for w in s.split() if not drop.match(w))
         return re.sub(r"\s+", " ", s).strip() or q

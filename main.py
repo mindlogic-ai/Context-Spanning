@@ -1,52 +1,37 @@
-"""Context Spanning — single entry point.
+"""Context Spanning - single entry point.
 
   python main.py infer   --input-wav q.wav --output-wav out.wav [--voice f0]
   python main.py serve   [--voice f0] [--host 0.0.0.0 --port 8080 --token ...]
   python main.py prepare --in-dir data/raw --out-dir data/prepared
   python main.py train   --data-dir data/prepared --out-dir runs/ft [--checkpoint ckpt.pt]
 
-Backends are the DuetaSpan runtime's (contextspan/duetaspan): the tool router + 125-tool bank
+Backends are the DuetaSpan runtime's (contextspan/duetaspan): the tool router + tool bank
 (MCP_ROUTER_LLM_URL / MCP_ROUTER_LLM_MODEL / MCP_ROUTER_LLM_API=openai), the RAG LLM
 (MOSHICP_RAG_LLM_URL / MOSHICP_RAG_LLM_MODEL) and the ASR endpoint (MOSHICP_ASR_URL, the
-`python -m contextspan.duetaspan.runtime.asr_server` protocol). See README.
+`python -m contextspan.duetaspan.runtime.asr_server` protocol). See README.md and docs/BACKENDS.md.
 """
 import argparse
 import json
 import sys
+import time
 
 import numpy as np
 import soundfile as sf
 
-
-def transcript(spm, toks):
-    from contextspan.spans import RET_TOKEN_ID, SPAN_TOKEN_ID, TEXT_PAD
-    out, run = [], []
-    for t in toks:
-        if t is None or t <= 2 or t == TEXT_PAD:
-            continue
-        if t in (RET_TOKEN_ID, SPAN_TOKEN_ID):
-            if run:
-                out.append(spm.decode(run)); run = []
-            out.append("<ret>" if t == RET_TOKEN_ID else "<span>")
-        else:
-            run.append(int(t))
-    if run:
-        out.append(spm.decode(run))
-    return " ".join(out)
+from contextspan.runtime.default_persona import DEFAULT_PERSONA
 
 
 def _backend_and_asr():
     """The DuetaSpan runtime backend (MCP router over the tool bank, then LLM-RAG) and its ASR client,
-    prewarmed the way the DuetaSpan offline chat does: the first `<ret>` otherwise pays the MCP session
-    set-up, the tool discovery and the router's first call (measured 3.5 s -> 0.2-0.5 s warm)."""
-    import time
+    prewarmed: the first `<ret>` otherwise pays the MCP session set-up, the tool discovery and the
+    router's first call (measured 3.5 s cold -> 0.2-0.5 s warm)."""
     from contextspan.duetaspan.align.asr import ASR
     from contextspan.duetaspan.runtime.backend.realtime import RealtimeBackend
+    from contextspan.duetaspan.runtime.mcp.client import get_mcp_router
+    from contextspan.duetaspan.runtime.mcp.registry import get_registry
     backend = RealtimeBackend(cache=False)
     # A tool bank that failed to load (e.g. an incompatible `mcp` package: the servers do not start)
     # would otherwise degrade silently into "every live-value request gets no span" (#9).
-    from contextspan.duetaspan.runtime.mcp.client import get_mcp_router
-    from contextspan.duetaspan.runtime.mcp.registry import get_registry
     n_tools, n_bank = len(get_mcp_router().list_tools()), len(get_registry().supported())
     if n_tools < n_bank:
         raise RuntimeError(f"tool bank did not load: router sees {n_tools} tools, registry supports {n_bank} "
@@ -73,8 +58,8 @@ def _ctx(a):
 
 def infer(a):
     from contextspan.model import Engine, load_voice
-    from contextspan.stream import run_stream
-    from contextspan.spans import persona_text
+    from contextspan.model.sequence_convention import persona_text, transcript
+    from contextspan.runtime.frame_stream import run_stream
     eng = Engine(a.checkpoint, temp=a.temp, temp_text=a.temp_text, cpu_offload=a.cpu_offload)
     eng.set_persona(persona_text(a.text_prompt, _ctx(a)), load_voice(a.voice))   # name/city as in training
     pcm, sr = sf.read(a.input_wav, dtype="float32")
@@ -96,16 +81,24 @@ def infer(a):
         json.dump({"transcript": text, "events": res["events"]}, open(a.output_text, "w"), indent=1)
 
 
-def serve_cmd(a):
+def serve(a):
     from contextspan.model import Engine, load_voice
-    from contextspan.serve import serve
+    from contextspan.runtime.websocket_server import serve as serve_ws
     eng = Engine(a.checkpoint, temp=a.temp, temp_text=a.temp_text)
     backend, asr = _backend_and_asr()
-    serve(eng, backend, asr, a.text_prompt, load_voice(a.voice),
-          host=a.host, port=a.port, token=a.token, listen_s=a.listen_s, raw_user_audio=a.raw_user_audio, enhance=a.enhance)
+    serve_ws(eng, backend, asr, a.text_prompt, load_voice(a.voice),
+             host=a.host, port=a.port, token=a.token, listen_s=a.listen_s, raw_user_audio=a.raw_user_audio,
+             enhance=a.enhance)
 
 
-from contextspan.personas import DEFAULT_PERSONA
+def prepare(a):
+    from contextspan.training.prepare import prepare as prepare_dir
+    prepare_dir(a.in_dir, a.out_dir)
+
+
+def train(a):
+    from contextspan.training.finetune import train as finetune
+    finetune(a.data_dir, a.out_dir, a.checkpoint, a.steps, a.lr, a.accum, a.context, a.ckpt_every, a.w_ret, a.seed)
 
 
 def main(argv=None):
@@ -144,17 +137,17 @@ def main(argv=None):
     p.add_argument("--listen-s", type=float, default=12.0)
     p.add_argument("--temp", type=float, default=0.8)
     p.add_argument("--temp-text", type=float, default=0.7)
-    p.set_defaults(fn=serve_cmd)
+    p.set_defaults(fn=serve)
 
     p = sub.add_parser("prepare", help="encode dialogues (json + stereo wav) into training tensors")
     p.add_argument("--in-dir", required=True)
     p.add_argument("--out-dir", required=True)
-    p.set_defaults(fn=lambda a: __import__("contextspan.train", fromlist=["prepare"]).prepare(a.in_dir, a.out_dir))
+    p.set_defaults(fn=prepare)
 
     p = sub.add_parser("train", help="fine-tune on prepared tensors")
     p.add_argument("--data-dir", required=True)
     p.add_argument("--out-dir", required=True)
-    p.add_argument("--checkpoint", default=None, help="start from a local .pt (default: PersonaPlex base)")
+    p.add_argument("--checkpoint", default=None, help="start from a local .pt (default: the released weights)")
     p.add_argument("--steps", type=int, default=1000)
     p.add_argument("--lr", type=float, default=2e-6)
     p.add_argument("--accum", type=int, default=8)
@@ -162,8 +155,7 @@ def main(argv=None):
     p.add_argument("--ckpt-every", type=int, default=250)
     p.add_argument("--w-ret", type=float, default=5.0)
     p.add_argument("--seed", type=int, default=0)
-    p.set_defaults(fn=lambda a: __import__("contextspan.train", fromlist=["train"]).train(
-        a.data_dir, a.out_dir, a.checkpoint, a.steps, a.lr, a.accum, a.context, a.ckpt_every, a.w_ret, a.seed))
+    p.set_defaults(fn=train)
 
     a = ap.parse_args(argv)
     a.fn(a)

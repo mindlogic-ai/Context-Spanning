@@ -16,7 +16,7 @@ import shutil
 import numpy as np
 import soundfile as sf
 
-from eval.common import Stack, load_mono, transcript
+from eval.stack import Stack, load_mono, transcript
 
 P_TEACHER = "You are a wise and friendly teacher. Answer questions or provide advice in a clear and engaging way."
 P_CONV = "You enjoy having a good conversation."

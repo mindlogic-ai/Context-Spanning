@@ -2,8 +2,8 @@
 """GPU-free single-model MCP backend over any OpenAI-compatible chat API.
 
 One wire format (chat/completions + native `tools`) covers the providers we validated
-(437 clean/heavy + 37벤치): OpenAI gpt-5.x and Gemini via its OpenAI-compat endpoint.
-Default model = gpt-5.6-luna (사용자 지정, clean 97%/heavy 95%, p50 1207ms).
+(437 clean/heavy + 37 bench cases): OpenAI gpt-5.x and Gemini via its OpenAI-compat endpoint.
+Default model = gpt-5.6-luna (owner-specified, clean 97%/heavy 95%, p50 1207ms).
 
 Flow (same single-model contract as gemini_backend, but provider-agnostic):
   route: transcript + ctx + answered-history --tools--> tool_calls
@@ -68,12 +68,13 @@ class ApiBackend:
 
     def retrieve(self, query: str, ctx: Optional[dict] = None,
                  history: Optional[list[str]] = None, convo: Optional[str] = None) -> str:
-        # convo = ContextDB.working_text() 스냅샷. 라우팅은 ASR 윈도우 하나가 아니라 대화
-        # 누적 상태를 근거로 해야 한다 — 윈도우가 토큰 머리를 놓치거나(FAST99→"t99") 꼬리
-        # 전에 발사되면("ABC123"→"a") 그 윈도우만으로는 복구가 불가능하지만, 앞선 전사가
-        # Context DB 에 적재돼 있으면 해소된다. 이 파라미터가 없던 동안 framestream 의
-        # inspect 검사(_convo_ok)가 조용히 False 가 되어 이 백엔드 경로는 Context DB 를
-        # 한 번도 보지 못했다.
+        # convo = ContextDB.working_text() snapshot. Routing must be grounded in the
+        # accumulated conversation state, not in a single ASR window — when a window misses the
+        # head of a token (FAST99 -> "t99") or fires before its tail ("ABC123" -> "a"), that
+        # window alone cannot recover it, but an earlier transcript already loaded into the
+        # Context DB resolves it. While this parameter did not exist, framestream's inspect
+        # check (_convo_ok) quietly became False and this backend path never once saw the
+        # Context DB.
         t0 = time.perf_counter()
         user = ""
         if ctx:
@@ -108,10 +109,11 @@ class ApiBackend:
         except Exception as e:
             raw = f"tool execution failed: {e}"
 
-        # 우리 4개 라이브 FastMCP 서버(time/weather/finance/websearch)는 전부 구어 한 줄을
-        # 반환한다(finance는 프리픽스를 소비층에 위임 — realtime._as_tool_result와 동일 규칙으로
-        # 여기서 정규화). 2번째 모델 콜(포맷팅, ~1s)은 순수 중복이라 기본 스킵.
-        # API_BACKEND_FORMAT=model 로 항상-모델 포맷팅 강제 가능(계약 밖 외부 MCP 서버 연동용).
+        # All four of our live FastMCP servers (time/weather/finance/websearch) return a single
+        # spoken line (finance delegates the prefix to the consuming layer — normalized here by
+        # the same rule as realtime._as_tool_result). The 2nd model call (formatting, ~1s) is
+        # pure duplication, so it is skipped by default. API_BACKEND_FORMAT=model forces
+        # always-model formatting (for external MCP servers outside this contract).
         raw_s = str(raw).strip()
         if os.environ.get("API_BACKEND_FORMAT") != "model":
             if not raw_s.startswith("(tool result)") and not raw_s.startswith("(no information"):

@@ -35,7 +35,7 @@ from contextspan.duetaspan.common import paths
 
 DATA = str(paths.DATA)
 
-# 고성현, 대한민국 — the default context for tools that need a "where".
+# Seonghyeon Ko, South Korea — the default context for tools that need a "where".
 CTX = {"city": "Seoul", "country": "KR", "timezone": "Asia/Seoul",
        "lat": 37.5665, "lon": 126.9780}
 _SEOUL_BOX = (37.4, 37.7, 126.7, 127.2)          # lat_min, lat_max, lon_min, lon_max

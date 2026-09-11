@@ -5,7 +5,7 @@ Runs Qwen3-ASR-1.7B via the transformers backend (no vLLM engine, ~4GB) so it ca
 GPU2 with the gemma router/RAG server. POST /transcribe with a wav file (multipart `file`
 field, as asr.py sends, or a raw wav body) -> {"text": ...}. GET /health -> ok.
 
-Launch (GPU2): CUDA_VISIBLE_DEVICES=2 PYTHONPATH=. ksh-python -m contextspan.duetaspan.runtime.asr_server
+Launch: CUDA_VISIBLE_DEVICES=<gpu> python -m contextspan.duetaspan.runtime.asr_server
 """
 import io
 import json

@@ -19,7 +19,7 @@ import sys
 
 import numpy as np
 
-from eval.common import Stack, load_mono, transcript
+from eval.stack import Stack, load_mono, transcript
 
 # The official agent's system prompt (v3/lk_agent_tool.py VoiceAgent.instructions), verbatim.
 PERSONA = (

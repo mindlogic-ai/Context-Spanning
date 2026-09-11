@@ -23,4 +23,4 @@ eval = ["playwright"]             # eval/live drives the browser page; then `pla
 include = ["contextspan*"]
 
 [tool.setuptools.package-data]
-contextspan = ["web/*", "moshi/LICENSE.*", "datasets/moshicp/mcp_tool_bank.json", "datasets/moshicp/TOOLS.md", "datasets/moshicp/*.sqlite"]
+contextspan = ["runtime/web/*", "moshi/LICENSE.*", "datasets/moshicp/mcp_tool_bank.json", "datasets/moshicp/TOOLS.md", "datasets/moshicp/*.sqlite"]

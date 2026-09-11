@@ -6,7 +6,7 @@ import time
 
 import requests
 
-_http = requests.Session()   # TLS 재사용: 콜당 ~800ms 절감
+_http = requests.Session()   # TLS reuse: ~800ms saved per call
 from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("finance")
@@ -136,9 +136,9 @@ def get_stock_price(company: str) -> str:
         if prev:
             try:
                 pct = (price - prev) / prev * 100.0
-                # 표면형 파리티 (2026-08-03): 학습 span 의 변동률 정식은
-                #   ", up 1.2% from the previous close" (up/down, 70건).
-                # "(-8.8% today)" 괄호 형식은 학습에 0건이었다.
+                # Surface-form parity (2026-08-03): the canonical change-rate form in the
+                # training spans is ", up 1.2% from the previous close" (up/down, 70 cases).
+                # The parenthesized "(-8.8% today)" form appeared 0 times in training.
                 change_txt = f", {'up' if pct >= 0 else 'down'} {abs(pct):.1f}% from the previous close"
             except Exception:
                 change_txt = ""
@@ -146,12 +146,13 @@ def get_stock_price(company: str) -> str:
         # No "(tool result)" prefix here: the span-prefix is applied uniformly by the consuming
         # layer (realtime._as_tool_result), so baking it into this one server made its output
         # inconsistent with every other adapter (plain record) and double-prefixed downstream.
-        # "right now" 꼬리도 학습 주가 span 에 0건 — "... KRW." 마침표 종결이 정식.
+        # A trailing "right now" also appeared 0 times in the training stock spans — the
+        # canonical form ends the sentence with a period: "... KRW."
         return (
             f"{name} ({sym}) is trading at "
             f"{price_txt} {currency}{change_txt}."
         ).replace("  ", " ")
-    except Exception as exc:  # pragma: no cover - network failure path
+    except Exception:  # pragma: no cover - network failure path
         return ""   # a transport failure is not something to say aloud: no span (ContextSpanning #10)
 
 

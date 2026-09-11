@@ -78,15 +78,17 @@ class ASR:
         #     Isolated vllm env; we just POST audio. Falls through to faster-whisper if unreachable.
         if os.environ.get("MOSHICP_ASR_BACKEND", "qwen").lower() in ("qwen", "qwen_http", "qwen3"):
             url = os.environ.get("MOSHICP_ASR_URL", "http://localhost:8990/transcribe")
-            # MOSHICP_ASR_URL 이 명시돼 있으면 무조건 신뢰한다 (2026-08-03 실사고).
-            # 1초짜리 연결 프로브는 박스가 바쁜 순간(엔진 로딩 등) 타임아웃하고, 그러면
-            # 이 프로세스는 stub 로 강등돼 **수명 내내 전사가 '' 가 된다** — FDB v3 두 샤드가
-            # 통째로 무콜(calls=[])이 된 원인. 명시 env = 운영자 의도이므로 강등 금지;
-            # 일시 장애는 요청별 timeout(10s)과 except → "" 가 흡수한다.
+            # If MOSHICP_ASR_URL is set explicitly, trust it unconditionally (2026-08-03
+            # incident). The 1-second connect probe times out whenever the box is momentarily
+            # busy (engine loading, etc.), and the process is then demoted to the stub so
+            # **every transcript is '' for the rest of its lifetime** — the cause of two FDB v3
+            # shards coming out entirely call-less (calls=[]). An explicit env var is the
+            # operator's intent, so no demotion; transient failures are absorbed by the
+            # per-request timeout (10s) and the except -> "" path.
             if os.environ.get("MOSHICP_ASR_URL", "").strip():
                 self._model, self._backend = url, "qwen_http"
                 _SHARED["model"], _SHARED["backend"] = url, "qwen_http"
-                print(f"[ASR] Qwen3-ASR vLLM endpoint {url} (명시 env — 프로브 생략)", flush=True)
+                print(f"[ASR] Qwen3-ASR vLLM endpoint {url} (explicit env; probe skipped)", flush=True)
                 return
             try:
                 import socket
@@ -201,9 +203,11 @@ class ASR:
                 r = requests.post(self._model, files={"file": ("a.wav", buf, "audio/wav")},
                                   data=data or None, timeout=10)
                 text = (r.json().get("text") or "").strip()
-                # 기본은 종전과 동일한 lowercase 계약. MOSHICP_ASR_KEEP_CASE=1 이면 원문 케이스
-                # 유지 — 철자 ID("A B C one two three")의 케이스 정보를 라우터/인자채움까지
-                # 보존한다(소문자화가 ASR이 실제 들은 정보를 파괴하던 경로의 opt-in 수리).
+                # The default keeps the previous lowercase contract. With
+                # MOSHICP_ASR_KEEP_CASE=1 the original case is preserved — this carries the case
+                # information of spelled-out IDs ("A B C one two three") all the way to the
+                # router and argument filling (an opt-in repair of the path where lowercasing
+                # destroyed what the ASR actually heard).
                 if os.environ.get("MOSHICP_ASR_KEEP_CASE", "").strip().lower() in ("1", "true", "on"):
                     return text
                 return text.lower()
