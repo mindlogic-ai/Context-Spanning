@@ -50,6 +50,11 @@ bash scripts/backends.sh start        # router on GPU 1, ASR on GPU 0; waits unt
 source scripts/env.sh
 ```
 
+The defaults assume two GPUs: the router alone takes ~82 GB at `ROUTER_MEM=0.85`, and the ASR (~5 GB)
+shares the other GPU with the speech model (~20 GB). On a single 96 GB GPU start it with
+`ROUTER_GPUS=0 ASR_GPU=0 ROUTER_MEM=0.6 bash scripts/backends.sh start`; the span latency figures below
+were measured on the two-GPU layout.
+
 On `<ret>` the router picks ONE tool (or answers a knowledge question directly); the tool runs for real —
 time, weather, prices, web search, places and routes, SGD-seeded bookings — and its result is the span.
 The shipped bank is the 60 tools whose result is something a voice assistant says
