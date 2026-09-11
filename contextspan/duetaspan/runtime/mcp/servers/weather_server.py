@@ -26,7 +26,7 @@ def _wttr(city: str) -> str:
     c = d["current_condition"][0]
     place = city
     parts = [f"{place}: {float(c['temp_C']):.1f}\u00b0C", f"humidity {int(c['humidity'])}%",
-             f"wind {float(c['windspeedKmph']):.1f} km/h", (c.get("weatherDesc") or [{}])[0].get("value", "").lower() or "unclear conditions"]
+             f"wind {float(c['windspeedKmph']):.1f} km/h", (c.get("weatherDesc") or [{}])[0].get("value", "").strip().lower() or "unclear conditions"]
     return "(tool result) " + ", ".join(parts) + "."
 
 # open-meteo WMO weather interpretation codes -> spoken condition.
