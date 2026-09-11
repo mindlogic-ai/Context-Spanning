@@ -1,11 +1,7 @@
 ---
-# TODO(seonghyeon, yongwoo): the base model nvidia/personaplex-7b-v1 is released under the NVIDIA Open Model
-# License (license: other on the Hub), with kyutai/moshiko (CC-BY-4.0) underneath. Derived weights normally
-# inherit it, so the code is MIT but these weights are declared under the NVIDIA license until someone with
-# authority says otherwise. Also decide gated: true / extra_gated_prompt before the repo goes public.
 license: other
-license_name: nvidia-open-model-license
-license_link: https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/
+license_name: personaplex-model-license
+license_link: https://huggingface.co/nvidia/personaplex-7b-v1
 base_model: nvidia/personaplex-7b-v1
 pipeline_tag: audio-to-audio
 language:
@@ -16,8 +12,10 @@ tags:
   - full-duplex
   - spoken-dialogue
   - speech-to-speech
+  - retrieval
   - retrieval-augmented-generation
   - tool-calling
+  - context-spanning
   - moshi
   - personaplex
 ---
@@ -32,7 +30,7 @@ tags:
 > through that package.
 
 <!-- TODO(seonghyeon): replace XXXX.XXXXX with the arXiv id -->
-[![arXiv](https://img.shields.io/badge/arXiv-XXXX.XXXXX-b31b1b.svg)](https://arxiv.org/abs/XXXX.XXXXX) [![Code](https://img.shields.io/badge/GitHub-ContextSpanning-181717?logo=github)](https://github.com/mindlogic-ai/ContextSpanning) [![Base Model](https://img.shields.io/badge/base-PersonaPlex--7B-76b900)](https://huggingface.co/nvidia/personaplex-7b-v1) [![Weights License](https://img.shields.io/badge/weights-NVIDIA%20Open%20Model%20License-76b900)](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/) [![Code License](https://img.shields.io/badge/code-MIT-blue.svg)](https://github.com/mindlogic-ai/ContextSpanning/blob/main/LICENSE)
+[![arXiv](https://img.shields.io/badge/arXiv-XXXX.XXXXX-b31b1b.svg)](https://arxiv.org/abs/XXXX.XXXXX) [![Code](https://img.shields.io/badge/GitHub-ContextSpanning-181717?logo=github)](https://github.com/mindlogic-ai/ContextSpanning) [![Base Model](https://img.shields.io/badge/base-PersonaPlex--7B-76b900)](https://huggingface.co/nvidia/personaplex-7b-v1) [![Weights License](https://img.shields.io/badge/weights-PersonaPlex%20license-76b900)](https://huggingface.co/nvidia/personaplex-7b-v1) [![Code License](https://img.shields.io/badge/code-MIT-blue.svg)](https://github.com/mindlogic-ai/ContextSpanning/blob/main/LICENSE)
 
 A full-duplex speech model that keeps listening and talking while it calls an external backend. When the
 model emits `<ret>`, the recent user audio is transcribed, a tool router (with an LLM for knowledge
@@ -57,6 +55,17 @@ questions) returns one reference, and that reference is written into the model's
 - **Three released voices** (`f0`, `f1`, `f2`) and PersonaPlex-style persona prompts carrying the user's
   name and city.
 
+## Files
+
+| file | content |
+|---|---|
+| `context_spanning_7b.pt` | `{"model": state_dict}` in bf16, loadable with `main.py infer --checkpoint` or fetched automatically |
+| `voices/f0.pt`, `voices/f1.pt`, `voices/f2.pt` | voice prompts (`{"codes": LongTensor[8, P]}`, agent-voice Mimi codes) |
+| `assets/figures/` | the paper's figures used by this card |
+
+Mimi and the text tokenizer are taken from the PersonaPlex repository at load time; the `moshi` package is
+vendored in the code repository (`contextspan/moshi/`).
+
 ## Model Overview
 
 - Type: full-duplex speech-to-speech model (Moshi architecture, PersonaPlex fork)
@@ -64,17 +73,17 @@ questions) returns one reference, and that reference is written into the model's
 - Parameters: 7B
 - Audio codec: Mimi, 12.5 Hz, 8 codebooks per channel (user and agent)
 - Frame clock: 80 ms per step
-- Sequence convention: `<ret>` = 4, span open = 12, span close = 13 (checkpoints trained before 2026-09-08 used 12 on both sides; set `CS_SPAN_CLOSE_ID=12`)
+- Sequence convention: `<ret>` = 4, span open = 12, span close = 13 (`CS_SPAN_CLOSE_ID`; checkpoints trained before 2026-09-08 used 12 on both sides), text pad = 3
 - Training data: `manifest_v6h` — 823,659 dialogues, ~10,009 h indexed; every dialogue passed a frame-level audio QA and a full-text QA
 - Training objective: two-group selective text loss (answer tokens vs. the rest of the grounded reply, weighted by a detached softmax over the two group losses) plus Moshi's audio codebook losses; span and prefix columns masked out
-- Optimisation: 8-bit AdamW, context 3,000 frames, lr 2e-6 (temporal transformer) / 4e-6 (depth transformer), 4× NVIDIA RTX Pro 6000
-- Released checkpoint: DuetaSpan v7, step 8000
+- Optimisation: 8-bit AdamW, context 3,000 frames, lr 2e-6 (temporal transformer) / 4e-6 (depth transformer), 32 dialogues per update, 4× NVIDIA RTX Pro 6000
+- Released checkpoint: DuetaSpan v7, step 8000 (2026-09-11)
 - Backends the numbers were measured with: router `google/gemma-4-26B-A4B-it` on vLLM, ASR Qwen3-ASR-1.7B
 - Language: English
 
 ## Benchmark Results
 
-Tables 1 and 2 of the paper. Rows marked † are reprinted from the original benchmark papers
+Numbers as reported in the paper (Tables 1 and 2). Rows marked † are reprinted from the original benchmark papers
 (Full-Duplex-Bench) or from MoshiRAG (spoken QA and math). Arrows give the direction of better.
 
 <!-- TODO(seonghyeon): confirm these are the camera-ready numbers -->
@@ -178,16 +187,15 @@ the ASR. Servers, GPU layout, vLLM flags and environment variables:
 - Out of scope: text-only use, batch transcription, or any use of the voice prompts to imitate a real
   person. The three released voices are synthetic; do not condition on a real person's voice without
   their consent.
-- The base model's license and acceptable-use terms (PersonaPlex, NVIDIA) apply to derived weights.
 
 ## License
 
-- **Weights (this repository):** derived from `nvidia/personaplex-7b-v1`, which is released under the
-  [NVIDIA Open Model License](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/);
-  PersonaPlex itself builds on `kyutai/moshiko-pytorch-bf16` (CC-BY-4.0). Use of these weights is governed by
-  those terms. <!-- TODO(seonghyeon, yongwoo): confirm wording and whether to gate the repo -->
+- **Weights (this repository):** inherit the [PersonaPlex model license](https://huggingface.co/nvidia/personaplex-7b-v1)
+  (NVIDIA Open Model License; PersonaPlex builds on `kyutai/moshiko-pytorch-bf16`, CC-BY-4.0).
+- **Voice prompts** (`voices/*.pt`) are derived from VCTK (CC BY 4.0).
 - **Code:** [mindlogic-ai/ContextSpanning](https://github.com/mindlogic-ai/ContextSpanning) is MIT; the
   vendored `contextspan/moshi/` carries Kyutai's own license files.
+<!-- TODO(seonghyeon): decide gated: true / extra_gated_prompt before the repo goes public -->
 
 ## Citation
 

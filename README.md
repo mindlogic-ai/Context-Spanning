@@ -19,7 +19,7 @@
   <br>
 
   <!-- TODO(seonghyeon): replace XXXX.XXXXX with the arXiv id once the preprint is up -->
-  [![arXiv](https://img.shields.io/badge/arXiv-XXXX.XXXXX-b31b1b.svg)](https://arxiv.org/abs/XXXX.XXXXX) [![Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-context--spanning--7b-yellow)](https://huggingface.co/mindlogicinc/context-spanning-7b) [![Base Model](https://img.shields.io/badge/base-PersonaPlex--7B-76b900)](https://huggingface.co/nvidia/personaplex-7b-v1) [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+  [![arXiv](https://img.shields.io/badge/arXiv-XXXX.XXXXX-b31b1b.svg)](https://arxiv.org/abs/XXXX.XXXXX) [![Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-context--spanning--7b-yellow)](https://huggingface.co/mindlogicinc/context-spanning-7b) [![Base Model](https://img.shields.io/badge/base-PersonaPlex--7B-76b900)](https://huggingface.co/nvidia/personaplex-7b-v1) [![Code License](https://img.shields.io/badge/code-MIT-blue.svg)](LICENSE) [![Weights License](https://img.shields.io/badge/weights-PersonaPlex%20license-76b900)](https://huggingface.co/nvidia/personaplex-7b-v1)
   <!-- TODO(seonghyeon): add a Demo / Project Page badge here if one goes live -->
 
 </div>
@@ -258,8 +258,7 @@ benchmark authors' own. `contextspan/moshi/` is the PersonaPlex fork of Kyutai's
 ## License
 
 Code: MIT — see `LICENSE`. `contextspan/moshi/` carries its own license files. The released weights are
-derived from `nvidia/personaplex-7b-v1` and are governed by the
-[NVIDIA Open Model License](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/)
-(PersonaPlex builds on `kyutai/moshiko-pytorch-bf16`, CC-BY-4.0); see the
-[model card](https://huggingface.co/mindlogicinc/context-spanning-7b).
-<!-- TODO(seonghyeon, yongwoo): confirm the weights-license wording -->
+fine-tuned from `nvidia/personaplex-7b-v1` and inherit the
+[PersonaPlex model license](https://huggingface.co/nvidia/personaplex-7b-v1) (NVIDIA Open Model License;
+PersonaPlex builds on `kyutai/moshiko-pytorch-bf16`, CC-BY-4.0). The voice prompts are derived from VCTK
+(CC BY 4.0). See the [model card](https://huggingface.co/mindlogicinc/context-spanning-7b).
