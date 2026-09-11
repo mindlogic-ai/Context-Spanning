@@ -106,7 +106,14 @@ def _browser_available() -> bool:
     The 32 browser tools stay unsupported on a machine without playwright and its
     bundled browser, rather than failing one call at a time deep inside a dialogue.
     """
-    return importlib.util.find_spec("playwright.sync_api") is not None
+    # find_spec on a dotted name imports the parent package first and raises when it is
+    # missing, so check the package before the module (#37: a README install has no playwright).
+    if importlib.util.find_spec("playwright") is None:
+        return False
+    try:
+        return importlib.util.find_spec("playwright.sync_api") is not None
+    except ModuleNotFoundError:
+        return False
 
 
 def _world_override() -> dict[str, Callable]:
