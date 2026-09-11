@@ -35,6 +35,22 @@ UTT_CACHE_S = 3.0
 RET_UTT_WAIT_S = float(os.environ.get("CS_RET_UTT_WAIT_S", "1.0"))
 
 
+def ret_question_plan(cache, t_now, speaking):
+    """What a `<ret>` at time `t_now` uses as its question (#43).
+
+    "cache"  - the last utterance ended, its FINAL transcript is in the cache and fresh: that is the question.
+    "wait"   - the user is still speaking, or the utterance ended but only a PARTIAL transcript is cached
+               (the final one is still in the ASR): wait for the final, bounded by RET_UTT_WAIT_S.
+    "window" - no utterance around: transcribe the fixed window before the <ret>.
+    A partial is cut wherever its 1.6 s tick fell ("...arthur's magazine or?"), so it is never the question."""
+    fresh = bool(cache.get("text")) and (t_now - cache.get("t", -1e9)) < UTT_CACHE_S
+    if fresh and cache.get("final") and not speaking:
+        return "cache"
+    if speaking or (fresh and not cache.get("final")):
+        return "wait"
+    return "window"
+
+
 class Utterances:
     """Causal utterance segmentation over user frames. `feed(i, frame)` returns the events due at frame i:
     ("partial", u0, i) while an utterance runs, ("final", u0, u1) when it has ended."""
@@ -153,9 +169,10 @@ def run_stream(eng, backend, asr, pcm, ctx=None, asr_window_s=12.0, realtime=Tru
     def start_ret(i):
         """The question for this <ret>: the fresh utterance transcript, else wait for the sentence, else the window."""
         pending[0] = True
-        if cache["text"] and (i / eng.frame_rate - cache["t"]) < UTT_CACHE_S and not utts.speaking:
+        plan = ret_question_plan(cache, i / eng.frame_rate, utts.speaking)
+        if plan == "cache":
             threading.Thread(target=kick, args=(i, cache["text"]), daemon=True).start()
-        elif utts.speaking:
+        elif plan == "wait":
             ret_wait[0] = i                # resolved by the utterance's final transcript or by the cap below
         else:
             threading.Thread(target=kick, args=(i,), daemon=True).start()
