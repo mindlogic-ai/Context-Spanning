@@ -23,7 +23,7 @@ from aiohttp import WSMsgType, web
 from ..duetaspan.runtime.backend.context_db import ContextDB, ContextProfile
 from ..model import load_voice
 from ..model.sequence_convention import persona_text
-from .frame_stream import RET_DEADLINE_S, RET_UTT_WAIT_S, UTT_CACHE_S, Utterances, retrieve_for_ret
+from .frame_stream import RET_DEADLINE_S, RET_UTT_WAIT_S, Utterances, ret_question_plan, retrieve_for_ret
 from .user_leveller import TARGET_LUFS, UserLeveller, load_enhancer, measure_lufs
 
 WEB = Path(__file__).parent / "web"
@@ -57,7 +57,7 @@ async def ws_handler(request):
         raw_tail, raw_told = [], False
         db, events = ContextDB(ContextProfile(persona=persona)), []
         # continuous utterance ASR (DuetaSpan live server): `heard` is indexed by absolute frame via `base`
-        utts, base, cache, ret_wait, t_ret = Utterances(), 0, {"text": None, "t": -1e9}, None, 0.0
+        utts, base, cache, ret_wait, t_ret = Utterances(), 0, {"text": None, "t": -1e9, "final": False}, None, 0.0
         slot = None                      # the span read whose following frame is still to be timed
         sr = int(eng.mimi.sample_rate)
 
@@ -107,7 +107,7 @@ async def ws_handler(request):
             text = await loop.run_in_executor(None, lambda: app_asr.transcribe(uslice(u0, u1), sr) or "")
             log.info("heard (%s, %.1fs): %s", kind, (u1 - u0) / eng.frame_rate, text.strip() or "<nothing>")
             if text.strip():
-                cache.update(text=text, t=u1 / eng.frame_rate)
+                cache.update(text=text, t=u1 / eng.frame_rate, final=(kind == "final"))
                 if kind == "final" and text != db.last_user_text():
                     db.add_user_turn(text)
                 await ws.send_json({"type": "user_text", "utt": int(u0), "final": kind == "final",
@@ -196,8 +196,8 @@ async def ws_handler(request):
             for kind, u0, u1 in utts.feed(stepped, frame):
                 asyncio.ensure_future(transcribe_utt(kind, u0, u1))
             if ret_wait is not None and (stepped - ret_wait) / eng.frame_rate >= RET_UTT_WAIT_S:
-                waiting, ret_wait = ret_wait, None
-                kick(waiting)                           # the sentence did not end in time: transcribe the window
+                ret_wait = None
+                kick(stepped - 1)                       # the sentence did not end in time: the window up to now, not up to the <ret>
             t_step = time.monotonic()
             out = eng.step(frame)
             stepped += 1
@@ -222,10 +222,11 @@ async def ws_handler(request):
             if out["is_ret"] and pending is None and ret_wait is None:
                 await ws.send_json({"type": "ret"})
                 i = stepped - 1
-                if cache["text"] and (i / eng.frame_rate - cache["t"]) < UTT_CACHE_S and not utts.speaking:
-                    kick(i, cache["text"])              # the sentence just ended: its transcript is the question
-                elif utts.speaking:
-                    ret_wait = i                        # mid-sentence: wait for the utterance to end (bounded)
+                plan = ret_question_plan(cache, i / eng.frame_rate, utts.speaking)
+                if plan == "cache":
+                    kick(i, cache["text"])              # the sentence just ended and its final transcript is here
+                elif plan == "wait":
+                    ret_wait = i                        # mid-sentence, or the final transcript is still in the ASR (bounded)
                 else:
                     kick(i)                             # no utterance around: the fixed window
     return ws
