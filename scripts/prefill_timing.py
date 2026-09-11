@@ -1,11 +1,20 @@
-"""Wall-clock of Context Span prefill + the next AR step vs span length, on the release engine.
-Run from the bench copy of the release repo (cs_bench_v2) with the bench env; single idle GPU."""
-import os, sys, time, json, statistics as st
-import numpy as np, torch
+"""Wall-clock of a Context Span block read + the next step against the span length, on the release engine.
+
+    python scripts/prefill_timing.py <checkpoint.pt> <out.json>     # from the repository root, one idle GPU
+"""
+import json
+import os
+import statistics as st
+import sys
+import time
+
+import numpy as np
+import torch
+
 sys.path.insert(0, os.getcwd())
-from contextspan.model import Engine
-from contextspan import inject as inject_mod
-from contextspan.spans import SPAN_OPEN_ID, SPAN_CLOSE_ID
+from contextspan.model import Engine                                        # noqa: E402
+from contextspan.model import context_span_block as block                  # noqa: E402
+from contextspan.model.sequence_convention import SPAN_CLOSE_ID, SPAN_OPEN_ID   # noqa: E402
 
 CK = sys.argv[1]; OUT = sys.argv[2]
 eng = Engine(checkpoint=CK, device="cuda")
@@ -28,8 +37,8 @@ def timed_step():
 @torch.no_grad()
 def timed_prefill(ids):
     sync(); t = time.perf_counter()
-    eng._pending_exit_cb0 = inject_mod.pending_exit_cb0(eng.lm_gen)
-    n = inject_mod.prefill(eng.lm_gen, ids, eng._sil, eng._sine)
+    eng._pending_exit_cb0 = block.pending_exit_cb0(eng.lm_gen)
+    n = block.prefill(eng.lm_gen, ids, eng._sil, eng._sine)
     sync(); return (time.perf_counter() - t) * 1e3, n
 
 res = {"gpu": torch.cuda.get_device_name(0), "ckpt": CK, "frame_ms": 1000 / eng.frame_rate}

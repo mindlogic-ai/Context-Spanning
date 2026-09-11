@@ -20,7 +20,7 @@ import os
 import numpy as np
 import soundfile as sf
 
-from eval.common import CTX, NO_INFO, RealtimeBackend, Stack, load_mono, transcript
+from eval.stack import RealtimeBackend, Stack, load_mono, transcript
 
 TAIL_S = 14.0     # answer window after the question
 PROMPT = "You are a wise and friendly teacher. Answer questions or provide advice in a clear and engaging way."

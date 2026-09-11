@@ -1,19 +1,30 @@
-"""Context Span sequence conventions shared by training and inference."""
+"""The Context Spanning sequence convention, shared by training and inference.
+
+One 17-row token sequence: text (ch0), 8 agent audio codebooks, 8 user audio codebooks.
+Control tokens on the text row: `<ret>` asks the backend; a Context Span block is the reference
+text between two span delimiters. Span and prefix columns carry placeholder audio (SILENCE on
+the agent rows, SINE on the user rows) and are masked out of the loss. Everything that decides
+how such a sequence is laid out lives here, so the assembler that writes the training data and
+the engine that reads a span at inference cannot drift apart.
+"""
 import random
+
 import torch
 
 TEXT_PAD = 3          # zero_text_code between words
 RET_TOKEN_ID = 4      # `<ret>`: MoshiRAG rag_token_id (spm '<0x00>')
-SPAN_TOKEN_ID = 12    # span delimiter, one control token per side (spm '<0x08>')
+SPAN_TOKEN_ID = 12    # span delimiter, one control token on each side (spm '<0x08>')
+SPAN_OPEN_ID = SPAN_CLOSE_ID = SPAN_TOKEN_ID   # the released checkpoints use the same id on both sides
 N_AUDIO_CB = 8        # 8 agent + 8 user codebooks -> 17 rows with ch0
-SINE_TOKENS = [430, 1268, 381, 1611, 1095, 1495, 56, 472]         # user audio on system/span frames
-SILENCE_TOKENS = [948, 243, 1178, 546, 1736, 1030, 1978, 2008]    # agent audio on system/span frames
+SINE_TOKENS = [430, 1268, 381, 1611, 1095, 1495, 56, 472]         # user audio on prefix/span frames
+SILENCE_TOKENS = [948, 243, 1178, 546, 1736, 1030, 1978, 2008]    # agent audio on prefix/span frames
 RAG_DELAY = {"start_delay": 1.0, "end_gap": 1.0, "random_sampling_proba": 0.2}  # MoshiRAG Eq.3
 FRAME_RATE = 12.5
 REF_DROPOUT = 0.0
 
 
 def persona_prompt(text: str) -> str:
+    """Wrap the persona in the `<system>` markers PersonaPlex expects (idempotent)."""
     t = (text or "").strip()
     return t if t.startswith("<system>") else f"<system> {t} <system>"
 
@@ -35,10 +46,12 @@ def persona_text(persona: str, user: dict | None = None) -> str:
 
 
 def context_span_ids(ref: str, spm) -> list:
-    return [SPAN_TOKEN_ID] + list(spm.encode(ref)) + [SPAN_TOKEN_ID]
+    """Text-row ids of a Context Span block: delimiter, reference tokens, delimiter."""
+    return [SPAN_OPEN_ID] + list(spm.encode(ref)) + [SPAN_CLOSE_ID]
 
 
 def sample_rag_delay(d_lead: int, rng: random.Random, frame_rate: float = FRAME_RATE) -> int:
+    """Frames between `<ret>` and the span's arrival, sampled as in MoshiRAG (Eq. 3)."""
     p = RAG_DELAY
     start_f, end_f = p["start_delay"] * frame_rate, p["end_gap"] * frame_rate
     if d_lead < start_f + end_f or rng.random() < p["random_sampling_proba"]:
@@ -47,6 +60,24 @@ def sample_rag_delay(d_lead: int, rng: random.Random, frame_rate: float = FRAME_
         lo, hi = int(round(start_f)), int(round(d_lead - end_f))
         d = rng.randint(lo, hi) if hi >= lo else rng.randint(0, int(d_lead))
     return min(d, int(d_lead))
+
+
+def transcript(spm, tokens) -> str:
+    """Render a text-row token stream as words with `<ret>` and `<span>` markers kept."""
+    out, run = [], []
+    for t in tokens:
+        if t is None or t <= 2 or t == TEXT_PAD:
+            continue
+        if t in (RET_TOKEN_ID, SPAN_OPEN_ID, SPAN_CLOSE_ID):
+            if run:
+                out.append(spm.decode(run))
+                run = []
+            out.append("<ret>" if t == RET_TOKEN_ID else "<span>")
+        else:
+            run.append(int(t))
+    if run:
+        out.append(spm.decode(run))
+    return " ".join(out)
 
 
 def _col(tokens):

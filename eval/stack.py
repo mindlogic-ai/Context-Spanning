@@ -1,21 +1,17 @@
-"""Shared pieces of the evaluation harness: the release stack (Engine + DuetaSpan backend + ASR),
-resampling, a deterministic voice per sample, the transcript helper. Evaluation is separate from the
-runtime package: nothing in `contextspan/` imports this folder."""
+"""The release stack for the evaluation harness: Engine + DuetaSpan backend + ASR, warmed, with a
+deterministic voice per sample. Evaluation is separate from the runtime package: nothing in
+`contextspan/` imports this folder. Run the runners from the repository root (`python -m eval...`)."""
 import hashlib
-import os
-import sys
 
 import numpy as np
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
+from contextspan.duetaspan.align.asr import ASR, _resample
+from contextspan.duetaspan.runtime.backend.realtime import RealtimeBackend
+from contextspan.model import Engine, load_voice
+from contextspan.model.sequence_convention import transcript
+from contextspan.runtime.frame_stream import run_stream
 
-from contextspan.duetaspan.align.asr import ASR, _resample            # noqa: E402
-from contextspan.duetaspan.runtime.backend.realtime import RealtimeBackend, NO_INFO   # noqa: E402
-from contextspan.model import Engine, load_voice                        # noqa: E402
-from contextspan.stream import run_stream                               # noqa: E402
-from main import transcript                                             # noqa: E402
+__all__ = ["ASR", "CTX", "RealtimeBackend", "Stack", "VOICES", "load_mono", "transcript"]
 
 CTX = {"city": "Seoul", "timezone": "Asia/Seoul"}      # the profile every paper run used
 VOICES = ("f0", "f1", "f2")                            # the released voice prompts

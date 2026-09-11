@@ -3,12 +3,11 @@
     python main.py serve [--voice f0] [--host 0.0.0.0 --port 8080 --token ...]
 
 The browser sends one 80 ms frame of float32 PCM at a time and gets one frame back, so the wire
-carries the clock the model runs on. When the model emits `<ret>`, the recent user audio is
-The user's speech is transcribed continuously by utterance (`user_text` events, partial and final); on
-`<ret>` the fresh transcript is the question, a sentence still running is waited for (bounded), the
-backend is asked, and the reference is injected on the first frame after it returns; a turn that needs
-no external knowledge injects nothing (`no_span`). The stream never stops to wait for any of it. One
-engine, one conversation at a time.
+carries the clock the model runs on. The user's speech is transcribed continuously by utterance
+(`user_text` events, partial and final); on `<ret>` the fresh transcript is the question, a sentence
+still running is waited for (bounded), the backend is asked, and the reference is injected the moment
+it returns; a turn that needs no external knowledge injects nothing (`no_span`). The stream never
+stops to wait for any of it. One engine, one conversation at a time. Message formats: docs/PROTOCOL.md.
 """
 import asyncio
 import hmac
@@ -21,11 +20,11 @@ from pathlib import Path
 import numpy as np
 from aiohttp import WSMsgType, web
 
-from .duetaspan.runtime.backend.context_db import ContextDB, ContextProfile
-from .levelling import TARGET_LUFS, UserLeveller, load_enhancer, measure_lufs
-from .model import load_voice
-from .spans import persona_text
-from .stream import RET_DEADLINE_S, RET_UTT_WAIT_S, UTT_CACHE_S, Utterances, retrieve_for_ret
+from ..duetaspan.runtime.backend.context_db import ContextDB, ContextProfile
+from ..model import load_voice
+from ..model.sequence_convention import persona_text
+from .frame_stream import RET_DEADLINE_S, RET_UTT_WAIT_S, UTT_CACHE_S, Utterances, retrieve_for_ret
+from .user_leveller import TARGET_LUFS, UserLeveller, load_enhancer, measure_lufs
 
 WEB = Path(__file__).parent / "web"
 log = logging.getLogger(__name__)
@@ -207,7 +206,7 @@ async def ws_handler(request):
             if slot is not None:
                 # The frame right after a span read: what the read and this step cost together, against the
                 # 80 ms slot. Nothing else changes on an overrun - the server catches up at one step per
-                # queued frame, the client absorbs it with its playback lead (see web/index.html play()).
+                # queued frame, the client absorbs it with its playback lead (see web/player.js).
                 step_ms = (time.monotonic() - t_step) * 1e3
                 slot.update(step_ms=round(step_ms, 1), total_ms=round(slot["prefill_ms"] + step_ms, 1))
                 await ws.send_json({"type": "slot", "prefill_ms": slot["prefill_ms"], "step_ms": slot["step_ms"],
@@ -233,7 +232,7 @@ async def ws_handler(request):
 
 
 def _retrieve(app, clip, sample_rate, user, db, said_text, events, notify, question=None):
-    """One `<ret>` off the frame clock: the DuetaSpan handler (stream.retrieve_for_ret) with the page
+    """One `<ret>` off the frame clock: `frame_stream.retrieve_for_ret` with the page
     told what the ASR heard as soon as it is known, and question/reference logged once per `<ret>`."""
     t0 = time.monotonic()
     timing = {}

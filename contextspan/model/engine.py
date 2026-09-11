@@ -1,47 +1,19 @@
-"""Model loading and the streaming engine (PersonaPlex base + Context Spanning checkpoint)."""
-import os
+"""The streaming engine: one user frame in, one agent frame out, Context Spans read on arrival.
+
+`Engine` wraps the PersonaPlex model with the Context Spanning checkpoint loaded: it builds the
+masked persona prefix, steps the model one 80 ms frame at a time, reports `<ret>` and reads a
+reference into the stream as a Context Span block exactly as the training assembler wrote it.
+"""
 import time
+
 import numpy as np
-import sentencepiece
 import torch
-from huggingface_hub import hf_hub_download
-from .moshi.models import LMGen, loaders
 
-from . import inject as inject_mod
-from .spans import (N_AUDIO_CB, RET_TOKEN_ID, SILENCE_TOKENS, SINE_TOKENS, SPAN_TOKEN_ID, TEXT_PAD,
-                    persona_prompt)
-
-BASE_REPO = "nvidia/personaplex-7b-v1"
-WEIGHTS_REPO = "mindlogicinc/context-spanning-7b"
-WEIGHTS_FILE = "context_spanning_7b.pt"
-
-
-def _hf(repo, name):
-    """CS_BASE_DIR / CS_WEIGHTS_DIR point at local copies; otherwise download from the Hub."""
-    local = os.environ.get("CS_BASE_DIR" if repo == BASE_REPO else "CS_WEIGHTS_DIR")
-    if local and os.path.exists(os.path.join(local, name)):
-        return os.path.join(local, name)
-    return hf_hub_download(repo, name)
-
-
-def load_model(checkpoint=None, device="cuda", cpu_offload=False):
-    """Returns (lm, mimi, spm). checkpoint: local .pt path, or None to fetch the released weights."""
-    mimi = loaders.get_mimi(_hf(BASE_REPO, loaders.MIMI_NAME), device)
-    spm = sentencepiece.SentencePieceProcessor(_hf(BASE_REPO, loaders.TEXT_TOKENIZER_NAME))
-    lm = loaders.get_moshi_lm(_hf(BASE_REPO, loaders.MOSHI_NAME), device=device, cpu_offload=cpu_offload)
-    ck = checkpoint or _hf(WEIGHTS_REPO, WEIGHTS_FILE)
-    sd = torch.load(ck, map_location="cpu", weights_only=False)
-    sd = sd.get("model", sd)
-    lm.load_state_dict({k.replace("._orig_mod.", "."): v for k, v in sd.items()})
-    lm.eval()
-    return lm, mimi, spm
-
-
-def load_voice(name_or_path="f0"):
-    """Voice prompt = agent-voice Mimi codes [8, P] saved as {'codes': LongTensor}. A bare name
-    ("f0", "f1", "f2") is fetched as voices/<name>.pt from the weights repo."""
-    path = name_or_path if os.path.exists(name_or_path) else _hf(WEIGHTS_REPO, f"voices/{name_or_path}.pt")
-    return torch.load(path, map_location="cpu")["codes"].long()
+from ..moshi.models import LMGen
+from . import context_span_block as block
+from .sequence_convention import (N_AUDIO_CB, RET_TOKEN_ID, SILENCE_TOKENS, SINE_TOKENS, SPAN_CLOSE_ID,
+                                  SPAN_OPEN_ID, TEXT_PAD, persona_prompt)
+from .weights import load_mimi, load_model
 
 
 class Engine:
@@ -51,7 +23,7 @@ class Engine:
     def __init__(self, checkpoint=None, device="cuda", temp=0.8, temp_text=0.7, cpu_offload=False):
         self.device = device
         self.lm, self.mimi, self.spm = load_model(checkpoint, device, cpu_offload)
-        self.user_mimi = loaders.get_mimi(_hf(BASE_REPO, loaders.MIMI_NAME), device)
+        self.user_mimi = load_mimi(device)
         self.frame_rate = float(self.mimi.frame_rate)
         self.frame_size = int(round(self.mimi.sample_rate / self.frame_rate))
         kw = dict(sample_rate=int(self.mimi.sample_rate), frame_rate=self.frame_rate)
@@ -66,13 +38,14 @@ class Engine:
         with torch.no_grad():
             for _ in range(4):
                 self.lm_gen.step(input_tokens=self._sine)
-            # The block forward (inject.prefill) is a multi-position path the single-step loop never
-            # exercises; its first call in a process costs ~0.7 s (measured 741 ms vs 58 ms for the
-            # second call, 2026-09-09). Pay it here, not on the first span of a conversation.
-            inject_mod.prefill(self.lm_gen, [SPAN_TOKEN_ID] + [TEXT_PAD] * 6 + [SPAN_TOKEN_ID], self._sil, self._sine)
+            # The block forward is a multi-position path the single-step loop never exercises; its
+            # first call in a process costs ~0.7 s (measured 741 ms vs 58 ms for the second call,
+            # 2026-09-09). Pay it here, not on the first span of a conversation.
+            block.prefill(self.lm_gen, [SPAN_OPEN_ID] + [TEXT_PAD] * 6 + [SPAN_CLOSE_ID], self._sil, self._sine)
         self.reset()
 
     def reset(self):
+        """Restart the streams for a new conversation."""
         for m in (self.lm_gen, self.mimi, self.user_mimi):
             try:
                 m._stop_streaming()
@@ -113,7 +86,7 @@ class Engine:
         if self._pending_exit_cb0 is not None:
             # The readout runs one frame late, so the live frame a span swallows would otherwise come
             # back carrying the block's placeholder; restore its real semantic code.
-            if t == SPAN_TOKEN_ID:
+            if t == SPAN_CLOSE_ID:
                 ac = ac.clone()
                 ac[:, 0, 0] = self._pending_exit_cb0
             self._pending_exit_cb0 = None
@@ -127,20 +100,20 @@ class Engine:
         Returns the number of frames the block consumed; `last_prefill_ms` holds its wall-clock cost.
         Measured 2026-09-09 (RTX PRO 6000 Blackwell): 27 ms up to 250 tokens, 32/38/41 ms at 300/350/400,
         so prefill + the next 32 ms step stays inside the 80 ms frame up to 400 tokens."""
-        ids = inject_mod.span_ids(reference, self.spm)
-        self._pending_exit_cb0 = inject_mod.pending_exit_cb0(self.lm_gen)
+        ids = block.span_ids(reference, self.spm)
+        self._pending_exit_cb0 = block.pending_exit_cb0(self.lm_gen)
         t0 = time.perf_counter()
-        n = inject_mod.prefill(self.lm_gen, ids, self._sil, self._sine)
+        n = block.prefill(self.lm_gen, ids, self._sil, self._sine)
         if self.device != "cpu":
             torch.cuda.synchronize()
-        self.last_prefill_ms = (time.perf_counter() - t0) * 1e3     # wall clock of the block read
+        self.last_prefill_ms = (time.perf_counter() - t0) * 1e3
         return n
 
     @torch.no_grad()
     def clone_voice(self, pcm, sample_rate: int) -> torch.Tensor:
         """Agent-voice Mimi codes [8, P] from a recording (resampled, -24 LUFS), the way PersonaPlex
         conditions on a voice. Resets the streams; call it between conversations."""
-        from .moshi.models.lm import normalize_audio
+        from ..moshi.models.lm import normalize_audio
         x = np.asarray(pcm, dtype=np.float32).reshape(-1)
         want = int(self.mimi.sample_rate)
         if sample_rate != want:
@@ -157,5 +130,6 @@ class Engine:
         return codes[0].to(torch.long)
 
     def decode_text(self, tokens) -> str:
-        skip = {TEXT_PAD, 0, 1, 2, RET_TOKEN_ID, SPAN_TOKEN_ID}
+        """Words only: control tokens and padding dropped."""
+        skip = {TEXT_PAD, 0, 1, 2, RET_TOKEN_ID, SPAN_OPEN_ID, SPAN_CLOSE_ID}
         return self.spm.decode([int(t) for t in tokens if t is not None and int(t) not in skip])

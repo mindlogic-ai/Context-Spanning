@@ -20,7 +20,15 @@ the failure that matters: no span arrived and the agent answered anyway with som
 """
 from __future__ import annotations
 
-import argparse, asyncio, json, os, re, statistics, sys, time
+import argparse
+import asyncio
+import json
+import os
+import re
+import statistics
+import sys
+import time
+
 from playwright.async_api import async_playwright
 
 WORD = re.compile(r"[a-z0-9]+")
@@ -150,4 +158,5 @@ async def main() -> int:
     return 0
 
 
-sys.exit(asyncio.run(main()))
+if __name__ == "__main__":
+    sys.exit(asyncio.run(main()))

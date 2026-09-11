@@ -1,11 +1,11 @@
-"""Frame-clock streaming loop: user audio in, agent audio out, spans injected as they arrive.
+"""Frame-clock streaming loop for a wav file: user audio in, agent audio out, spans injected as they arrive.
 
-The `<ret>` handling is the DuetaSpan live runtime's (duetaspan/runtime/live_server.py): the
-recent user audio is transcribed; the backend is asked with the user's profile, what the agent has
-already said, the requests already answered and the Context DB working text; a tool result or a
-direct answer is injected as a Context Span; a `<ret>` with no transcript, or a router "nothing to
-do" that no tool produced, injects NOTHING (the benchmark harness's gate: an abstain span exists in
-training only when a real tool ran and came back empty). The frame clock never waits for any of it.
+The `<ret>` handling is the DuetaSpan live runtime's: the recent user audio is transcribed; the
+backend is asked with the user's profile, what the agent has already said, the requests already
+answered and the Context DB working text; a tool result or a direct answer is injected as a Context
+Span; a `<ret>` with no transcript, or a router "nothing to do" that no tool produced, injects
+NOTHING (an abstain span exists in training only when a real tool ran and came back empty). The
+frame clock never waits for any of it.
 """
 import json
 import os
@@ -14,19 +14,19 @@ import time
 
 import numpy as np
 
-from .duetaspan.runtime.backend.context_db import ContextDB, ContextProfile
+from ..duetaspan.runtime.backend.context_db import ContextDB, ContextProfile
 
-# Wall-clock budget from <ret> to injection. The training corpus's ret->span delays (deploy_ret_delay.json,
-# live harness 2026-09-04) have p50 0.72 s, p99 2.3 s, max 2.4 s: a span later than that is outside what the
-# model was trained to wait for, and by then it has usually answered without it (ContextSpanning #12).
+# Wall-clock budget from <ret> to injection. The training corpus's ret->span delays (live harness
+# 2026-09-04) have p50 0.72 s, p99 2.3 s, max 2.4 s: a span later than that is outside what the model
+# was trained to wait for, and by then it has usually answered without it (#12).
 RET_DEADLINE_S = float(os.environ.get("CS_RET_DEADLINE_S", "2.5"))
 
-# The user's speech is transcribed continuously, by utterance, the way the DuetaSpan live server does it:
-# a frame is voiced above RMS_SPEECH, an utterance ends after UTT_END_F silent frames (0.72 s), a partial
-# transcript is taken every PARTIAL_EVERY_F frames (1.6 s) while it runs. On <ret> the freshest transcript
-# (< UTT_CACHE_S old) is the question — no second ASR call; if the user is still mid-sentence the question
-# waits for the utterance to end, at most RET_UTT_WAIT_S (MoshiRAG waits a fixed second; here the wait ends
-# with the sentence). Only with no utterance at all does the old fixed window get transcribed.
+# The user's speech is transcribed continuously, by utterance: a frame is voiced above RMS_SPEECH, an
+# utterance ends after UTT_END_F silent frames (0.72 s), a partial transcript is taken every
+# PARTIAL_EVERY_F frames (1.6 s) while it runs. On <ret> the freshest transcript (< UTT_CACHE_S old) is
+# the question - no second ASR call; if the user is still mid-sentence the question waits for the
+# utterance to end, at most RET_UTT_WAIT_S (MoshiRAG waits a fixed second; here the wait ends with the
+# sentence). Only with no utterance at all does the fixed window get transcribed.
 RMS_SPEECH = 0.01
 RMS_FLOOR = 0.008      # -42 dBFS after levelling: below this nothing is speech, whatever the VAD says
 UTT_END_F = 9
@@ -143,8 +143,8 @@ def run_stream(eng, backend, asr, pcm, ctx=None, asr_window_s=12.0, realtime=Tru
             if text.strip():
                 cache.update(text=text, t=u1 / eng.frame_rate, final=(kind == "final"))
                 transcripts.append((round(u1 / eng.frame_rate, 2), kind, text))
-                if kind == "final":
-                    db.add_user_turn(text) if text != db.last_user_text() else None
+                if kind == "final" and text != db.last_user_text():
+                    db.add_user_turn(text)
             waiting = ret_wait[0]
             if kind == "final" and waiting is not None:
                 ret_wait[0] = None
@@ -173,8 +173,9 @@ def run_stream(eng, backend, asr, pcm, ctx=None, asr_window_s=12.0, realtime=Tru
             ready["prefill_ms"] = round(eng.last_prefill_ms, 1) if ready["inject"] else 0.0
             events.append(ready)
             if verbose:
-                print(f"[span @{ready['t_inj']:.1f}s] q={ready['question']!r} src={ready['src']} "
-                      f"-> {('(late, dropped)' if ready['late'] else '(no span)') if ready['inject'] is None else ready['inject'][:100]!r}", flush=True)
+                shown = ("(late, dropped)" if ready["late"] else "(no span)") if ready["inject"] is None \
+                    else repr(ready["inject"][:100])
+                print(f"[span @{ready['t_inj']:.1f}s] q={ready['question']!r} src={ready['src']} -> {shown}", flush=True)
         frame = pcm[i * fs:(i + 1) * fs]
         for kind, u0, u1 in utts.feed(i, frame):
             threading.Thread(target=transcribe_utt, args=(kind, u0, u1), daemon=True).start()

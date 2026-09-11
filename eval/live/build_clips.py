@@ -8,7 +8,12 @@ and needs nothing installed; `CS_TTS` overrides the command (it receives TEXT an
 """
 from __future__ import annotations
 
-import json, os, shutil, subprocess, sys, wave
+import json
+import os
+import shutil
+import subprocess
+import sys
+import wave
 
 LEAD_S, TAIL_S, SR = 1.5, 26.0, 24000
 

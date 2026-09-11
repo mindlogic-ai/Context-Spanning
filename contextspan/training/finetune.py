@@ -1,69 +1,26 @@
-"""Data preparation and training.
+"""Fine-tuning on prepared tensors: Context Span blocks spliced at sampled delays, selective loss.
 
-Data format (one JSON per dialogue, next to a stereo wav with L=user, R=agent):
-  {"system_prompt": "...", "voice": "voices/f0.pt",
-   "turns": [{"speaker": "user"|"agent", "words": [{"w": "hello", "t": 4.21}, ...],
-              "ret": true, "reference": "The cafe opens at seven thirty AM."}]}
-Word times are seconds; `ret`/`reference` mark an agent turn whose answer is grounded on the
-reference. `prepare` encodes audio with Mimi and writes <name>.npz (codes, ch0, audio_mask,
-spans); `train` fine-tunes the model on a directory of such files.
+Each step draws `accum` dialogues, splices their Context Span blocks at a MoshiRAG-sampled delay
+after `<ret>`, prepends the masked persona prefix and trains the text row and the audio codebooks.
+Span and prefix columns are masked out of the text loss; `<ret>` is up-weighted (`w_ret`), padding
+down-weighted, and the acoustic codebooks carry a small weight next to the semantic one.
 """
 import glob
 import json
 import os
 import random
+
 import numpy as np
-import soundfile as sf
 import torch
 import torch.nn.functional as F
 
-from .model import BASE_REPO, _hf, load_model, load_voice
-from .spans import (FRAME_RATE, N_AUDIO_CB, RET_TOKEN_ID, TEXT_PAD, assemble_training_sequence,
-                    persona_prefix, sample_rag_delay)
+from ..model.sequence_convention import (RET_TOKEN_ID, TEXT_PAD, assemble_training_sequence, persona_prefix,
+                                         sample_rag_delay)
+from ..model.weights import load_model, load_voice
 
 
-@torch.no_grad()
-def prepare(in_dir, out_dir, device="cuda"):
-    import sentencepiece
-    from .moshi.models import loaders
-    mimi = loaders.get_mimi(_hf(BASE_REPO, loaders.MIMI_NAME), device)
-    spm = sentencepiece.SentencePieceProcessor(_hf(BASE_REPO, loaders.TEXT_TOKENIZER_NAME))
-    os.makedirs(out_dir, exist_ok=True)
-    fr, sr = FRAME_RATE, int(mimi.sample_rate)
-    for jp in sorted(glob.glob(f"{in_dir}/*.json")):
-        d = json.load(open(jp))
-        wav, s = sf.read(jp[:-5] + ".wav", dtype="float32", always_2d=True)
-        if s != sr:
-            import librosa
-            wav = np.stack([librosa.resample(wav[:, c], orig_sr=s, target_sr=sr) for c in range(2)], 1)
-        T = int(len(wav) * fr / sr)
-        x = torch.tensor(wav[:T * int(sr / fr)].T, device=device)[:, None]        # [2,1,S]
-        user = mimi.encode(x[0:1])[0, :N_AUDIO_CB, :T].cpu()
-        agent = mimi.encode(x[1:2])[0, :N_AUDIO_CB, :T].cpu()
-        ch0 = torch.full((T,), TEXT_PAD, dtype=torch.long)
-        spans = []
-        for turn in d["turns"]:
-            if turn["speaker"] != "agent" or not turn.get("words"):
-                continue
-            f0 = int(turn["words"][0]["t"] * fr)
-            for w in turn["words"]:
-                for k, tid in enumerate(spm.encode(" " + w["w"])):
-                    f = int(w["t"] * fr) + k
-                    if 0 <= f < T and ch0[f] == TEXT_PAD:
-                        ch0[f] = tid
-            if turn.get("ret") and turn.get("reference"):
-                rf = max(0, f0 - 1)
-                ch0[rf] = RET_TOKEN_ID                                            # <ret> right before the turn
-                body = turn.get("body_word_index", len(turn["words"]) // 3)       # lead ends here
-                cap = int(turn["words"][min(body, len(turn["words"]) - 1)]["t"] * fr) - 2
-                spans.append({"ret_frame": rf, "cap_frame": cap, "reference": turn["reference"]})
-        np.savez(f"{out_dir}/{os.path.basename(jp)[:-5]}.npz", agent=agent.numpy(), user=user.numpy(),
-                 ch0=ch0.numpy(), spans=json.dumps(spans), system_prompt=d.get("system_prompt", ""),
-                 voice=d.get("voice", ""))
-        print("prepared", jp)
-
-
-def _sample(path, spm, rng):
+def sample_sequence(path, spm, rng):
+    """One prepared dialogue -> (codes [17, T], text_mask [T], audio_mask [T]) with spans spliced in."""
     z = np.load(path, allow_pickle=True)
     codes = torch.cat([torch.tensor(z["ch0"])[None], torch.tensor(z["agent"]), torch.tensor(z["user"])], 0)
     spans = []
@@ -83,6 +40,7 @@ def _sample(path, spm, rng):
 
 
 def loss_fn(out, codes, tmask, amask, lm, w_ret=5.0, pad_w=0.5, acoustic_w=0.02):
+    """Weighted text CE (masked, `<ret>` x w_ret, pad x pad_w) + audio CE (semantic 1.0, acoustic acoustic_w)."""
     tl = torch.nan_to_num(out.text_logits[:, 0], nan=0.0)                    # [B,T,V]
     tgt = codes[:, 0]
     keep = out.text_mask[:, 0] & tmask
@@ -106,7 +64,7 @@ def train(data_dir, out_dir, checkpoint=None, steps=1000, lr=2e-6, accum=8, cont
           ckpt_every=250, w_ret=5.0, seed=0, device="cuda"):
     torch.manual_seed(seed)
     rng = random.Random(seed)
-    lm, mimi, spm = load_model(checkpoint, device) if checkpoint else load_model(None, device)
+    lm, mimi, spm = load_model(checkpoint, device)
     del mimi
     lm.train()
     opt = torch.optim.AdamW([p for p in lm.parameters() if p.requires_grad], lr=lr, weight_decay=0.0)
@@ -116,7 +74,7 @@ def train(data_dir, out_dir, checkpoint=None, steps=1000, lr=2e-6, accum=8, cont
         opt.zero_grad(set_to_none=True)
         tl_acc = al_acc = 0.0
         for _ in range(accum):
-            codes, tmask, amask = _sample(rng.choice(files), spm, rng)
+            codes, tmask, amask = sample_sequence(rng.choice(files), spm, rng)
             if codes.shape[1] > context:
                 s0 = rng.randint(0, codes.shape[1] - context)
                 codes, tmask, amask = codes[:, s0:s0 + context], tmask[s0:s0 + context], amask[s0:s0 + context]

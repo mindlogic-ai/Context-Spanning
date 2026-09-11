@@ -1,7 +1,7 @@
 """Bring the user channel to the loudness the fine-tune was trained on, using the same meter that
 already levels the agent's voice.
 
-Two libraries do the work; this file only feeds them one frame at a time.
+Two libraries do the work; this module only feeds them one frame at a time.
 
   pyloudnorm   ITU-R BS.1770-4 loudness. `normalize_audio` in the vendored moshi already uses it
                to put the agent's voice prompt at -24 LUFS, so measuring the user channel with the
