@@ -5,7 +5,7 @@ usage policy is one request per second, and Overpass hands out query slots and a
 429 when they run out — so the adapters sleep on purpose, 1.05 s and 1.5 s per call.
 A voice turn cannot afford that twice, and `directions` pays it twice: once per endpoint.
 
-Almost nothing these endpoints return actually changes. 선릉역's coordinates are the
+Almost nothing these endpoints return actually changes. Seolleung Station's coordinates are the
 same today as last year; so is the road geometry between two points, and the elevation
 of a mountain. The answer is to ask once. On a hit the caller skips the sleep *and* the
 round trip — which is why `get` has to be consulted before the throttle, not after.

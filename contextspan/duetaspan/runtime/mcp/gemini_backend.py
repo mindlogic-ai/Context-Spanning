@@ -95,7 +95,7 @@ class GeminiBackend:
                 "description": fn.get("description", ""),
                 "parameters": _clean_schema(fn.get("parameters") or {"type": "object"}),
             })
-        self._tools = [{"functionDeclarations": decls}]       # ← 사전 등록되는 MCP 카탈로그
+        self._tools = [{"functionDeclarations": decls}]       # ← the MCP catalog registered up front
 
     # ── raw generateContent call ──────────────────────────────────────────────
     def _call(self, contents: list[dict]) -> dict:
@@ -121,8 +121,9 @@ class GeminiBackend:
     # ── public API (mirrors RealtimeBackend.retrieve) ────────────────────────
     def retrieve(self, query: str, ctx: Optional[dict] = None,
                  history: Optional[list[str]] = None, convo: Optional[str] = None) -> str:
-        # convo = ContextDB.working_text() 스냅샷. api_backend.retrieve 와 같은 이유로
-        # 필수 입력이다 — 라우팅 근거를 단일 ASR 윈도우가 아니라 대화 누적 상태에 둔다.
+        # convo = ContextDB.working_text() snapshot. A required input for the same reason as
+        # api_backend.retrieve — routing is grounded in the accumulated conversation state, not
+        # in a single ASR window.
         self.last_trace = []
         user = ""
         if ctx:
@@ -187,10 +188,10 @@ if __name__ == "__main__":
     hist: list[str] = []
     for q in [
         "what time is it now?",
-        "what time is it now? and then, how's the weather like today?",       # 재포착 전사
+        "what time is it now? and then, how's the weather like today?",       # re-captured transcript
         "how's the weather like today? and how price is the samsung electronics?",
-        "uh um so like who wrote the old man and the sea",                      # no-tool 일반지식
-        "음 어 다달음 일에 인천에서 도쿄 는가 도, 전오 출로 있?",                 # heavy noise → abstain 기대
+        "uh um so like who wrote the old man and the sea",                      # no-tool general knowledge
+        "음 어 다달음 일에 인천에서 도쿄 는가 도, 전오 출로 있?",                 # heavy noise → abstain expected
     ]:
         out = b.retrieve(q, ctx=ctx, history=hist)
         tr = b.last_trace[-1]

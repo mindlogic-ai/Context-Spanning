@@ -44,9 +44,10 @@ def _schema(props, required):
     return {"type": "object", "properties": props, "required": required}
 
 
-# Stage0 도메인 그룹 설명 (client.py 2단 라우팅의 0단 카탈로그) — 4도메인 분할:
-# 단일 "fdb_v3" 그룹은 0단을 무의미하게 만들고(그룹 1개), 도메인 격차(housing 7.7%,
-# ecommerce 13.8%)의 진단 결과에 따라 그룹 자체에 전형 상황을 명시한다.
+# Stage-0 domain group descriptions (the stage-0 catalog of client.py's two-stage routing) —
+# split into 4 domains: a single "fdb_v3" group makes stage 0 meaningless (one group), and the
+# diagnosed domain gap (housing 7.7%, ecommerce 13.8%) is why each group now spells out the
+# situations typical of it.
 DOMAINS = {
     "travel_identity": ("Travel & identity: search/book flights, update passport or "
                         "driver-license details"),
@@ -58,10 +59,11 @@ DOMAINS = {
                           "add items to the shopping cart"),
 }
 
-# Parameters(json schema)는 공식 @function_tool 시그니처 그대로(인자 채점 계약 불변).
-# Descriptions는 FDB-v3 baseline 실패 분류(2026-07-27, 체인 미시도 지배·형제툴 치환)에
-# 근거해 재작성: 파라미터 힌트 + 전형 질의 예시 1개 + 체인 관계(search→book/add,
-# 결과 주소→commute, id별 1콜) 명시. ≤300자(client.py 병합 캡).
+# Parameters (json schema) follow the official @function_tool signatures exactly (the argument
+# scoring contract is unchanged). Descriptions were rewritten from the FDB-v3 baseline failure
+# taxonomy (2026-07-27, dominated by never-attempted chains and sibling-tool substitution):
+# parameter hints + one typical query example + the chain relations (search→book/add, result
+# address→commute, one call per id) spelled out. ≤300 chars (client.py's merge cap).
 TOOLS = {
     # ── Travel & Identity ────────────────────────────────────────────
     "search_flights": {
@@ -171,8 +173,9 @@ TOOLS = {
         "domain": "housing_location",
         "parameters": _schema({
             "filter_name": {"type": "string", "description": "Filter key to modify"},
-            # 공식 mock은 value: Any — 벤치 기대값도 자연 타입(1500, true)이다. 타입 미선언
-            # 으로 두어 라우터 후처리(_coerce_types)가 숫자/불리언 문자열을 자연 타입화한다.
+            # The official mock takes value: Any — the benchmark's expected values are natural
+            # types too (1500, true). Leaving the type undeclared lets the router's
+            # post-processing (_coerce_types) turn numeric/boolean strings into natural types.
             "value": {"description": "Filter value — natural JSON type "
                                      "(number for budgets, true/false for flags, else string)"},
         }, ["filter_name", "value"]),
@@ -211,7 +214,7 @@ TOOLS = {
         "parameters": _schema({
             "product_id": {"type": "string", "description": "ID of the product"},
             "quantity": {"type": "integer", "description": "Amount to add (1 if unstated)"},
-        }, ["product_id", "quantity"]),   # mock_apis.add_to_cart는 quantity 위치인자 필수
+        }, ["product_id", "quantity"]),   # mock_apis.add_to_cart requires quantity positionally
         "fn": _make_fn("add_to_cart"),
     },
 }

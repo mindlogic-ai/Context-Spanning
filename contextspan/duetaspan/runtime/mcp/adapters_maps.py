@@ -107,9 +107,10 @@ def warm_connections(block: float = 0.0) -> None:
         thread.join(max(0.0, deadline - time.monotonic()))
 
 # Optional. Without it, radius search still works from a station or a landmark;
-# with it, bare 행정동 names ("성수동") resolve too. Free tier, 100k calls/day.
-# Two endpoints: address.json geocodes 지번/도로명 ("역삼동 640-1", "테헤란로 152"),
-# keyword.json resolves place names and POIs ("성수동", "남산서울타워", "강남역 스타벅스").
+# with it, bare administrative-dong names ("성수동") resolve too. Free tier, 100k calls/day.
+# Two endpoints: address.json geocodes lot-number/road-name addresses ("역삼동 640-1",
+# "테헤란로 152"), keyword.json resolves place names and POIs ("성수동", "남산서울타워",
+# "강남역 스타벅스").
 _KAKAO_SEARCH = "https://dapi.kakao.com/v2/local/search/keyword.json"
 _KAKAO_ADDR = "https://dapi.kakao.com/v2/local/search/address.json"
 _KAKAO_KEY = os.environ.get("KAKAO_REST_API_KEY", "")
@@ -117,7 +118,7 @@ _HANGUL = re.compile(r"[가-힣]")
 
 # What a Korean actually says -> what OpenStreetMap calls it. Order matters:
 # the first entry whose word appears in the query wins, so put "한식" before
-# the generic "식당" or every 한식집 query collapses to plain restaurants.
+# the generic "식당" or every Korean-restaurant query collapses to plain restaurants.
 _POI_TAGS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("주유소", "fuel", "gas station", "petrol"), '["amenity"="fuel"]'),
     (("충전소", "ev charg"), '["amenity"="charging_station"]'),
@@ -341,7 +342,7 @@ def _kakao(query: str, x: str = "", y: str = "", radius: int = 0) -> list[dict]:
 
     OSM has no node called "성수동" — Seoul's neighbourhood is filed as 성수동1가 /
     성수동2가, so Nominatim resolves the bare name to a road in Jeju. Kakao carries
-    the 행정동 gazetteer, which is the one thing the keyless stack cannot fake.
+    the administrative-dong gazetteer, which is the one thing the keyless stack cannot fake.
     """
     params: dict[str, Any] = {"query": query, "size": 10}
     if x and y:
@@ -379,7 +380,7 @@ def _kakao_nearby(centre: str, keyword: str, radius: int) -> tuple[float, float,
 
 
 def _kakao_addr(query: str) -> list[dict]:
-    """Kakao's address geocoder — 지번 and 도로명, the one thing a name gazetteer can't do.
+    """Kakao's address geocoder — lot-number and road-name, what a name gazetteer cannot do.
 
     "역삼동 640-1" and "테헤란로 152" carry a building number; the local OSM gazetteer and
     Nominatim both stall or miss on those, while Kakao answers in ~160 ms nationwide."""
@@ -399,12 +400,13 @@ def _kakao_addr(query: str) -> list[dict]:
 
 def _kakao_geocode(address: str) -> dict | None:
     """Kakao as the primary Korean geocoder: ~160 ms warm, nationwide, and it answers the
-    things the keyless stack cannot — 지번, 도로명, and bare 행정동 names alike.
+    things the keyless stack cannot — lot-number, road-name and bare dong names alike.
 
     Hangul only, because Kakao is Korea-only: letting it field "Times Square" would pull a
     Seoul cafe of that name over Manhattan. A miss or any error returns None so the caller
     falls through to the local index and Nominatim — Kakao speeds this path, never gates it.
-    Address search first (precise for 지번/도로명), then keyword search (place names/POIs).
+    Address search first (precise for lot-number/road-name addresses), then keyword search
+    (place names/POIs).
     """
     if not (_KAKAO_KEY and _HANGUL.search(address)):
         return None
@@ -510,8 +512,9 @@ def _places(address: str, limit: int = 10) -> list[dict]:
     ask again with the home bias and keep whichever hit is actually notable.
     """
     # Kakao first when a key is configured: ~160 ms nationwide, and the only source here
-    # that geocodes 지번/도로명 with a building number ("역삼동 640-1", "테헤란로 152"). It
-    # returns None for non-Korean names and on any error, so the keyless path still runs.
+    # that geocodes lot-number/road-name addresses with a building number ("역삼동 640-1",
+    # "테헤란로 152"). It returns None for non-Korean names and on any error, so the keyless
+    # path still runs.
     kakao = _kakao_geocode(address)
     if kakao:
         return [kakao]
@@ -619,9 +622,9 @@ def search_places(query: str = "", keywords: str = "", location: str = "",
         return (f"{hit['display_name'].split(',')[0]} "
                 f"({float(hit['lat']):.5f}, {float(hit['lon']):.5f})")
 
-    # A bare 동/구 name is ambiguous nationwide — Nominatim reads "성수동" as the
-    # one in Jeju. Walk the candidates until one actually has the thing asked for,
-    # rather than hardcoding Seoul.
+    # A bare dong/gu (neighbourhood/district) name is ambiguous nationwide — Nominatim
+    # reads "성수동" as the one in Jeju. Walk the candidates until one actually has the
+    # thing asked for, rather than hardcoding Seoul.
     for hit in candidates:
         lat, lon = float(hit["lat"]), float(hit["lon"])
         found = _nearby(lat, lon, keyword, radius)

@@ -263,7 +263,7 @@ if __name__ == "__main__":
         started = time.monotonic()
         hit = place(name)
         elapsed = (time.monotonic() - started) * 1000
-        where = f"{hit['display_name']} ({hit['lat']}, {hit['lon']})" if hit else "— 없음"
+        where = f"{hit['display_name']} ({hit['lat']}, {hit['lon']})" if hit else "— none"
         print(f"{name:<8} {elapsed:6.2f} ms  {where}")
 
     seolleung = place("선릉역")
@@ -273,7 +273,7 @@ if __name__ == "__main__":
 
     started = time.monotonic()
     fuel = nearby(lat, lon, 1500, "amenity", "fuel")
-    print(f"주유소 near 선릉역  {(time.monotonic() - started) * 1000:.2f} ms  {fuel[:3]}")
+    print(f"fuel near 선릉역  {(time.monotonic() - started) * 1000:.2f} ms  {fuel[:3]}")
     assert fuel, "OSM has fuel stations within 1.5 km of 선릉역"
     assert fuel == sorted(fuel), "results must come back nearest first"
 
@@ -292,7 +292,7 @@ if __name__ == "__main__":
     # Seoul Forest is a closed way, so this is empty unless ways were indexed too.
     parks = nearby(float(seongsu["lat"]), float(seongsu["lon"]), 2000, "leisure", "park")
     assert parks, "성수동 has parks within 2 km; ways must be indexed, not just nodes"
-    print(f"공원 near 성수동  {len(parks)} 곳, 가장 가까운 곳 {parks[0][1]}")
+    print(f"parks near 성수동  {len(parks)} found, nearest {parks[0][1]}")
 
     # 경주 is the whole point of the country-wide extract: on the Seoul-only file this
     # box excluded it and `attractions` fell through to a 3.1 s Overpass call.
@@ -301,7 +301,7 @@ if __name__ == "__main__":
     if covers(lat, lon):
         started = time.monotonic()
         sights = nearby(lat, lon, 6000, "tourism", "attraction")
-        print(f"경주 명소  {(time.monotonic() - started) * 1000:.2f} ms  {len(sights)} 곳")
+        print(f"경주 sights  {(time.monotonic() - started) * 1000:.2f} ms  {len(sights)} found")
         assert sights, "경주 has tourist attractions within 6 km"
     else:
         print("경주 is outside the indexed box — Seoul-only extract, Overpass will answer")

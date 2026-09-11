@@ -30,9 +30,9 @@ TOOL_BANK = os.path.join(DATA, "moshicp", "mcp_tool_bank.json")
 _NEEDS_BROWSER = "no browser installed (playwright/puppeteer MCP server not provisioned)"
 # The one thing left with no keyless source. Congestion is measured by cameras and
 # loop detectors owned by agencies that gate the feed; there is no OpenStreetMap of
-# live traffic. A free key from 서울 열린데이터광장 or TMAP closes it — free, not paid.
+# live traffic. A free key from Seoul Open Data Plaza or TMAP closes it — free, not paid.
 _NEEDS_TRAFFIC = ("real-time congestion needs a free agency key "
-                  "(서울 열린데이터광장 / TMAP); no keyless feed exists")
+                  "(Seoul Open Data Plaza / TMAP); no keyless feed exists")
 
 _UNSUPPORTED = {"map_road_traffic": _NEEDS_TRAFFIC}
 
@@ -122,7 +122,7 @@ def _world_override() -> dict[str, Callable]:
 
     Reads with no keyless structured source — KTX timetables, cinema showtimes, bus/rental/
     event listings — used to return a seeded (fake-but-Korean) row. There is no free API for
-    most of them (코레일 gives no public seat feed; cinema times are per-chain), so instead of
+    most of them (Korail gives no public seat feed; cinema times are per-chain), so instead of
     a made-up row they now fall back to **web search** (DuckDuckGo instant answer), per the
     user's request. It is the real answer when the web has one and `(no information found)`
     when it does not — never a fake row, and never a loosely-matched encyclopedia page. Web
@@ -131,9 +131,10 @@ def _world_override() -> dict[str, Callable]:
     Only the *reads* move; buying still records into the world. `_web_read` joins the args into
     a query — robust to BFCL's slot renaming (`from` -> `_from`), no per-slot template to drift.
     """
-    # 생성 env(gsh)에는 mcp/fastmcp 패키지가 없어 server 모듈 import가 죽는다. 그 경우
-    # override 없이 world(SQLite 시드)로 degrade — 데이터 생성용 dispatch에는 그게 오히려
-    # 결정론적이고 네트워크 무의존이라 적합하다 (user 2026-07-21: backend/mcp를 참고해 생성).
+    # The generation env (gsh) has no mcp/fastmcp package, so importing the server module
+    # dies. In that case degrade to world (the SQLite seed) with no override — for
+    # data-generation dispatch that is actually the better fit: deterministic and
+    # network-independent (user 2026-07-21: build it using backend/mcp as the reference).
     try:
         from contextspan.duetaspan.runtime.mcp.adapters_media import lookup_music
         from contextspan.duetaspan.runtime.mcp.servers.websearch_server import instant_answer
@@ -142,8 +143,9 @@ def _world_override() -> dict[str, Callable]:
 
     # DuckDuckGo's instant answer only (not full web_search): a clear factual answer or
     # "(no information found)" — never a loosely-matched Wikipedia page passed off as the
-    # answer, which is the "정보 애매하면 no-info" the user asked for. One request, no
-    # Wikipedia round trip, so it stays well under a second (~120-450 ms warm). Memoised.
+    # answer, which is the "no-info when the information is ambiguous" the user asked for. One
+    # request, no Wikipedia round trip, so it stays well under a second (~120-450 ms warm).
+    # Memoised.
     web = _memo("webread", cache.HOUR, instant_answer)
 
     def _web_read(intent: str) -> Callable:
@@ -193,7 +195,7 @@ def _live_tools() -> dict[str, Callable]:
     try:
         from contextspan.duetaspan.runtime.mcp.servers.finance_server import get_stock_price
         from contextspan.duetaspan.runtime.mcp.servers.websearch_server import web_search
-    except ImportError:                      # mcp/fastmcp 미설치 env: live 없이 world만
+    except ImportError:                      # env without mcp/fastmcp installed: world only, no live
         return {}
 
     quote = _memo("stock", cache.MINUTE, get_stock_price)
@@ -235,7 +237,7 @@ class Registry:
             from contextspan.duetaspan.runtime.mcp.servers import websearch_server
             websearch_server.warm_connections()
         except ImportError:
-            pass                             # mcp 패키지 없는 생성 env: world-only 모드
+            pass                             # generation env without the mcp package: world-only mode
 
     # ----- classification -----------------------------------------------------
     def backend_of(self, function: str) -> str:

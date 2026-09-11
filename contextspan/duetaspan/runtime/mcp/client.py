@@ -132,13 +132,14 @@ _SYSTEM_PROMPT = (
     "tool with the best arguments you can infer. "
     "Only call get_time for current time/date, get_weather for current weather, "
     "and get_stock_price for live stock or crypto prices. "
-    # 라이브 값은 '직접 답변' 금지. 시계/기온/시세는 모델이 알 수 없는 값이라, 산문으로
-    # 답하면 그 자체가 지어낸 값이다(실측: 시간 답한 뒤 날씨를 도구 없이 산문으로 재진술).
+    # Live values must never be answered directly. Clock/temperature/price are values the model
+    # cannot know, so prose answers are fabrications (observed: weather restated with no tool).
     "The current time, the current weather, and a live price are values you CANNOT know: "
     "never state them from your own knowledge and never restate them from earlier text. "
     "If such a request is unanswered, you MUST call its tool — answering directly is forbidden. "
-    # (2026-08-25 실사고: 모델이 스팬 도착 전 날씨를 조작 발화 → 라우터가 '기답'으로 오인해
-    # get_weather 기권 → 조작이 교정 툴콜을 죽이는 자기강화 루프)
+    # (2026-08-25 incident: the model fabricated weather before the span arrived -> the router
+    # read it as 'already answered' and abstained from get_weather -> self-reinforcing loop where
+    # the fabrication kills the corrective tool call)
     "IGNORE any time/weather/price statement inside ASSISTANT_ALREADY_SAID unless the history "
     "shows the tool call that produced it — with no tool result behind it, that statement is a "
     "HALLUCINATION and the request is still UNANSWERED. For time/weather/price requests, calling "
@@ -150,12 +151,14 @@ _SYSTEM_PROMPT = (
     "or chit-chat) -- for those, call NO tool and instead ANSWER DIRECTLY with one "
     "concise factual spoken sentence (this answer is used verbatim, so make it "
     "complete and correct; resolve pronouns from any provided context). "
-    # 2026-08-25 (실측 실패: 40s 연속발화에서 누적 전사가 그대로 들어와 '마지막 질문'이
-    # 아니라 첫 질문(get_time)으로 라우팅 → 주가 질문에 시각이 주입됨). 발화-단위 창이
-    # 무너져 여러 질문이 함께 들어와도, 라우팅 대상은 항상 '아직 답하지 않은 가장 최근
-    # 질문' 하나임을 규칙으로 명시한다 (유저 지시: "누적 전사 전체로 들어가도 가장 최근
-    # 질문에 답할 수 있도록").
-    # (2026-08-25 유저 설계) 위치/타임존 인자는 코드 폴백이 아니라 라우터가 프로필에서 채운다.
+    # 2026-08-25 (observed failure: in 40s of running speech the whole cumulative transcript came
+    # in and routing picked the FIRST question (get_time) instead of the last one -> the time was
+    # injected for a stock question). Even when the utterance-level window collapses and several
+    # questions arrive together, the rule states the routing target is always the single most
+    # recent UNANSWERED question (owner: "even if the whole cumulative transcript comes in, it
+    # must still be able to answer the most recent question").
+    # (2026-08-25 owner design) Location/timezone arguments are filled by the router from the
+    # profile, not by a code fallback.
     "The conversation context may include the user's PROFILE (home city, timezone). "
     "When a tool needs a location or timezone argument and the user did not name one, fill it "
     "from the profile yourself (profile says Seoul + 'how's the weather?' -> city='Seoul'; "
@@ -180,26 +183,26 @@ _SYSTEM_PROMPT = (
     "route the LATEST request. If a list of already-answered requests is provided, "
     "those are done — route the newest request that has NOT been answered yet, and "
     "never re-route an already-answered one. "
-    # 에이전트가 이미 '말한' 것도 answered 다. history(도구 장부)에는 안 실리지만 발화에는 있다.
-    # 에이전트가 이미 '말한' 것도 answered 다. history(도구 장부)에는 안 실리지만 발화에는 있다.
+    # What the agent already SAID counts as answered too — absent from history (the tool ledger), present in speech.
+    # What the agent already SAID counts as answered too — absent from history (the tool ledger), present in speech.
     "An ASSISTANT_ALREADY_SAID block, when present, is the assistant's own spoken answer so "
     "far. Any request it already answers is DONE — never route that one again. Then look at "
     "ASR_TRANSCRIPT for the requests it does NOT yet answer, take the LAST such request, and "
     "CALL ITS TOOL. Do not describe what you would do and do not reply that the answer is "
     "already known: emit the tool call itself. Answer directly (no tool) only when EVERY "
     "request in the transcript is already answered. "
-    # 범위 제한: 답은 '마지막 미응답 요청' 하나만 다룬다. 재진술 금지.
-    # 실측(2026-08-03): 도구콜과 별개로 라우터가 "It is 11:32 AM ... and the weather is 32°C..."
-    # 처럼 이미 답한 것까지 묶은 직접답변을 만들어냈다. 그게 span 으로 들어가면 모델은 같은
-    # 사실을 두 번 받아 중복 발화하거나 어느 쪽을 말할지 흔들린다.
+    # Scope limit: a reply covers only the single LAST unanswered request. No restating.
+    # Observed (2026-08-03): besides the tool call, the router produced a direct answer bundling
+    # already-answered facts ("It is 11:32 AM ... and the weather is 32°C..."). Fed in as a span,
+    # the model gets the same fact twice and either repeats it or wavers over which one to say.
     "SCOPE — whatever you return covers EXACTLY ONE request: the LAST one that is still "
     "unanswered. Work backwards from the END of ASR_TRANSCRIPT: take the last request, and "
     "if ASSISTANT_ALREADY_SAID already answers it, step back to the one before it, and so on. "
     "Never bundle several requests into one reply and never repeat a fact that "
     "ASSISTANT_ALREADY_SAID or an earlier tool result already provided. If every request is "
     "already answered, reply exactly: (no information found). "
-    # 직렬 체인: 한 발화가 여러 스텝(여러 도구콜)을 요구할 수 있다 — 이전 콜의 '결과'가
-    # history에 실려 오므로, 남은 스텝이 있으면 그 결과를 인자로 다음 도구를 고른다.
+    # Serial chains: one utterance may require several steps (several tool calls) — earlier call
+    # RESULTS arrive in history, so when a step remains, pick the next tool using those results.
     "One utterance may require SEVERAL tool calls in sequence (e.g. search first, "
     "then book/add/update using the search result). Earlier tool calls are listed "
     "with their RESULTS: if the request still has an unfinished step, call the NEXT "
@@ -211,19 +214,20 @@ _SYSTEM_PROMPT = (
     "itself asks for it ('then...', 'also...', 'after that...'): NEVER invent a step, "
     "or argument values, that appear in neither the transcript nor the earlier "
     "results. "
-    # 자기수정: 최신 의도만 유효.
+    # Self-correction: only the latest intent is valid.
     "If the user corrects themselves mid-request ('no wait', 'actually', 'I mean', "
     "'scratch that', 'not X, Y'), ONLY the latest corrected intent and values are "
     "valid — the pre-correction tool choice and argument values are void; never use "
     "them. "
-    # 근사-중복 재발행 방지(r4 정밀도 실패 16건의 처방): 같은 요청의 재포장 콜 금지.
+    # Block near-duplicate re-issues (fix for 16 r4 precision failures): no repackaged call for the same request.
     "A repeat of an ALREADY-MADE call whose arguments differ only in formatting, "
     "spelling, or a superseded pre-correction value is still a repeat — FORBIDDEN. "
     "Call the same tool again only for a genuinely NEW request or the user's FINAL "
     "corrected values not yet executed."
-    # (2026-08-03) '미완성 요청이면 no-tool' 규칙을 넣었다가 되돌림: 26B 라우터가 ID 가
-    # 완성된 뒤에도 툴콜 대신 직접답변(환각 'ABC12'/전사 앵무새)으로 도망갔다(프로브 실측
-    # calls=[] 2/2). 선발행-중복은 프롬프트가 아니라 라우터 모델 품질(벤치 표준 31B)로 잡는다.
+    # (2026-08-03) A rule "no tool if the request is incomplete" was added and then reverted: the
+    # 26B router escaped into direct answers (hallucinated 'ABC12' / transcript parroting) instead
+    # of a tool call even after the ID was complete (probe: calls=[] 2/2). Premature-duplicate
+    # calls are caught by router model quality (31B is the bench standard), not by the prompt.
 )
 
 
@@ -294,9 +298,9 @@ _STOCK_INTENT = {"stock", "stocks", "share", "shares", "price", "priced", "tradi
 def _has_intent(query: str, words: set) -> bool:
     """Latin words match as tokens (typo-tolerant), Korean gate words by containment.
 
-    2026-08-25 (router_speed 실험 이식): 종전 정확일치 매처는 ASR 오타('tmie')가 게이트를
-    빠뜨려 하드 게이팅을 못 켰다. difflib ratio >= 0.78 퍼지 매칭을 더해 오타 내성을 확보
-    — 이것이 하드 게이트 복원의 전제다."""
+    2026-08-25 (ported from the router_speed experiment): the old exact-match matcher let ASR
+    typos ('tmie') slip past the gate, so hard gating could not be enabled. Adding difflib ratio
+    >= 0.78 fuzzy matching gives typo tolerance — the precondition for restoring the hard gate."""
     import re as _re
     import difflib as _dl
     toks = set(_re.findall(r"[a-z']+", query.lower()))
@@ -316,20 +320,20 @@ _TOOL_INTENT_GATE = {
     "get_stock_price": _STOCK_INTENT,
 }
 
-# ── 오툴콜 구조적 제거 (2026-08-25 유저: "잘못된 툴콜 하는 걸 아예 없애줘" — router_speed
-# 실험(_canonical/_post_guard/safe-abstain)의 프로덕션 이식) ─────────────────────────────
+# ── Structural removal of wrong tool calls (2026-08-25 owner: "get rid of wrong tool calls
+# entirely" — production port of router_speed's _canonical/_post_guard/safe-abstain) ───────────
 _TXN_RE = __import__("re").compile(
     r"buy|reserve|book|pay|order|transfer|schedule|cancel|delete", __import__("re").IGNORECASE)
-# 예약/결제류 툴을 부를 자격이 되는 명시적 동사 증거 (퍼지 매칭 _has_intent로 판정)
+# Explicit verb evidence that licenses a booking/payment tool (judged by fuzzy _has_intent)
 _TXN_VERBS = {"book", "reserve", "reservation", "buy", "purchase", "order", "pay", "send",
               "transfer", "schedule", "cancel", "delete", "tickets", "예약", "예매", "끊어",
               "잡아", "결제", "취소", "보내"}
 
 
 def _canonical_name(bank: dict, name: str):
-    """LLM이 변형한 툴이름의 결정적 복구 (실험 _canonical 이식, LLM 무개입).
-    exact → 대소문자/언더스코어 무시 → 같은 도메인 유일 후보 → difflib(0.6).
-    가드: 검색 의도 이름(_TXN 미포함)은 절대 예약/결제 툴로 복구되지 않는다."""
+    """Deterministic recovery of a tool name the LLM mangled (ported _canonical, no LLM involved).
+    exact → case/underscore-insensitive → sole candidate in the same domain → difflib(0.6).
+    Guard: a search-intent name (no _TXN match) is never recovered into a booking/payment tool."""
     import difflib as _dl
     if not name:
         return None
@@ -358,15 +362,16 @@ def _canonical_name(bank: dict, name: str):
 
 
 def _coerce_types(args: dict[str, Any], schema: dict[str, Any]) -> dict[str, Any]:
-    """스키마 선언 타입으로 인자 값을 결정적으로 강제(모델 무접촉 후처리).
-    LLM이 "1500"/"true"처럼 문자열화한 number/integer/boolean을 원타입으로 — r4 실측:
-    타입 불일치만으로 판정 실패 3건(housing_03/08/24). 값 자체는 절대 바꾸지 않는다."""
+    """Deterministically coerce argument values to the schema-declared types (post-processing, the
+    model is never touched). number/integer/boolean the LLM stringified as "1500"/"true" go back to
+    their declared type — r4: 3 grading failures from type mismatch alone (housing_03/08/24). The
+    values themselves are never changed."""
     props = (schema or {}).get("properties") or {}
     out: dict[str, Any] = {}
     for k, v in args.items():
         p = props.get(k) if isinstance(props.get(k), dict) else None
         t = p.get("type") if p else None
-        untyped = p is not None and "type" not in p   # 스키마에 있으나 타입 미선언(= Any)
+        untyped = p is not None and "type" not in p   # in schema but no declared type (= Any)
         if isinstance(v, str):
             s = v.strip()
             try:
@@ -378,7 +383,7 @@ def _coerce_types(args: dict[str, Any], schema: dict[str, Any]) -> dict[str, Any
                 elif t == "boolean" and s.lower() in ("true", "false"):
                     v = s.lower() == "true"
                 elif untyped:
-                    # Any 필드는 자연 JSON 타입으로: "1500"→1500, "true"→true, 그 외 문자열 유지.
+                    # Any field -> natural JSON type: "1500"→1500, "true"→true, else keep str.
                     if s.lower() in ("true", "false"):
                         v = s.lower() == "true"
                     elif _re.fullmatch(r"-?\d+", s):
@@ -478,9 +483,10 @@ class MCPRouter:
                 )
             except Exception as exc:
                 logger.warning("MCP server '%s' failed to start: %s", server_name, exc)
-        # ── registry 도구뱅크 병합 (2026-07-27): SGD 액션(상태유지 시뮬)·기타 지원 도구를
-        # 라우터 카탈로그에 노출 — 벤치(cases100/FDB-v3)의 도구 우주와 백엔드 연결.
-        # 스키마는 슬림화(프롬프트 예산: gemma len 4096) — 이름/짧은설명/타입만.
+        # ── registry tool-bank merge (2026-07-27): expose SGD actions (stateful simulation) and
+        # other support tools in the router catalog — connects the bench (cases100/FDB-v3) tool
+        # universe to its backend. Schemas are slimmed (prompt budget: gemma len 4096) — name,
+        # short description and types only.
         try:
             if toolpack_only:
                 raise _SkipMerge()
@@ -501,8 +507,8 @@ class MCPRouter:
                                        for k, v in props.items()},
                         "required": sch.get("required") or []}
                 desc = str(_reg.bank.get(fn, {}).get("description") or "")[:90]
-                # 도메인-우선 2단 라우팅: 0단은 도메인 그룹만 노출(프롬프트 예산), 1단에서
-                # 해당 도메인 툴+슬림 스키마로 선택 — argschema/domain을 엔트리에 보관.
+                # Domain-first two-stage routing: stage0 exposes domain groups only (prompt
+                # budget), stage1 picks that domain's tools + slim schemas — keep argschema/domain.
                 dom = str(_reg.bank.get(fn, {}).get("domain") or fn.split("_")[0])
                 self._tools[fn] = {"session": None, "server": "registry", "argschema": slim,
                                    "domain": dom,
@@ -517,11 +523,12 @@ class MCPRouter:
         except Exception as exc:
             logger.warning("registry merge failed: %s", exc)
 
-        # ── run-scoped toolpack 병합 (MOSHICP_EXTRA_TOOLPACK): 벤치(FDB-v3)의 공식
-        # 도구를 이 실행에 한해 라우터 카탈로그에 노출. 팩 모듈은
+        # ── run-scoped toolpack merge (MOSHICP_EXTRA_TOOLPACK): expose the bench's (FDB-v3)
+        # official tools in the router catalog for this run only. The pack module exports
         #   TOOLS = {name: {"description":.., "parameters": <json schema>, "fn": callable}}
-        # (+ 선택 DOMAIN)을 export. registry 병합과 동일 규약(argschema/domain/도메인-우선
-        # 2단) 이되 dispatch는 팩의 fn을 직접 호출. 이름 충돌 시 팩이 우선(벤치의 공식 백엔드).
+        # (+ optional DOMAIN). Same contract as the registry merge (argschema/domain/domain-first
+        # two-stage) but dispatch calls the pack's fn directly. On a name clash the pack wins
+        # (it is the bench's official backend).
         pack_path = os.environ.get("MOSHICP_EXTRA_TOOLPACK", "").strip()
         if pack_path:
             try:
@@ -531,15 +538,16 @@ class MCPRouter:
                 spec.loader.exec_module(mod)
                 pack = getattr(mod, "TOOLS", {}) or {}
                 default_dom = str(getattr(mod, "DOMAIN", "") or "toolpack")
-                dom_descs = getattr(mod, "DOMAINS", {}) or {}   # {domain: 그룹 설명(stage0)}
+                dom_descs = getattr(mod, "DOMAINS", {}) or {}   # {domain: group description (stage0)}
                 n_pack = 0
                 for fn, spec_d in pack.items():
                     params = spec_d.get("parameters") or {"type": "object", "properties": {}}
-                    # 300자: 파라미터 힌트+전형 질의 예시 1개가 들어가는 설명을 살린다
-                    # (120은 예시를 잘라 라우팅 정확도를 깎았다). 예산: 도메인당 툴 3개 수준.
+                    # 300 chars keeps a description holding parameter hints + one typical query
+                    # example (120 truncated the example and cut routing accuracy). Budget: about
+                    # 3 tools per domain.
                     desc = str(spec_d.get("description") or "")[:300]
                     dom = str(spec_d.get("domain") or default_dom)
-                    # 팩이 우선: 라이브/registry 동명 도구를 덮어써 벤치 백엔드로 연결.
+                    # Pack wins: overrides a same-named live/registry tool to reach the bench backend.
                     self._tools[fn] = {"session": None, "server": "toolpack",
                                        "fn": spec_d.get("fn"), "argschema": params,
                                        "domain": dom,
@@ -558,7 +566,7 @@ class MCPRouter:
         if entry is None:
             return None
         if entry.get("server") == "toolpack":
-            # run-scoped toolpack 도구: 팩의 fn을 직접 호출하고 문자열 결과 반환.
+            # run-scoped toolpack tool: call the pack's fn directly and return its string result.
             fn = entry.get("fn")
             if fn is None:
                 return None
@@ -568,7 +576,7 @@ class MCPRouter:
                 logger.warning("toolpack tool '%s' failed: %s", name, exc)
                 return None
         if entry.get("server") == "registry":
-            # registry 도구: 읽기=실API/웹검색, 액션=상태유지 시뮬 (registry.dispatch 규약 그대로)
+            # registry tool: reads = real API/web search, actions = stateful sim (registry.dispatch contract)
             try:
                 from contextspan.duetaspan.runtime.mcp.registry import get_registry
                 return str(get_registry().dispatch(name, args or {}))
@@ -606,7 +614,7 @@ class MCPRouter:
             ],
             "tools": tools,
             "options": {"temperature": 0.0},
-            "keep_alive": -1,        # 모델 상주 고정 — 세션 사이 idle에도 언로드 금지(콜드 방지)
+            "keep_alive": -1,        # pin the model resident — never unload while idle (avoids cold starts)
         }
         try:
             resp = requests.post(f"{_LLM_URL}/api/chat", json=payload, timeout=30)
@@ -650,8 +658,8 @@ class MCPRouter:
             payload["temperature"] = 0.0
             payload["max_tokens"] = _MAX_TOKENS
         headers = {"Authorization": "Bearer " + _LLM_KEY} if _LLM_KEY else None
-        # MCP_ROUTER_DEBUG=1 이면 라우터에 실제로 들어간 유저 메시지를 그대로 찍는다.
-        # (도구 카탈로그는 124개라 너무 길어 제외 — 시스템 규칙은 코드에 고정되어 있다.)
+        # With MCP_ROUTER_DEBUG=1, print the user message exactly as it entered the router.
+        # (The 124-tool catalog is too long to include — the system rules are fixed in code.)
         if os.environ.get("MCP_ROUTER_DEBUG") == "1":
             _ts = _time.strftime("%H:%M:%S") + f".{int(_time.time() % 1 * 1000):03d}"
             print(f"\n[{_ts}] [router-in stage={stage}] ─────────────────────────\n{query}\n"
@@ -664,7 +672,7 @@ class MCPRouter:
             logger.warning("MCP router LLM call failed: %s", exc)
             return None
         finally:
-            # 라우터 지연 실측(호출당 wall-time) — r4 대비 +20% 예산 검증용.
+            # Measured router latency (wall-time per call) — to verify the +20% budget vs r4.
             print(f"[{_time.strftime('%H:%M:%S')}] [router-llm] stage={stage} "
                   f"dt={_time.time() - _t0:.2f}s", flush=True)
         if os.environ.get("MCP_ROUTER_DEBUG") == "1":
@@ -682,11 +690,11 @@ class MCPRouter:
         try:
             picked = json.loads(text[text.index("{"): text.rindex("}") + 1])
         except Exception:
-            # JSON이 아니면 모델이 그냥 문장으로 답한 것 — 직접답변으로 살린다(버리면 RAG 2콜).
+            # Not JSON = the model answered in prose — keep it as a direct answer (dropping it = 2 RAG calls).
             return {"answer": text} if len(text) > 2 else None
         if not isinstance(picked, dict):
             return None
-        if picked.get("answer"):                      # 단일콜 직접답변 (일반지식/abstain)
+        if picked.get("answer"):                      # single-call direct answer (general knowledge/abstain)
             return {"answer": str(picked["answer"]).strip()}
         if not picked.get("name"):
             return None
@@ -697,16 +705,18 @@ class MCPRouter:
                      convo: Optional[str] = None):
         """Ask the LLM to pick one tool. Returns (tool_name, args), {"answer": str}, or None.
 
-        aux(내적독백)는 LLM 메시지에만 라벨링해 붙인다(대명사 해소용) — 이후의 인텐트
-        게이트들은 클린 `query`로 판정해 aux 단어가 게이트를 잘못 여는 일을 막는다."""
+        aux (the agent's inner monologue) is attached, labelled, to the LLM message only (for
+        pronoun resolution) — the intent gates below judge the clean `query`, so aux words cannot
+        open a gate by mistake."""
         tools = self._tool_schemas()
         if not tools:
             return None
-        # ── 프롬프트 길이 사전 캐치 (2026-08-25 유저: "router는 빨라야 하는데 프롬프트가
-        # 너무 길어져도 사전에 캐치돼 있어야"): 발화-단위 창이 무너지면 누적 전사가 통째로
-        # 들어와 라우팅이 느려지고 첫 질문에 끌린다. 상한 초과 시 WARN을 남기고(창 붕괴
-        # 신호 — VAD/AGC 점검 트리거) 꼬리만 유지한다. '마지막 질문' 규칙과 정합.
-        self._last_convo = convo or ""     # 환각-city 판정용 (프로필 출처 인자는 정당)
+        # ── Catch prompt length up front (2026-08-25 owner: "the router has to be fast, so an
+        # over-long prompt must be caught in advance too"): when the utterance-level window
+        # collapses the whole cumulative transcript comes in, routing slows down and is pulled to
+        # the first question. Over the cap, log a WARN (window-collapse signal — trigger a VAD/AGC
+        # check) and keep only the tail. Consistent with the 'last question' rule.
+        self._last_convo = convo or ""     # for hallucinated-city checks (profile-sourced args are legit)
         _qcap = int(os.environ.get("MOSHICP_ROUTER_QUERY_CAP", "480") or 480)
         if len(query) > _qcap:
             print(f"[router] WARN: transcript {len(query)} chars > cap {_qcap} — "
@@ -714,18 +724,19 @@ class MCPRouter:
             query = query[-_qcap:]
         if aux and len(aux) > _qcap:
             aux = aux[-_qcap:]
-        # aux = 에이전트 자신의 내적 독백(= 이미 소리내어 말한 답). 예전 라벨
-        # "Context (earlier conversation)"는 출처를 안 밝혀서, 라우터가 이걸 '이미 답한 것'으로
-        # 읽지 못했다 — 실측: 에이전트가 시간을 이미 말한 뒤에도 같은 전사에서 get_time 을
-        # 다시 골랐다(2026-08-03). 출처와 함의를 명시해 미응답 요청으로 넘어가게 한다.
-        # 라벨은 '사실 서술'만 둔다. 여기에 지시문("do not route it again" 등)을 넣었더니
-        # 라우터가 대화체로 응답해 JSON 대신 'call:get_weather{...}' 를 텍스트로 뱉었다.
-        # 규칙은 전부 _SYSTEM_PROMPT 가 소유하고, 유저 메시지는 라벨링된 자료만 담는다.
+        # aux = the agent's own inner monologue (= the answer it already said aloud). The old label
+        # "Context (earlier conversation)" did not name the source, so the router could not read it
+        # as 'already answered' — observed: it picked get_time again from the same transcript after
+        # the agent had already said the time (2026-08-03). Naming the source and its implication
+        # makes it move on to the unanswered request. The label states FACTS only: adding
+        # instructions here ("do not route it again" etc.) made the router reply conversationally,
+        # emitting 'call:get_weather{...}' as text instead of JSON. All rules belong to
+        # _SYSTEM_PROMPT; the user message carries labelled material only.
         msg = (f"ASSISTANT_ALREADY_SAID (the assistant's own spoken answer so far):\n{aux}"
                f"\n\nASR_TRANSCRIPT:\n{query}") if aux else query
         if _LLM_API == "openai":
-            # 도메인-우선 2단 (registry 병합으로 카탈로그가 프롬프트 예산 초과 시):
-            # 0단 = 라이브 툴 개별 + registry는 도메인 그룹으로만 → 1단 = 그 도메인 툴+스키마.
+            # Domain-first two-stage (when the registry merge pushes the catalog over budget):
+            # stage0 = live tools individually + registry as domain groups → stage1 = that domain's tools+schemas.
             regs = {n: e for n, e in self._tools.items()
                     if e.get("server") in ("registry", "toolpack")}
             if regs:
@@ -768,24 +779,25 @@ class MCPRouter:
             return None
         name = fn.get("name")
         if name not in self._tools:
-            # 결정적 이름 복구 (실험 _canonical 이식) — 복구 불가면 안전한 no-tool
+            # Deterministic name recovery (ported _canonical) — unrecoverable means a safe no-tool
             name = _canonical_name(self._tools, name)
             if name is None:
                 return None
-        # ── SEARCH vs BOOK 코드 강제 (실험 safe-abstain 이식): 예약/결제류 툴은 발화에
-        # 명시적 예약 동사 증거가 있어야만 허용. 없으면 같은 도메인의 유일한 검색 툴로
-        # 강등하고, 그마저 없으면 no-tool — '틀린 확신 호출'을 구조적으로 abstain으로 바꾼다
-        # (heavy-noise 실측: 오툴콜이 abstain보다 훨씬 해로움 — NOISE_ROBUSTNESS.md).
+        # ── SEARCH vs BOOK enforced in code (ported safe-abstain): a booking/payment tool is
+        # allowed only with explicit booking-verb evidence in the utterance. Without it, demote to
+        # the domain's sole search tool, and if there is none, no-tool — this structurally turns a
+        # 'confidently wrong call' into an abstain (heavy-noise: a wrong tool call is far more
+        # harmful than abstaining — NOISE_ROBUSTNESS.md).
         if _TXN_RE.search(name) and not _has_intent(query, _TXN_VERBS):
             parts = name.split("_")
             dom = f"{parts[0]}_{parts[1]}_" if len(parts) >= 3 and parts[1].isdigit() else None
             finds = [k for k in self._tools if dom and k.startswith(dom)
                      and not _TXN_RE.search(k)]
             if len(finds) == 1:
-                logger.info("txn-guard: %s -> %s (예약 동사 부재, 검색 강등)", name, finds[0])
+                logger.info("txn-guard: %s -> %s (no booking verb, demoted to search)", name, finds[0])
                 name = finds[0]
             else:
-                logger.info("txn-guard: %s vetoed (예약 동사 부재) -> no-tool", name)
+                logger.info("txn-guard: %s vetoed (no booking verb) -> no-tool", name)
                 return None
         # llama3.2:3b cannot reliably suppress web_search for ordinary
         # general-knowledge questions via prompting alone (verified: it calls
@@ -794,15 +806,17 @@ class MCPRouter:
         # caller's LLM-RAG path, per the routing contract.
         if name == "web_search" and not _has_search_intent(query):
             return None
-        # per-tool intent gate — 기원: llama3.2:3b가 "capital of France"에 get_weather를
-        # 과호출하던 시절의 하드 차단. 단일콜 설계(직접답변/abstain 선택지 보유) + a4b급
-        # 라우터에선 툴 선택이 의도적이라, 하드 게이트는 ASR 오타("tmie")가 키워드를 못
-        # 맞추면 정답 라우팅까지 죽인다. 기본 SOFT(경고만); MCP_ROUTER_HARD_GATES=1 복원.
+        # per-tool intent gate — origin: a hard block from when llama3.2:3b over-called get_weather
+        # for "capital of France". With the single-call design (direct answer/abstain available) and
+        # an a4b-class router the tool choice is deliberate, so a hard gate kills correct routing
+        # whenever an ASR typo ("tmie") misses the keywords. Default SOFT (warn only);
+        # MCP_ROUTER_HARD_GATES=1 restores it.
         gate = _TOOL_INTENT_GATE.get(name)
         if gate is not None and not _has_intent(query, gate):
-            # 2026-08-25: 매처가 퍼지(오타 내성)가 되면서 소프트로 물러났던 근거('tmie'류가
-            # 정답 라우팅을 죽임)가 해소됨 → 기본 HARD 복원 (유저: "잘못된 툴콜 아예 없애").
-            # MCP_ROUTER_SOFT_GATES=1 로만 종전 소프트 동작 복귀.
+            # 2026-08-25: now the matcher is fuzzy (typo-tolerant), the reason for backing off to
+            # soft ('tmie'-type typos killing correct routing) is gone → default HARD restored
+            # (owner: "get rid of wrong tool calls entirely"). Only MCP_ROUTER_SOFT_GATES=1 brings
+            # back the old soft behaviour.
             if not os.environ.get("MCP_ROUTER_SOFT_GATES"):
                 logger.info("intent-gate veto (hard): %s for %r -> no-tool", name, query[:60])
                 return None
@@ -818,10 +832,12 @@ class MCPRouter:
         if not isinstance(args, dict):
             args = {}
         args = _clean_args(args)
-        # (2026-08-25 유저 설계: "폴백/구현 없이 router LLM에게 정보를 줘서 툴콜링하게") —
-        # 종전엔 쿼리에 없는 city를 무조건 삭제해 LLM이 프로필로 옳게 채운 인자까지 지웠고,
-        # 그 빈자리를 _inject_ctx가 결정적으로 재주입했다. 이제 프로필 인자 채움은 LLM 소관:
-        # 쿼리에도, 대화 컨텍스트(프로필 포함)에도 없는 city만 환각으로 보고 떨군다.
+        # (2026-08-25 owner design: "no fallback, no extra implementation — give the router LLM the
+        # information and let it make the tool call") — this used to delete any city absent from the
+        # query, wiping even arguments the LLM had correctly filled from the profile, and
+        # _inject_ctx then deterministically re-injected them. Profile arg filling is the LLM's job
+        # now: only a city found neither in the query nor in the conversation context (profile
+        # included) counts as a hallucination and is dropped.
         if name == "get_weather":
             city = str(args.get("city") or "")
             if city and city.lower() not in query.lower() \
@@ -832,9 +848,10 @@ class MCPRouter:
     def _llm_fill_args(self, name: str, query: str,
                        history: Optional[list[str]] = None,
                        convo: Optional[str] = None) -> dict[str, Any]:
-        """2단 라우팅: 선택된 registry 도구의 풀 스키마로 인자만 생성 (1단 카탈로그는 무스키마).
-        convo(Context DB 스냅샷)+history(이전 콜+결과)를 함께 줘 직렬 체인 인자("결과 A의
-        주소/ID를 B에")를 채우고, 자기수정 발화에선 최신 값만 채택하게 한다."""
+        """Stage-2 routing: generate only the arguments, from the chosen registry tool's full schema
+        (the stage-1 catalog carries no schemas). convo (Context DB snapshot) + history (earlier
+        calls and their results) are passed together so serial-chain arguments ("the address/id
+        from result A into B") get filled and a self-correcting utterance yields only the latest values."""
         import json as _json
         import time as _time
         entry = self._tools.get(name) or {}
@@ -855,8 +872,9 @@ class MCPRouter:
                  "content": ("Extract the arguments for ONE tool call from the user request. "
                              "Reply with ONLY a JSON object of arguments (no prose). "
                              "Use verbatim values from the request; omit unknown OPTIONAL fields. "
-                             # required 누락 → 백엔드 TypeError → 콜 전체가 소실되는 경로 차단:
-                             # 필수 인자는 컨텍스트/이전 결과/상식 디폴트로 반드시 채운다.
+                             # Block the path "missing required -> backend TypeError -> the whole
+                             # call is lost": required args are always filled from the context,
+                             # earlier results, or a common-sense default.
                              "Every field in the schema's 'required' list MUST be present: if "
                              "the user did not state it, infer the most plausible value from the "
                              "request, the earlier results, or a common default (e.g. bedrooms: "
@@ -864,7 +882,7 @@ class MCPRouter:
                              "The request is live ASR and the user may self-correct ('no wait', "
                              "'actually', 'I mean', 'not X, Y'): ONLY the latest corrected value "
                              "is valid — never use a value the user replaced. "
-                             # 음성값 표기 규범(ASR 발화체 → API 값): 의미 동일, 표기만 정규화.
+                             # Spoken-value notation rules (ASR speech → API value): same meaning, notation only.
                              "Value formatting rules for spoken input: write dates as "
                              "'<Month> <number>' with NO ordinal suffix ('November 1', never "
                              "'November 1st'). When the schema description names canonical "
@@ -886,8 +904,8 @@ class MCPRouter:
         else:
             payload.update({"temperature": 0.0, "max_tokens": _MAX_TOKENS})
         headers = {"Authorization": "Bearer " + _LLM_KEY} if _LLM_KEY else None
-        # MCP_ROUTER_DEBUG=1 이면 라우터에 실제로 들어간 유저 메시지를 그대로 찍는다.
-        # (도구 카탈로그는 124개라 너무 길어 제외 — 시스템 규칙은 코드에 고정되어 있다.)
+        # With MCP_ROUTER_DEBUG=1, print the user message exactly as it entered the router.
+        # (The 124-tool catalog is too long to include — the system rules are fixed in code.)
         if os.environ.get("MCP_ROUTER_DEBUG") == "1":
             _ts = _time.strftime("%H:%M:%S") + f".{int(_time.time() % 1 * 1000):03d}"
             print(f"\n[{_ts}] [router-in stage=fill] ─────────────────────────\n{query}\n"
@@ -931,24 +949,26 @@ class MCPRouter:
         {"answer": ...} (general knowledge / abstain — single-call design), or None.
         history: already-answered requests (spoken form) — the router must pick the
         newest UNanswered request when the ASR transcript re-captures old ones.
-        convo: Context DB working_text() 스냅샷 — 대화 누적 상태(유저 턴+도구 결과)를
-        stage0/stage1/인자채움의 1급 입력으로 주입(체인의 '결과 A를 인자로 B' 일원화)."""
+        convo: Context DB working_text() snapshot — injects the cumulative conversation state (user
+        turns + tool results) as a first-class input to stage0/stage1/arg-filling, unifying the
+        chain's 'result A as an argument to B'."""
         ctx = ctx or {}
         selection = self._select_tool(query, history, aux, convo)
         if selection is None:
             return None
         if isinstance(selection, dict) and selection.get("answer"):
-            # 단일콜 직접답변: 라우터 모델이 일반지식/abstain을 즉답 — 별도 RAG 콜 불필요.
+            # Single-call direct answer: the router answers general knowledge/abstain itself — no extra RAG call.
             return {"answer": selection["answer"], "tool": None, "server": None, "args": {}}
         name, args = selection
         entry = self._tools.get(name, {})
         if entry.get("server") in ("registry", "toolpack"):
             if not args:
-                args = self._llm_fill_args(name, query, history, convo)  # 2단: 인자 생성
-            # ── dispatch 직전 required 최종 가드 ──────────────────────────────
-            # 누락 required는 백엔드 TypeError → '콜 자체 소실'(선택 정답이어도 미기록)로
-            # 이어진다(r2 실측: add_to_cart quantity). 검증 → fill 재시도 1회 → 그래도
-            # 없으면 타입별 합리적 기본값. 빈 인자로 죽이는 것보다 기록되는 편이 항상 낫다.
+                args = self._llm_fill_args(name, query, history, convo)  # stage 2: generate args
+            # ── final required-args guard right before dispatch ────────────────
+            # A missing required arg means a backend TypeError → 'the call itself is lost' (not
+            # recorded even when the pick was correct; r2: add_to_cart quantity). Validate → retry
+            # fill once → otherwise a sensible per-type default. Being recorded always beats dying
+            # on empty args.
             sch = entry.get("argschema") or {}
             req = sch.get("required") or []
             missing = [k for k in req if k not in args]
@@ -963,7 +983,7 @@ class MCPRouter:
                     t = (props.get(k) or {}).get("type", "string")
                     args[k] = _DEF.get(t, "")
                 logger.warning("required args defaulted for '%s': %s", name, missing)
-            # 스키마 타입 강제(후처리): "1500"→1500, "true"→true — 값 불변, 타입만.
+            # Schema type coercion (post-processing): "1500"→1500, "true"→true — type only, value unchanged.
             args = _coerce_types(args, sch)
         # Profile arguments for the live tools without a second LLM call: a `get_time` with no timezone or a
         # `get_weather` with no place takes the user's profile value (ContextSpanning #12: the argument
