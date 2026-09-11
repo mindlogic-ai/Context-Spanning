@@ -1,10 +1,17 @@
 ---
-license: mit
+# TODO(seonghyeon, yongwoo): the base model nvidia/personaplex-7b-v1 is released under the NVIDIA Open Model
+# License (license: other on the Hub), with kyutai/moshiko (CC-BY-4.0) underneath. Derived weights normally
+# inherit it, so the code is MIT but these weights are declared under the NVIDIA license until someone with
+# authority says otherwise. Also decide gated: true / extra_gated_prompt before the repo goes public.
+license: other
+license_name: nvidia-open-model-license
+license_link: https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/
 base_model: nvidia/personaplex-7b-v1
 pipeline_tag: audio-to-audio
 language:
   - en
 library_name: contextspan
+# TODO(jaeho): thumbnail: <absolute URL of assets/figures/architecture.png once the repo is public>
 tags:
   - full-duplex
   - spoken-dialogue
@@ -25,7 +32,7 @@ tags:
 > through that package.
 
 <!-- TODO(seonghyeon): replace XXXX.XXXXX with the arXiv id -->
-[![arXiv](https://img.shields.io/badge/arXiv-XXXX.XXXXX-b31b1b.svg)](https://arxiv.org/abs/XXXX.XXXXX) [![Code](https://img.shields.io/badge/GitHub-ContextSpanning-181717?logo=github)](https://github.com/mindlogic-ai/ContextSpanning) [![Base Model](https://img.shields.io/badge/base-PersonaPlex--7B-76b900)](https://huggingface.co/nvidia/personaplex-7b-v1) [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![arXiv](https://img.shields.io/badge/arXiv-XXXX.XXXXX-b31b1b.svg)](https://arxiv.org/abs/XXXX.XXXXX) [![Code](https://img.shields.io/badge/GitHub-ContextSpanning-181717?logo=github)](https://github.com/mindlogic-ai/ContextSpanning) [![Base Model](https://img.shields.io/badge/base-PersonaPlex--7B-76b900)](https://huggingface.co/nvidia/personaplex-7b-v1) [![Weights License](https://img.shields.io/badge/weights-NVIDIA%20Open%20Model%20License-76b900)](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/) [![Code License](https://img.shields.io/badge/code-MIT-blue.svg)](https://github.com/mindlogic-ai/ContextSpanning/blob/main/LICENSE)
 
 A full-duplex speech model that keeps listening and talking while it calls an external backend. When the
 model emits `<ret>`, the recent user audio is transcribed, a tool router (with an LLM for knowledge
@@ -168,8 +175,19 @@ the ASR. Servers, GPU layout, vLLM flags and environment variables:
   router and tools you trust.
 - Context Spans occupy one text token per frame, so long references spend context; see the paper's
   limitations section.
+- Out of scope: text-only use, batch transcription, or any use of the voice prompts to imitate a real
+  person. The three released voices are synthetic; do not condition on a real person's voice without
+  their consent.
 - The base model's license and acceptable-use terms (PersonaPlex, NVIDIA) apply to derived weights.
-  <!-- TODO(seonghyeon): confirm the PersonaPlex license line / whether the repo should be gated -->
+
+## License
+
+- **Weights (this repository):** derived from `nvidia/personaplex-7b-v1`, which is released under the
+  [NVIDIA Open Model License](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/);
+  PersonaPlex itself builds on `kyutai/moshiko-pytorch-bf16` (CC-BY-4.0). Use of these weights is governed by
+  those terms. <!-- TODO(seonghyeon, yongwoo): confirm wording and whether to gate the repo -->
+- **Code:** [mindlogic-ai/ContextSpanning](https://github.com/mindlogic-ai/ContextSpanning) is MIT; the
+  vendored `contextspan/moshi/` carries Kyutai's own license files.
 
 ## Citation
 
@@ -188,4 +206,4 @@ the ASR. Servers, GPU layout, vLLM flags and environment variables:
 
 Fine-tuned from [PersonaPlex-7B](https://huggingface.co/nvidia/personaplex-7b-v1) (NVIDIA), which builds
 on [Moshi](https://github.com/kyutai-labs/moshi) and the Mimi codec (Kyutai). Retrieval pipeline, data
-generation and the RAG-suite protocol follow [MoshiRAG](https://arxiv.org/abs/2604.12928).
+generation and the RAG-suite protocol follow MoshiRAG (Chien et al., 2026).

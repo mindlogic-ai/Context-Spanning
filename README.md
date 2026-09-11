@@ -1,5 +1,9 @@
 <div align="center">
 
+  <!-- TODO(seonghyeon): Dueta logo goes here once it exists — 2026-08-20 AI-SLM meeting: derive it from the
+       BAZE app colour scheme (violet), reviewers 선영·상현·경수; 8/27: 경수님께 2시간 한도로 요청.
+       <img width="240" alt="Dueta" src="assets/figures/logo.png"> -->
+
   <h1>Context Spanning</h1>
   <h3>A Communication Framework for Full-Duplex Speech Models and External LLM Backends</h3>
 
@@ -253,4 +257,9 @@ benchmark authors' own. `contextspan/moshi/` is the PersonaPlex fork of Kyutai's
 
 ## License
 
-MIT — see `LICENSE`. `contextspan/moshi/` carries its own license files.
+Code: MIT — see `LICENSE`. `contextspan/moshi/` carries its own license files. The released weights are
+derived from `nvidia/personaplex-7b-v1` and are governed by the
+[NVIDIA Open Model License](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/)
+(PersonaPlex builds on `kyutai/moshiko-pytorch-bf16`, CC-BY-4.0); see the
+[model card](https://huggingface.co/mindlogicinc/context-spanning-7b).
+<!-- TODO(seonghyeon, yongwoo): confirm the weights-license wording -->
