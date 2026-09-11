@@ -7,14 +7,20 @@ the agent rows, SINE on the user rows) and are masked out of the loss. Everythin
 how such a sequence is laid out lives here, so the assembler that writes the training data and
 the engine that reads a span at inference cannot drift apart.
 """
+import os
 import random
 
 import torch
 
 TEXT_PAD = 3          # zero_text_code between words
 RET_TOKEN_ID = 4      # `<ret>`: MoshiRAG rag_token_id (spm '<0x00>')
-SPAN_TOKEN_ID = 12    # span delimiter, one control token on each side (spm '<0x08>')
-SPAN_OPEN_ID = SPAN_CLOSE_ID = SPAN_TOKEN_ID   # the released checkpoints use the same id on both sides
+# Span delimiters. Checkpoints trained since 2026-09-08 (the released v7 weights included) close the
+# block with a distinct token so the frame after the block carries an unambiguous "context ended,
+# speak" signal: open = 12 (spm '<0x08>'), close = 13 (spm '<0x09>'). Older checkpoints used 12 on
+# both sides; run those with CS_SPAN_CLOSE_ID=12. Training (moshicp) reads the same convention.
+SPAN_OPEN_ID = 12
+SPAN_CLOSE_ID = int(os.environ.get("CS_SPAN_CLOSE_ID", "13"))
+SPAN_TOKEN_ID = SPAN_OPEN_ID   # legacy alias for the opening delimiter; never use it for pairing
 N_AUDIO_CB = 8        # 8 agent + 8 user codebooks -> 17 rows with ch0
 SINE_TOKENS = [430, 1268, 381, 1611, 1095, 1495, 56, 472]         # user audio on prefix/span frames
 SILENCE_TOKENS = [948, 243, 1178, 546, 1736, 1030, 1978, 2008]    # agent audio on prefix/span frames
