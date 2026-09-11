@@ -1,5 +1,6 @@
-# Browser ↔ server protocol (`/ws`)
+# Browser <-> server protocol (`/ws`)
 
+Server: `contextspan/runtime/websocket_server.py`; page: `contextspan/runtime/web/`.
 One WebSocket per conversation; the server holds one engine, so a second connection gets `busy`.
 Binary frames are float32 PCM at the sample rate given in `ready`, one frame (`frame_size` samples,
 80 ms) per message in both directions. Text frames are JSON objects with a `type`.
