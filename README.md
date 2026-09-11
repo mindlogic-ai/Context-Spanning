@@ -13,12 +13,13 @@ never waits. Training and inference share one sequence convention (`contextspan/
 [mindlogicinc/context-spanning-7b](https://huggingface.co/mindlogicinc/context-spanning-7b) — **DuetaSpan v7, step 8000**,
 fine-tuned from [`nvidia/personaplex-7b-v1`](https://huggingface.co/nvidia/personaplex-7b-v1) on
 `manifest_v6h`: 823,659 dialogues, ~10,009 h indexed, every dialogue passed a frame-level audio QA and a
-full-text QA. Two-group selective loss: the text row and the semantic codebook at full weight, the
-acoustic codebooks at a small one; span and prefix columns masked out. Three released voices (`f0`, `f1`, `f2`).
+full-text QA. Two-group selective text loss: the tokens of the asked-for answer form one group and the rest of the
+text row the other, weighted by a detached softmax over the two group losses; audio codebook losses as in PersonaPlex;
+span and prefix columns masked out. Sequence convention: `<ret>` = 4, Context Span open = 12, close = 13 (checkpoints
+trained before 2026-09-08 used 12 on both sides: set `CS_SPAN_CLOSE_ID=12`). Three released voices (`f0`, `f1`, `f2`).
 
 | benchmark (step 8000) | resp | ref | P(resp \| ref) | `<ret>` rate |
 |---|---|---|---|---|
-| MoshiRAG math (100) | 0.80 | 0.80 | 1.00 | 0.925 |
 | HaluEvalAudio (120, router: Gemma-4-26B-A4B) | 0.642 | 0.725 | **0.851** | 0.925 |
 | math word problems (40) | 0.80 | 0.80 | **1.00** | 0.925 |
 | Full-Duplex-Bench v1.0 (40/task) | pause TOR 0.725 (lower is better) · interruption rating 4.43 / take-turn 0.925 / latency 1.21 s · backchannel TOR 0.65, JSD 0.73 | | | |
