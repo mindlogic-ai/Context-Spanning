@@ -11,6 +11,7 @@ import torch
 
 from ..moshi.models import LMGen
 from . import context_span_block as block
+from . import prefix_prefill as prefix
 from .sequence_convention import (N_AUDIO_CB, RET_TOKEN_ID, SILENCE_TOKENS, SINE_TOKENS, SPAN_CLOSE_ID,
                                   SPAN_OPEN_ID, TEXT_PAD, persona_prompt)
 from .weights import load_mimi, load_model
@@ -54,25 +55,32 @@ class Engine:
             m.streaming_forever(1)
         self._pending_exit_cb0, self.frames = None, 0
 
-    def _forced(self, text_id, agent=None, user=None):
-        tt = torch.tensor([text_id], dtype=torch.long, device=self.device)
-        self.lm_gen.step(input_tokens=self._sine if user is None else user,
-                         moshi_tokens=self._sil if agent is None else agent, text_token=tt)
+    def _prefix_steps(self, system_prompt, voice_codes=None):
+        """The prefix as forced step triples: voice codes -> silence -> persona text -> silence."""
+        pad = int(self.lm_gen.zero_text_code)
+        text = lambda t: torch.tensor([t], dtype=torch.long, device=self.device)
+        steps = []
+        if voice_codes is not None:
+            vc = voice_codes.to(self.device)
+            steps += [(self._sine, vc[:, p][None, :, None], text(pad)) for p in range(vc.shape[1])]
+            steps.append((self._sine, self._sil, text(pad)))
+        ids = self.spm.encode(persona_prompt(system_prompt))
+        steps += [(self._sine, self._sil, text(int(t))) for t in ids]
+        if ids:
+            steps.append((self._sine, self._sil, text(pad)))
+        return steps
 
     @torch.no_grad()
     def set_persona(self, system_prompt, voice_codes=None):
-        """Prefix: voice codes -> silence -> persona text -> silence (all forced, no audio out)."""
-        pad = int(self.lm_gen.zero_text_code)
-        if voice_codes is not None:
-            vc = voice_codes.to(self.device)
-            for p in range(vc.shape[1]):
-                self._forced(pad, agent=vc[:, p][None, :, None])
-            self._forced(pad)
-        ids = self.spm.encode(persona_prompt(system_prompt))
-        for t in ids:
-            self._forced(int(t))
-        if ids:
-            self._forced(pad)
+        """Prefix: voice codes -> silence -> persona text -> silence, all forced, read in one backbone
+        forward (~0.1 s instead of ~5.5 s of single steps, #38). Same state as `set_persona_stepwise`."""
+        prefix.prefill_forced_steps(self.lm_gen, self._prefix_steps(system_prompt, voice_codes))
+
+    @torch.no_grad()
+    def set_persona_stepwise(self, system_prompt, voice_codes=None):
+        """Reference path: the same prefix forced one `lm_gen.step` at a time (what the batched read is checked against)."""
+        for user_codes, agent_codes, text_token in self._prefix_steps(system_prompt, voice_codes):
+            self.lm_gen.step(input_tokens=user_codes, moshi_tokens=agent_codes, text_token=text_token)
 
     @torch.no_grad()
     def step(self, user_pcm):
