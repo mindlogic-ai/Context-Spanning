@@ -11,7 +11,7 @@ from contextspan.model import Engine, load_voice
 from contextspan.model.sequence_convention import transcript
 from contextspan.runtime.frame_stream import run_stream
 
-__all__ = ["ASR", "CTX", "RealtimeBackend", "Stack", "VOICES", "load_mono", "transcript"]
+__all__ = ["ASR", "CTX", "Engine", "RealtimeBackend", "Stack", "VOICES", "load_mono", "load_voice", "run_stream", "transcript"]
 
 CTX = {"city": "Seoul", "timezone": "Asia/Seoul"}      # the profile every paper run used
 VOICES = ("f0", "f1", "f2")                            # the released voice prompts

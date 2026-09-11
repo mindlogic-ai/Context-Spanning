@@ -53,7 +53,8 @@ Measured on RTX PRO 6000 Blackwell, 2026-09:
 | `MCP_ROUTER_JSON_MODE` | 1 | the router asks the server for a JSON object; dropped automatically if the server rejects it |
 | `MCP_ROUTER_MAX_TOKENS` | 120 | router decode budget |
 | `MCP_ROUTER_TIMEOUT_S` | 8 | router call budget |
-| tool HTTP calls | 4 s | a transport failure yields no span, never a sentence about the failure (#10) |
+| MCP server HTTP calls (weather, finance, web search) | 4 s | a transport failure yields no span, never a sentence about the failure (#10) |
+| `MCP_MAPS_BUDGET_S` | unset | when set, the map adapters make one attempt with this timeout instead of their 10-20 s retries |
 | `CS_RET_DEADLINE_S` | 2.5 | a span that would land later than this after `<ret>` is dropped (`late` event): the corpus's ret-to-span delays have p99 2.3 s, and a span that arrives after the model has answered is worse than none |
 | `CS_RET_UTT_WAIT_S` | 1.0 | on `<ret>` mid-sentence, how long the question waits for the utterance to end before the fixed window is transcribed (#7) |
 | `CS_USER_TARGET_LUFS` | -24.0 | loudness the user channel is levelled to (the training median); `--raw-user-audio` bypasses it |
