@@ -19,7 +19,9 @@ acoustic codebooks at a small one; span and prefix columns masked out. Three rel
 | benchmark (step 8000) | resp | ref | P(resp \| ref) | `<ret>` rate |
 |---|---|---|---|---|
 | MoshiRAG math (100) | 0.80 | 0.80 | 1.00 | 0.925 |
-| HaluEvalAudio / OpenAudioBench / Full-Duplex-Bench | (step-8000 HaluEval/FDB numbers: to be filled) | | | |
+| HaluEvalAudio (120, router: Gemma-4-26B-A4B) | 0.642 | 0.725 | **0.851** | 0.925 |
+| math word problems (40) | 0.80 | 0.80 | **1.00** | 0.925 |
+| Full-Duplex-Bench v1.0 (40/task) | pause TOR 0.725 (lower is better) · interruption rating 4.43 / take-turn 0.925 / latency 1.21 s · backchannel TOR 0.65, JSD 0.73 | | | |
 
 Protocols and scorers: [`eval/README.md`](eval/README.md). All numbers are `resp`/`ref` accuracy in [0, 1], higher is better.
 
