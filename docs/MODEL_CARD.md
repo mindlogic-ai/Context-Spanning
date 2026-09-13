@@ -52,15 +52,15 @@ questions) returns one reference, and that reference is written into the model's
   its cache and keeps stepping at the 80 ms frame clock.
 - **Real tools.** The shipped bank is 60 tools whose result is something a voice assistant says — time,
   weather, prices, web search, places and routes, SGD-seeded bookings — plus four MCP servers.
-- **Three released voices** (`f0`, `f1`, `f2`) and PersonaPlex-style persona prompts carrying the user's
-  name and city.
+- **Eight released voices** (`f0`-`f3` female, `m0`-`m3` male) and PersonaPlex-style persona prompts carrying
+  the user's name and city.
 
 ## Files
 
 | file | content |
 |---|---|
 | `context_spanning_7b.pt` | `{"model": state_dict}` in bf16, loadable with `main.py infer --checkpoint` or fetched automatically |
-| `voices/f0.pt`, `voices/f1.pt`, `voices/f2.pt` | voice prompts (`{"codes": LongTensor[8, P]}`, agent-voice Mimi codes) |
+| `voices/{f0,f1,f2,f3,m0,m1,m2,m3}.pt` | voice prompts (`{"codes": LongTensor[8, P]}`, agent-voice Mimi codes; 8 s each) |
 | `assets/figures/` | the paper's figures used by this card |
 
 Mimi and the text tokenizer are taken from the PersonaPlex repository at load time; the `moshi` package is
@@ -185,7 +185,7 @@ the ASR. Servers, GPU layout, vLLM flags and environment variables:
 - Context Spans occupy one text token per frame, so long references spend context; see the paper's
   limitations section.
 - Out of scope: text-only use, batch transcription, or any use of the voice prompts to imitate a real
-  person. The three released voices are synthetic; do not condition on a real person's voice without
+  person. The eight released voices come from volunteers who released their recordings under CC0; do not condition on a real person's voice without
   their consent.
 
 ## License
@@ -193,7 +193,8 @@ the ASR. Servers, GPU layout, vLLM flags and environment variables:
 - **Weights (this repository):** [NVIDIA Open Model License](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/),
   inherited from the PersonaPlex weights they are fine-tuned from. (PersonaPlex was initialised from
   `kyutai/moshiko-pytorch-bf16`, CC-BY-4.0; that attribution is carried, it is not the license of this model.)
-- **Voice prompts** (`voices/*.pt`) are derived from VCTK (CC BY 4.0).
+- **Voice prompts** (`voices/*.pt`) are built from CC0 recordings of the [Kyutai Unmute Voice Donation](https://huggingface.co/kyutai/tts-voices)
+  project (volunteers who released their voice under CC0; no attribution or consent condition attaches).
 - **Code:** [mindlogic-ai/ContextSpanning](https://github.com/mindlogic-ai/ContextSpanning) is MIT; the
   vendored `contextspan/moshi/` carries Kyutai's own license files.
 <!-- TODO(seonghyeon): decide gated: true / extra_gated_prompt before the repo goes public -->

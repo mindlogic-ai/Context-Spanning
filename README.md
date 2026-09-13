@@ -89,7 +89,7 @@ fine-tuned from [`nvidia/personaplex-7b-v1`](https://huggingface.co/nvidia/perso
 full-text QA. Two-group selective text loss: the tokens of the asked-for answer form one group and the rest of the
 text row the other, weighted by a detached softmax over the two group losses; audio codebook losses as in PersonaPlex;
 span and prefix columns masked out. Sequence convention: `<ret>` = 4, Context Span open = 12, close = 13 (checkpoints
-trained before 2026-09-08 used 12 on both sides: set `CS_SPAN_CLOSE_ID=12`). Three released voices (`f0`, `f1`, `f2`).
+trained before 2026-09-08 used 12 on both sides: set `CS_SPAN_CLOSE_ID=12`). Eight released voices (`f0`-`f3` female, `m0`-`m3` male).
 
 | benchmark (step 8000) | resp | ref | P(resp \| ref) | `<ret>` rate |
 |---|---|---|---|---|
@@ -262,4 +262,5 @@ fine-tuned from `nvidia/personaplex-7b-v1` and are distributed under the
 [NVIDIA Open Model License](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/),
 the license of the PersonaPlex weights. (PersonaPlex itself was initialised from `kyutai/moshiko-pytorch-bf16`,
 whose weights are CC-BY-4.0; that attribution is carried, it is not the license of this model.) The voice
-prompts are derived from VCTK (CC BY 4.0). See the [model card](https://huggingface.co/mindlogicinc/context-spanning-7b).
+prompts are built from CC0 voice recordings ([Kyutai Unmute Voice Donation](https://huggingface.co/kyutai/tts-voices), volunteers
+who released their voice under CC0). See the [model card](https://huggingface.co/mindlogicinc/context-spanning-7b).
