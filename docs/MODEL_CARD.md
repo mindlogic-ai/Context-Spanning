@@ -1,7 +1,7 @@
 ---
 license: other
-license_name: personaplex-model-license
-license_link: https://huggingface.co/nvidia/personaplex-7b-v1
+license_name: nvidia-open-model-license
+license_link: https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/
 base_model: nvidia/personaplex-7b-v1
 pipeline_tag: audio-to-audio
 language:
@@ -30,7 +30,7 @@ tags:
 > through that package.
 
 <!-- TODO(seonghyeon): replace XXXX.XXXXX with the arXiv id -->
-[![arXiv](https://img.shields.io/badge/arXiv-XXXX.XXXXX-b31b1b.svg)](https://arxiv.org/abs/XXXX.XXXXX) [![Code](https://img.shields.io/badge/GitHub-ContextSpanning-181717?logo=github)](https://github.com/mindlogic-ai/ContextSpanning) [![Base Model](https://img.shields.io/badge/base-PersonaPlex--7B-76b900)](https://huggingface.co/nvidia/personaplex-7b-v1) [![Weights License](https://img.shields.io/badge/weights-PersonaPlex%20license-76b900)](https://huggingface.co/nvidia/personaplex-7b-v1) [![Code License](https://img.shields.io/badge/code-MIT-blue.svg)](https://github.com/mindlogic-ai/ContextSpanning/blob/main/LICENSE)
+[![arXiv](https://img.shields.io/badge/arXiv-XXXX.XXXXX-b31b1b.svg)](https://arxiv.org/abs/XXXX.XXXXX) [![Code](https://img.shields.io/badge/GitHub-ContextSpanning-181717?logo=github)](https://github.com/mindlogic-ai/ContextSpanning) [![Base Model](https://img.shields.io/badge/base-PersonaPlex--7B-76b900)](https://huggingface.co/nvidia/personaplex-7b-v1) [![Weights License](https://img.shields.io/badge/weights-NVIDIA%20Open%20Model%20License-76b900)](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/) [![Code License](https://img.shields.io/badge/code-MIT-blue.svg)](https://github.com/mindlogic-ai/ContextSpanning/blob/main/LICENSE)
 
 A full-duplex speech model that keeps listening and talking while it calls an external backend. When the
 model emits `<ret>`, the recent user audio is transcribed, a tool router (with an LLM for knowledge
@@ -190,8 +190,9 @@ the ASR. Servers, GPU layout, vLLM flags and environment variables:
 
 ## License
 
-- **Weights (this repository):** inherit the [PersonaPlex model license](https://huggingface.co/nvidia/personaplex-7b-v1)
-  (NVIDIA Open Model License; PersonaPlex builds on `kyutai/moshiko-pytorch-bf16`, CC-BY-4.0).
+- **Weights (this repository):** [NVIDIA Open Model License](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/),
+  inherited from the PersonaPlex weights they are fine-tuned from. (PersonaPlex was initialised from
+  `kyutai/moshiko-pytorch-bf16`, CC-BY-4.0; that attribution is carried, it is not the license of this model.)
 - **Voice prompts** (`voices/*.pt`) are derived from VCTK (CC BY 4.0).
 - **Code:** [mindlogic-ai/ContextSpanning](https://github.com/mindlogic-ai/ContextSpanning) is MIT; the
   vendored `contextspan/moshi/` carries Kyutai's own license files.
