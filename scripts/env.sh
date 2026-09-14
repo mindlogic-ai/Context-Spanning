@@ -17,5 +17,11 @@ else
 fi
 export JUDGE_LLM_URL="$MOSHICP_RAG_LLM_URL"
 export JUDGE_LLM_MODEL="${JUDGE_MODEL:-$MOSHICP_RAG_LLM_MODEL}"   # eval judge; the paper runs judged with google/gemma-4-31B-it
-# ASR endpoint (POST /transcribe, multipart wav -> {"text"})
-export MOSHICP_ASR_URL="http://localhost:${ASR_PORT}/transcribe"
+# ASR endpoint. ASR_BACKEND=vllm (default, qwen-asr-serve): OpenAI audio API, `model` = MOSHICP_ASR_MODEL.
+# ASR_BACKEND=transformers: POST /transcribe, multipart wav -> {"text"}.
+export ASR_BACKEND="${ASR_BACKEND:-vllm}"
+if [ "$ASR_BACKEND" = "vllm" ]; then
+  export MOSHICP_ASR_URL="http://localhost:${ASR_PORT}/v1/audio/transcriptions"; export MOSHICP_ASR_MODEL="${MOSHICP_ASR_MODEL:-qwen3-asr}"
+else
+  export MOSHICP_ASR_URL="http://localhost:${ASR_PORT}/transcribe"
+fi

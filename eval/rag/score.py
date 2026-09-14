@@ -92,10 +92,12 @@ def first_voiced_after(path, t0, thr=-38):
 
 
 def asr_file(url, path):
+    data = {"model": os.environ.get("MOSHICP_ASR_MODEL", "qwen3-asr")} if "/v1/audio/transcriptions" in url else None
     with open(path, "rb") as f:
-        r = requests.post(url, files={"file": ("a.wav", f, "audio/wav")}, timeout=120)
+        r = requests.post(url, files={"file": ("a.wav", f, "audio/wav")}, data=data, timeout=120)
     j = r.json()
-    return j.get("text", j.get("transcript", "")) if isinstance(j, dict) else str(j)
+    text = j.get("text", j.get("transcript", "")) if isinstance(j, dict) else str(j)
+    return re.sub(r"^language\s+\w+<asr_text>\s*", "", text.strip())   # vLLM qwen-asr-serve prefix
 
 
 def main(argv=None):

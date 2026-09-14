@@ -168,8 +168,9 @@ Everything the model needs is in this repository: `contextspan/moshi/` is the Pe
 ## Backends
 
 Two servers: the router LLM (OpenAI-compatible; default Gemma-4-26B-A4B on vLLM) and an ASR endpoint
-(`POST /transcribe` -> `{"text"}`; default Qwen3-ASR). `scripts/backends.sh` starts both with the settings
-every number here was measured with; `scripts/env.sh` exports the endpoints.
+(default Qwen3-ASR-1.7B on vLLM via `qwen-asr-serve`, OpenAI audio API; `ASR_BACKEND=transformers` starts
+the plain `POST /transcribe` server instead). `scripts/backends.sh` starts both with the settings every
+number here was measured with; `scripts/env.sh` exports the endpoints.
 
 ```bash
 pip install -e '.[asr-server]' vllm
@@ -181,6 +182,13 @@ The defaults assume two GPUs: the router alone takes ~82 GB at `ROUTER_MEM=0.85`
 shares the other GPU with the speech model (~20 GB). On a single 96 GB GPU start it with
 `ROUTER_GPUS=0 ASR_GPU=0 ROUTER_MEM=0.6 bash scripts/backends.sh start`; the span latency figures below
 were measured on the two-GPU layout.
+
+Where the `<ret>` -> span time goes (24 HaluEval questions, wall clock, v7-class checkpoint): the question's
+final transcript 0.45 s median with the transformers ASR server (it queues behind the running partial
+transcript on the shared GPU), the router 0.27 s, frame pickup 0.04 s. The vLLM ASR server takes the same
+clip in 0.13 s, and once the model has emitted `<ret>` the utterance is closed after 0.4 s of silence
+(`CS_RET_CUT_S`) instead of the 0.72 s end-of-utterance rule, so the final transcript starts earlier. Both
+are on by default; `ASR_BACKEND=transformers CS_RET_CUT_S=0` restores the previous path.
 
 On `<ret>` the router picks ONE tool (or answers a knowledge question directly); the tool runs for real —
 time, weather, prices, web search, places and routes, SGD-seeded bookings — and its result is the span.
