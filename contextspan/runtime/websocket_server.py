@@ -136,6 +136,7 @@ async def ws_handler(request):
                         try:
                             voice = load_voice(name)
                             eng.reset(); eng.set_persona(prefix, voice)
+                            log.info("voice: %s (%d frames)", name, int(voice.shape[1]))
                             await ws.send_json({"type": "voice", "name": m.get("name"), "frames": int(voice.shape[1])})
                         except Exception as e:
                             await ws.send_json({"type": "error", "stage": "voice", "message": str(e)})
