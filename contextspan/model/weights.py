@@ -49,6 +49,6 @@ def load_model(checkpoint=None, device="cuda", cpu_offload=False):
 
 def load_voice(name_or_path="f0"):
     """Voice prompt = agent-voice Mimi codes [8, P] saved as {'codes': LongTensor}. A bare name
-    (f0-f3, m0-m3) is fetched as voices/<name>.pt from the weights repo."""
+    (f0-f3, m0-m3, seonghyeon) is fetched as voices/<name>.pt from the weights repo."""
     path = name_or_path if os.path.exists(name_or_path) else hf_path(WEIGHTS_REPO, f"voices/{name_or_path}.pt")
     return torch.load(path, map_location="cpu")["codes"].long()

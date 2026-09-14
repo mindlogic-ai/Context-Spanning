@@ -89,7 +89,7 @@ fine-tuned from [`nvidia/personaplex-7b-v1`](https://huggingface.co/nvidia/perso
 full-text QA. Two-group selective text loss: the tokens of the asked-for answer form one group and the rest of the
 text row the other, weighted by a detached softmax over the two group losses; audio codebook losses as in PersonaPlex;
 span and prefix columns masked out. Sequence convention: `<ret>` = 4, Context Span open = 12, close = 13 (checkpoints
-trained before 2026-09-08 used 12 on both sides: set `CS_SPAN_CLOSE_ID=12`). Eight released voices (`f0`-`f3` female, `m0`-`m3` male).
+trained before 2026-09-08 used 12 on both sides: set `CS_SPAN_CLOSE_ID=12`). Nine released voices: `f0`-`f3` (female) and `m0`-`m3` (male) from CC0 volunteer recordings, and `seonghyeon`, a team member's own voice recorded for this release.
 
 | benchmark (step 8000) | resp | ref | P(resp \| ref) | `<ret>` rate |
 |---|---|---|---|---|
