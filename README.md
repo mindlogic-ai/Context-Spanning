@@ -163,7 +163,9 @@ export HF_TOKEN=<token with access to nvidia/personaplex-7b-v1 and the weights r
 
 Everything the model needs is in this repository: `contextspan/moshi/` is the PersonaPlex fork of Kyutai's
 `moshi` package (MIT, license files alongside). Only the weights come from the Hub; `CS_BASE_DIR` /
-`CS_WEIGHTS_DIR` point at local copies instead.
+`CS_WEIGHTS_DIR` point at local copies instead. Voice prompts are always taken from the weights repo on the
+Hub (a pinned checkpoint snapshot may carry stale `voices/`); set `CS_VOICES_DIR` to a local `voices/` directory
+for offline use.
 
 ## Backends
 
