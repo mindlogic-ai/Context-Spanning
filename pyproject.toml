@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-asr-server = ["qwen-asr"]         # python -m contextspan.duetaspan.runtime.asr_server (Qwen3-ASR)
+asr-server = ["qwen-asr"]         # Qwen3-ASR: `qwen-asr-serve` (needs vllm) or python -m contextspan.duetaspan.runtime.asr_server
 eval = ["playwright"]             # eval/live drives the browser page; then `playwright install chromium`
 
 [tool.setuptools.packages.find]

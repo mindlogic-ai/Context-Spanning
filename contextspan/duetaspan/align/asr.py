@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import re
 import warnings
 from typing import Optional
 
@@ -199,10 +200,17 @@ class ASR:
             _lang = os.environ.get("MOSHICP_ASR_LANGUAGE", "").strip()
             if _lang:
                 data["language"] = _lang
+            # vLLM's `qwen-asr-serve` speaks the OpenAI audio API (`/v1/audio/transcriptions`): it
+            # needs a `model` field and prefixes the text with "language English<asr_text>". Same
+            # weights, ~2x faster per request and it batches, so the final transcript of a question no
+            # longer queues behind the partial one (measured 0.45 s -> 0.13 s median on the bench box).
+            if "/v1/audio/transcriptions" in self._model:
+                data["model"] = os.environ.get("MOSHICP_ASR_MODEL", "qwen3-asr")
             try:
                 r = requests.post(self._model, files={"file": ("a.wav", buf, "audio/wav")},
                                   data=data or None, timeout=10)
                 text = (r.json().get("text") or "").strip()
+                text = re.sub(r"^language\s+\w+<asr_text>\s*", "", text)
                 # The default keeps the previous lowercase contract. With
                 # MOSHICP_ASR_KEEP_CASE=1 the original case is preserved — this carries the case
                 # information of spelled-out IDs ("A B C one two three") all the way to the
