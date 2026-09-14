@@ -49,6 +49,18 @@ def load_model(checkpoint=None, device="cuda", cpu_offload=False):
 
 def load_voice(name_or_path="f0"):
     """Voice prompt = agent-voice Mimi codes [8, P] saved as {'codes': LongTensor}. A bare name
-    (f0-f3, m0-m3, seonghyeon) is fetched as voices/<name>.pt from the weights repo."""
-    path = name_or_path if os.path.exists(name_or_path) else hf_path(WEIGHTS_REPO, f"voices/{name_or_path}.pt")
+    (f0-f3, m0-m3, seonghyeon, or any file under the repo's voices/) is fetched as voices/<name>.pt.
+
+    The voices are looked up on the Hub weights repo, never under CS_WEIGHTS_DIR: that
+    variable points at a *checkpoint*, and a checkpoint snapshot may carry the voice files
+    that were current when it was uploaded (the VCTK f0-f2 for every checkpoint before
+    2026-09-14), so honouring it here made "f0" a different voice depending on which
+    checkpoint was loaded, with no error and no log line. CS_VOICES_DIR points at a local
+    voices/ directory when one is wanted."""
+    if os.path.exists(name_or_path):
+        path = name_or_path
+    else:
+        local = os.environ.get("CS_VOICES_DIR")
+        cand = os.path.join(local, f"{name_or_path}.pt") if local else ""
+        path = cand if cand and os.path.exists(cand) else hf_hub_download(WEIGHTS_REPO, f"voices/{name_or_path}.pt")
     return torch.load(path, map_location="cpu")["codes"].long()
