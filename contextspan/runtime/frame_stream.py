@@ -33,6 +33,14 @@ UTT_END_F = 9
 PARTIAL_EVERY_F = 20
 UTT_CACHE_S = 3.0
 RET_UTT_WAIT_S = float(os.environ.get("CS_RET_UTT_WAIT_S", "1.0"))
+# Once the model has emitted <ret> and is waiting for the running utterance to end, the utterance ends after
+# RET_CUT_S of silence instead of the full UTT_END_F (0.72 s): the <ret> is the model's own signal that the
+# question is over, so the final transcript starts up to 0.32 s earlier. 0.4 s is the debounce that kept the
+# question whole (2026-09-02 debounce study); 0 disables the cut. Measured on the probe box: the <ret> lands
+# within +-0.1 s of the 0.72 s end-of-utterance mark, and the 0.9 s <ret> -> span median is 0.45 s final ASR
+# + 0.27 s router.
+RET_CUT_S = float(os.environ.get("CS_RET_CUT_S", "0.4"))
+RET_CUT_F = int(round(RET_CUT_S / 0.08))
 
 
 def ret_question_plan(cache, t_now, speaking):
@@ -83,6 +91,15 @@ class Utterances:
             n += 1
             hits += self.vad.is_speech(pcm[off:off + 640], 16000)
         return n > 0 and hits * 2 >= n                            # at least half the sub-frames
+
+    def end_now(self, i):
+        """End the running utterance at frame i without the full UTT_END_F silence (the <ret> cut).
+        Returns its ("final", u0, u1) event, or None when nothing (long enough) is running."""
+        if self.u0 is None:
+            return None
+        u0, u1 = self.u0, i - self.usil + 1
+        self.u0, self.usil = None, 0
+        return ("final", u0, u1) if u1 - u0 >= self.min_len_f else None
 
     def feed(self, i, frame):
         out = []
@@ -196,6 +213,10 @@ def run_stream(eng, backend, asr, pcm, ctx=None, asr_window_s=12.0, realtime=Tru
         frame = pcm[i * fs:(i + 1) * fs]
         for kind, u0, u1 in utts.feed(i, frame):
             threading.Thread(target=transcribe_utt, args=(kind, u0, u1), daemon=True).start()
+        if RET_CUT_F and ret_wait[0] is not None and utts.speaking and utts.usil >= RET_CUT_F:
+            ev = utts.end_now(i)               # <ret> already out and the user quiet for RET_CUT_S: the question is over
+            if ev is not None:
+                threading.Thread(target=transcribe_utt, args=ev, daemon=True).start()
         with lock:                         # check-and-clear under the lock: the utterance thread may claim it first
             waiting = ret_wait[0]
             if waiting is not None and (i - waiting) / eng.frame_rate >= RET_UTT_WAIT_S:

@@ -19,7 +19,7 @@
   <br>
 
   <!-- TODO(seonghyeon): replace XXXX.XXXXX with the arXiv id once the preprint is up -->
-  [![arXiv](https://img.shields.io/badge/arXiv-XXXX.XXXXX-b31b1b.svg)](https://arxiv.org/abs/XXXX.XXXXX) [![Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-context--spanning--7b-yellow)](https://huggingface.co/mindlogicinc/context-spanning-7b) [![Base Model](https://img.shields.io/badge/base-PersonaPlex--7B-76b900)](https://huggingface.co/nvidia/personaplex-7b-v1) [![Code License](https://img.shields.io/badge/code-MIT-blue.svg)](LICENSE) [![Weights License](https://img.shields.io/badge/weights-PersonaPlex%20license-76b900)](https://huggingface.co/nvidia/personaplex-7b-v1)
+  [![arXiv](https://img.shields.io/badge/arXiv-XXXX.XXXXX-b31b1b.svg)](https://arxiv.org/abs/XXXX.XXXXX) [![Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-context--spanning--7b-yellow)](https://huggingface.co/mindlogicinc/context-spanning-7b) [![Base Model](https://img.shields.io/badge/base-PersonaPlex--7B-76b900)](https://huggingface.co/nvidia/personaplex-7b-v1) [![Code License](https://img.shields.io/badge/code-MIT-blue.svg)](LICENSE) [![Weights License](https://img.shields.io/badge/weights-NVIDIA%20Open%20Model%20License-76b900)](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/)
   <!-- TODO(seonghyeon): add a Demo / Project Page badge here if one goes live -->
 
 </div>
@@ -89,7 +89,7 @@ fine-tuned from [`nvidia/personaplex-7b-v1`](https://huggingface.co/nvidia/perso
 full-text QA. Two-group selective text loss: the tokens of the asked-for answer form one group and the rest of the
 text row the other, weighted by a detached softmax over the two group losses; audio codebook losses as in PersonaPlex;
 span and prefix columns masked out. Sequence convention: `<ret>` = 4, Context Span open = 12, close = 13 (checkpoints
-trained before 2026-09-08 used 12 on both sides: set `CS_SPAN_CLOSE_ID=12`). Three released voices (`f0`, `f1`, `f2`).
+trained before 2026-09-08 used 12 on both sides: set `CS_SPAN_CLOSE_ID=12`). Eight released voices (`f0`-`f3` female, `m0`-`m3` male).
 
 | benchmark (step 8000) | resp | ref | P(resp \| ref) | `<ret>` rate |
 |---|---|---|---|---|
@@ -168,8 +168,9 @@ Everything the model needs is in this repository: `contextspan/moshi/` is the Pe
 ## Backends
 
 Two servers: the router LLM (OpenAI-compatible; default Gemma-4-26B-A4B on vLLM) and an ASR endpoint
-(`POST /transcribe` -> `{"text"}`; default Qwen3-ASR). `scripts/backends.sh` starts both with the settings
-every number here was measured with; `scripts/env.sh` exports the endpoints.
+(default Qwen3-ASR-1.7B on vLLM via `qwen-asr-serve`, OpenAI audio API; `ASR_BACKEND=transformers` starts
+the plain `POST /transcribe` server instead). `scripts/backends.sh` starts both with the settings every
+number here was measured with; `scripts/env.sh` exports the endpoints.
 
 ```bash
 pip install -e '.[asr-server]' vllm
@@ -181,6 +182,13 @@ The defaults assume two GPUs: the router alone takes ~82 GB at `ROUTER_MEM=0.85`
 shares the other GPU with the speech model (~20 GB). On a single 96 GB GPU start it with
 `ROUTER_GPUS=0 ASR_GPU=0 ROUTER_MEM=0.6 bash scripts/backends.sh start`; the span latency figures below
 were measured on the two-GPU layout.
+
+Where the `<ret>` -> span time goes (24 HaluEval questions, wall clock, v7-class checkpoint): the question's
+final transcript 0.45 s median with the transformers ASR server (it queues behind the running partial
+transcript on the shared GPU), the router 0.27 s, frame pickup 0.04 s. The vLLM ASR server takes the same
+clip in 0.13 s, and once the model has emitted `<ret>` the utterance is closed after 0.4 s of silence
+(`CS_RET_CUT_S`) instead of the 0.72 s end-of-utterance rule, so the final transcript starts earlier. Both
+are on by default; `ASR_BACKEND=transformers CS_RET_CUT_S=0` restores the previous path.
 
 On `<ret>` the router picks ONE tool (or answers a knowledge question directly); the tool runs for real —
 time, weather, prices, web search, places and routes, SGD-seeded bookings — and its result is the span.
@@ -258,7 +266,9 @@ benchmark authors' own. `contextspan/moshi/` is the PersonaPlex fork of Kyutai's
 ## License
 
 Code: MIT — see `LICENSE`. `contextspan/moshi/` carries its own license files. The released weights are
-fine-tuned from `nvidia/personaplex-7b-v1` and inherit the
-[PersonaPlex model license](https://huggingface.co/nvidia/personaplex-7b-v1) (NVIDIA Open Model License;
-PersonaPlex builds on `kyutai/moshiko-pytorch-bf16`, CC-BY-4.0). The voice prompts are derived from VCTK
-(CC BY 4.0). See the [model card](https://huggingface.co/mindlogicinc/context-spanning-7b).
+fine-tuned from `nvidia/personaplex-7b-v1` and are distributed under the
+[NVIDIA Open Model License](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/),
+the license of the PersonaPlex weights. (PersonaPlex itself was initialised from `kyutai/moshiko-pytorch-bf16`,
+whose weights are CC-BY-4.0; that attribution is carried, it is not the license of this model.) The voice
+prompts are built from CC0 voice recordings ([Kyutai Unmute Voice Donation](https://huggingface.co/kyutai/tts-voices), volunteers
+who released their voice under CC0). See the [model card](https://huggingface.co/mindlogicinc/context-spanning-7b).

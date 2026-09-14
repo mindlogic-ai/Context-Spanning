@@ -5,9 +5,9 @@ package name because its module paths are part of the deployment contract (`scri
 the `DUETASPAN_*` / `MOSHICP_*` environment variables, external tooling).
 
 ```
-align/asr.py               ASR client: POST /transcribe endpoint first, local whisper fallbacks
+align/asr.py               ASR client: HTTP endpoint first (vLLM qwen-asr-serve or /transcribe), local whisper fallbacks
 common/paths.py            every on-disk location, resolved from DUETASPAN_* variables
-runtime/asr_server.py      Qwen3-ASR HTTP server (the endpoint the client prefers)
+runtime/asr_server.py      Qwen3-ASR plain HTTP server (transformers; scripts/backends.sh ASR_BACKEND=transformers)
 runtime/backend/
   realtime.py              RealtimeBackend: the retrieve() the engine calls; router first, LLM-RAG second
   retrieve.py              the reference-string contract and the MCP-intent words

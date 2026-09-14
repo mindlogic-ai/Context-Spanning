@@ -23,7 +23,7 @@ from aiohttp import WSMsgType, web
 from ..duetaspan.runtime.backend.context_db import ContextDB, ContextProfile
 from ..model import load_voice
 from ..model.sequence_convention import persona_text
-from .frame_stream import RET_DEADLINE_S, RET_UTT_WAIT_S, Utterances, ret_question_plan, retrieve_for_ret
+from .frame_stream import RET_CUT_F, RET_DEADLINE_S, RET_UTT_WAIT_S, Utterances, ret_question_plan, retrieve_for_ret
 from .user_leveller import TARGET_LUFS, UserLeveller, load_enhancer, measure_lufs
 
 WEB = Path(__file__).parent / "web"
@@ -195,6 +195,10 @@ async def ws_handler(request):
                 del heard[:keep]; base += keep
             for kind, u0, u1 in utts.feed(stepped, frame):
                 asyncio.ensure_future(transcribe_utt(kind, u0, u1))
+            if RET_CUT_F and ret_wait is not None and utts.speaking and utts.usil >= RET_CUT_F:
+                ev = utts.end_now(stepped)      # <ret> already out and the user quiet for RET_CUT_S: the question is over
+                if ev is not None:
+                    asyncio.ensure_future(transcribe_utt(*ev))
             if ret_wait is not None and (stepped - ret_wait) / eng.frame_rate >= RET_UTT_WAIT_S:
                 ret_wait = None
                 kick(stepped - 1)                       # the sentence did not end in time: the window up to now, not up to the <ret>

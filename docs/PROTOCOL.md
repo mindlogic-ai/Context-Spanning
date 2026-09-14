@@ -10,7 +10,7 @@ Binary frames are float32 PCM at the sample rate given in `ready`, one frame (`f
 | message | when | effect |
 | --- | --- | --- |
 | `{"type":"context", name, location, lat, lon, tz, persona, db}` | before the first frame (and whenever a field changes) | Context DB profile (`db` = notes) and the model's prefix (see below); a change to `persona`, `name` or `location` before the first frame resets the prefix |
-| `{"type":"voice", "name":"f1"}` | before the first frame | one of the released voices (`f0`,`f1`,`f2`) |
+| `{"type":"voice", "name":"f1"}` | before the first frame | one of the released voices (`f0`-`f3`, `m0`-`m3`) |
 | `{"type":"clone"}` then one binary message (float32 PCM, ≥ 2 s) | before the first frame | the agent speaks with that voice (microphone recording or a decoded audio file) |
 | binary frame | while talking | one 80 ms frame of the user; the engine steps once per frame |
 | `{"type":"reset"}` | any time | new conversation on the same connection (prefix, Context DB) |

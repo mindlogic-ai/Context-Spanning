@@ -11,7 +11,7 @@ knowledge injects nothing.
 | server | default | port | GPU | started by |
 |---|---|---|---|---|
 | router LLM (also RAG fallback and eval judge) | `google/gemma-4-26B-A4B-it` on vLLM | 8004 | `ROUTER_GPUS` (1) | `scripts/backends.sh start` |
-| ASR | Qwen3-ASR-1.7B, `python -m contextspan.duetaspan.runtime.asr_server` | 8990 | `ASR_GPU` (0) | `scripts/backends.sh start` |
+| ASR | Qwen3-ASR-1.7B: `qwen-asr-serve` on vLLM (`ASR_BACKEND=vllm`, default) or `python -m contextspan.duetaspan.runtime.asr_server` (`ASR_BACKEND=transformers`) | 8990 | `ASR_GPU` (0) | `scripts/backends.sh start` |
 | RAG / judge (optional second server) | `RAG_MODEL` when set | `RAG_PORT` (8005) | `RAG_GPUS` | `scripts/backends.sh start` |
 
 ```bash
@@ -21,9 +21,16 @@ source scripts/env.sh          # MCP_ROUTER_* / MOSHICP_RAG_LLM_* / MOSHICP_ASR_
 ```
 
 Any OpenAI-compatible server replaces the router (`ROUTER_MODEL`, or the `MCP_ROUTER_LLM_*` variables
-directly; a hosted API takes `MCP_ROUTER_LLM_KEY` / `MOSHICP_RAG_LLM_KEY`). Any `POST /transcribe ->
-{"text"}` endpoint replaces the ASR (`MOSHICP_ASR_URL`). The ASR server accepts `language` as a name or a
-code (#27).
+directly; a hosted API takes `MCP_ROUTER_LLM_KEY` / `MOSHICP_RAG_LLM_KEY`). The ASR is any OpenAI audio
+API (`MOSHICP_ASR_URL` ending in `/v1/audio/transcriptions`, `MOSHICP_ASR_MODEL` = served name) or any
+`POST /transcribe -> {"text"}` endpoint. The transformers server accepts `language` as a name or a code (#27).
+
+The two ASR servers run the same weights; they differ in speed under the runtime's load. The runtime sends a
+partial transcript every 1.6 s while the user speaks and the final one when the utterance ends, and the
+transformers server (plain `HTTPServer`, one request at a time, sharing its GPU with the speech model) makes
+the final transcript of a question wait behind the partial: 0.45 s median, up to 1.1 s, on a 6 s question —
+half of the `<ret>` -> span time. vLLM batches them: 0.13 s for the same clip, 0.76 s for a 31 s one (1.5 s
+on transformers). `ASR_MEM=0.12` is enough for the 1.7B model at `--max-model-len 4096`.
 
 Footprint on one 96 GB GPU with everything on it: the router needs its own GPU (~82 GB at `ROUTER_MEM`
 0.85 — the A4B weights alone are 48.5 GiB and the 8192-token KV cache needs the rest; 0.58 fails to start);
