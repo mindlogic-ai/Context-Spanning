@@ -143,7 +143,10 @@ def web_search(query: str) -> str:
                 except Exception:
                     answer = None
                 if answer:
-                    return _one_sentence(answer)
+                    # DuckDuckGo's instant answer is cut to its first sentence as before; the Wikipedia
+                    # lead is returned whole, as it was on the serial path (a span is the source text,
+                    # never a summary of it).
+                    return _one_sentence(answer) if futs[fut] == 0 else answer
         return _NO_INFO
     finally:
         pool.shutdown(wait=False)
