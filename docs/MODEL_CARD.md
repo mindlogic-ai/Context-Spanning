@@ -52,7 +52,7 @@ questions) returns one reference, and that reference is written into the model's
   its cache and keeps stepping at the 80 ms frame clock.
 - **Real tools.** The shipped bank is 60 tools whose result is something a voice assistant says — time,
   weather, prices, web search, places and routes, SGD-seeded bookings — plus four MCP servers.
-- **Eight released voices** (`f0`-`f3` female, `m0`-`m3` male) and PersonaPlex-style persona prompts carrying
+- **Nine released voices** (`f0`-`f3` female, `m0`-`m3` male, plus `seonghyeon`, a team member's own recorded voice) and PersonaPlex-style persona prompts carrying
   the user's name and city.
 
 ## Files
@@ -60,7 +60,7 @@ questions) returns one reference, and that reference is written into the model's
 | file | content |
 |---|---|
 | `context_spanning_7b.pt` | `{"model": state_dict}` in bf16, loadable with `main.py infer --checkpoint` or fetched automatically |
-| `voices/{f0,f1,f2,f3,m0,m1,m2,m3}.pt` | voice prompts (`{"codes": LongTensor[8, P]}`, agent-voice Mimi codes; 8 s each) |
+| `voices/{f0,f1,f2,f3,m0,m1,m2,m3,seonghyeon}.pt` | voice prompts (`{"codes": LongTensor[8, P]}`, agent-voice Mimi codes; 8 s each) |
 | `assets/figures/` | the paper's figures used by this card |
 
 Mimi and the text tokenizer are taken from the PersonaPlex repository at load time; the `moshi` package is
@@ -185,7 +185,7 @@ the ASR. Servers, GPU layout, vLLM flags and environment variables:
 - Context Spans occupy one text token per frame, so long references spend context; see the paper's
   limitations section.
 - Out of scope: text-only use, batch transcription, or any use of the voice prompts to imitate a real
-  person. The eight released voices come from volunteers who released their recordings under CC0; do not condition on a real person's voice without
+  person. The `f`/`m` voices come from volunteers who released their recordings under CC0 and `seonghyeon` is a team member's own voice, released with consent; do not condition on a real person's voice without
   their consent.
 
 ## License
