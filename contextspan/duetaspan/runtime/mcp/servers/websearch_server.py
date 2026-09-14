@@ -1,7 +1,7 @@
 """FastMCP server exposing a web_search tool over stdio (DuckDuckGo + Wikipedia, key-free)."""
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 
 import requests
 from mcp.server.fastmcp import FastMCP
@@ -13,6 +13,7 @@ _DDG_URL = "https://api.duckduckgo.com/"
 _WIKI_SEARCH = "https://en.wikipedia.org/w/api.php"
 
 _NO_INFO = "(no information found)"
+_TIMEOUT_S = 2   # per request: the span deadline is 2.5 s, so a slower answer is dropped anyway (as get_weather)
 
 # Every call opened a fresh TLS connection to DuckDuckGo, and the handshake alone was
 # ~1.3 s of a 1.5 s search. One reused session answers the same query in ~130 ms.
@@ -50,7 +51,7 @@ def _ddg_answer(query: str) -> str | None:
         data = _http.get(
             _DDG_URL,
             params={"q": query, "format": "json", "no_html": 1, "skip_disambig": 1},
-            timeout=4,
+            timeout=_TIMEOUT_S,
         ).json()
     except (requests.RequestException, ValueError):
         return None
@@ -80,7 +81,7 @@ def _wiki_summary(query: str) -> str | None:
                 "generator": "search", "gsrsearch": query, "gsrlimit": 1,
                 "prop": "extracts", "exintro": 1, "explaintext": 1,
             },
-            timeout=4,
+            timeout=_TIMEOUT_S,
         ).json()
     except (requests.RequestException, ValueError):
         return None
@@ -122,15 +123,30 @@ def web_search(query: str) -> str:
     """
     if not query:
         return _NO_INFO
-    # Neither source needs the other's answer, so ask both at once and keep DuckDuckGo's
-    # when it has one. Serially this was 120 ms + 490 ms whenever DuckDuckGo came up empty.
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        ddg = pool.submit(_ddg_answer, query)
-        wiki = pool.submit(_wiki_summary, query)
-        answer, fallback = ddg.result(), wiki.result()
-    if answer:
-        return _one_sentence(answer)
-    return fallback or _NO_INFO
+    # Ask both at once and return as soon as either has an answer. Waiting for both meant a
+    # provider that cannot be reached (DuckDuckGo's TCP connect hangs from some hosts, #39)
+    # held back the answer the other one already had until its own timeout: measured 4.06 s
+    # for a Wikipedia sentence that was in hand at 0.62 s, i.e. past the span deadline, so the
+    # turn ended as "(no information found)". DuckDuckGo's instant answer is still preferred
+    # when both arrive together.
+    pool = ThreadPoolExecutor(max_workers=2)
+    futs = {pool.submit(_ddg_answer, query): 0, pool.submit(_wiki_summary, query): 1}
+    try:
+        pending = set(futs)
+        while pending:
+            done, pending = wait(pending, timeout=_TIMEOUT_S + 0.5, return_when=FIRST_COMPLETED)
+            if not done:
+                break
+            for fut in sorted(done, key=futs.get):          # DuckDuckGo first when both are in
+                try:
+                    answer = fut.result()
+                except Exception:
+                    answer = None
+                if answer:
+                    return _one_sentence(answer)
+        return _NO_INFO
+    finally:
+        pool.shutdown(wait=False)
 
 
 if __name__ == "__main__":
