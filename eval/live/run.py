@@ -46,12 +46,45 @@ def norm(s: str) -> str:
     return " ".join(NUM_WORDS.get(t, t) for t in toks)
 
 
+_SCALE_RUN = re.compile(
+    r"\b((?:(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|"
+    r"fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|"
+    r"hundred|thousand|million|billion|and|point)\s+)+)"
+)
+
+
+def norm_scaled(s: str) -> str:
+    """`norm`, but a run of number words that carries a scale word (hundred, thousand, million) is
+    folded to its VALUE with word2number: "eight thousand eight hundred and forty-eight point eight
+    six" -> "8848.86". `norm` alone folds token by token ("8 1000 8 100 and 40 8"), which is right
+    for years and clock times ("eighteen forty-two" -> "1842") and wrong for magnitudes; the two
+    renderings are complementary, so `contains` tries both."""
+    from word2number import w2n
+    text = (s or "").lower().replace("-", " ")
+
+    def fold(m):
+        run = m.group(1)
+        if not re.search(r"\b(hundred|thousand|million|billion)\b", run):
+            return run
+        try:
+            v = w2n.word_to_num(run.strip())
+        except ValueError:
+            return run
+        return f"{v} "
+
+    return norm(_SCALE_RUN.sub(fold, text + " "))
+
+
 def contains(hay: str, needle: str) -> bool:
     """The agent SPEAKS its answer and the gold is written, so the two never match literally.
     Compare on normalised words, then again with the spaces removed, which is what makes "six
-    fifty-one P M" match "PM" and "8,848" match "eight thousand eight hundred forty eight"."""
-    h, n = norm(hay), norm(needle)
-    return n in h or n.replace(" ", "") in h.replace(" ", "")
+    fifty-one P M" match "PM"; and on the scale-folded rendering, which is what makes "8848"
+    match "eight thousand eight hundred and forty-eight"."""
+    n = norm(needle)
+    for h in (norm(hay), norm_scaled(hay)):
+        if n in h or n.replace(" ", "") in h.replace(" ", ""):
+            return True
+    return False
 
 
 async def one(page, url: str, wav: str, case: dict, seconds: float) -> dict:

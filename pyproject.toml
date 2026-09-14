@@ -17,7 +17,7 @@ dependencies = [
 
 [project.optional-dependencies]
 asr-server = ["qwen-asr"]         # python -m contextspan.duetaspan.runtime.asr_server (Qwen3-ASR)
-eval = ["playwright"]             # eval/live drives the browser page; then `playwright install chromium`
+eval = ["playwright", "word2number"]             # eval/live drives the browser page; then `playwright install chromium`
 
 [tool.setuptools.packages.find]
 include = ["contextspan*"]
