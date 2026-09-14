@@ -169,6 +169,16 @@ function context() {
            lat: geo ? geo.lat : null, lon: geo ? geo.lon : null, tz, persona: $("persona").value.trim(),
            db: $("db").value.trim() };
 }
+// The chosen voice is per connection on the server (every new socket starts on the default), so
+// it is sent again on every Start, before the context: a Stop/Start no longer falls back to f0.
+// A cloned voice keeps its samples in `clonedVoice` for the same reason.
+let clonedVoice = null;
+function sendVoice() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  if (clonedVoice) { ws.send(JSON.stringify({ type: "clone" })); ws.send(clonedVoice.buffer.slice(0)); return; }
+  const name = $("voicesel").value;
+  if (name) ws.send(JSON.stringify({ type: "voice", name }));
+}
 function sendContext() {
   for (const f of FIELDS) {
     // A persona equal to the server's default is not remembered, so a later release changing that
@@ -241,7 +251,7 @@ async function start() {
   mode = "talk";
   $("go").disabled = true; $("clone").disabled = true; status("connecting", "busy");
   if (ws && ws.readyState === WebSocket.OPEN && fmt) {   // the connection the voice was cloned on
-    sendContext(); openMic(fmt.sampleRate, fmt.frameSize);
+    sendVoice(); sendContext(); openMic(fmt.sampleRate, fmt.frameSize);
     return;
   }
   connect();
@@ -270,7 +280,7 @@ function connect() {
       fmt = { sampleRate: m.sample_rate, frameSize: m.frame_size };
       if (mode === "clone") { openMic(fmt.sampleRate, fmt.frameSize, true); }
       else if (mode === "voice") { applyVoice(); }
-      else { sendContext(); openMic(fmt.sampleRate, fmt.frameSize); }
+      else { sendVoice(); sendContext(); openMic(fmt.sampleRate, fmt.frameSize); }
     }
     else if (m.type === "busy") {
       notice("Another conversation is already running on this server.");
@@ -504,8 +514,8 @@ function stop(msg) {
 function applyVoice() {
   const v = queuedVoice; queuedVoice = null;
   if (!v || !ws || ws.readyState !== WebSocket.OPEN) return;
-  if (v.name !== undefined) ws.send(JSON.stringify({ type: "voice", name: v.name }));
-  else { ws.send(JSON.stringify({ type: "clone" })); ws.send(v.pcm.buffer); }
+  if (v.name !== undefined) { clonedVoice = null; ws.send(JSON.stringify({ type: "voice", name: v.name })); }
+  else { clonedVoice = v.pcm; $("voicesel").value = ""; ws.send(JSON.stringify({ type: "clone" })); ws.send(v.pcm.buffer.slice(0)); }
 }
 function chooseVoice(v) {
   if (running) { notice("Stop the conversation first; the next one starts in the chosen voice."); return; }

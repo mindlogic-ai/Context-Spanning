@@ -13,6 +13,7 @@ import asyncio
 import hmac
 import json
 import logging
+import os
 import re
 import time
 from pathlib import Path
@@ -117,6 +118,10 @@ async def ws_handler(request):
                 kick(waiting, text.strip() or None)
         app_asr = request.app["asr"]
         lvl_peak = lvl_peak2 = 0.0; said_logged = 0
+        # CS_SESSION_DIR: keep each session's user audio, raw as received and as the model and the
+        # ASR heard it after levelling, so 'it did not understand me' can be replayed offline.
+        sess_dir = os.environ.get("CS_SESSION_DIR"); raw_all, lev_all = [], []
+        log.info("session: default voice until the page sends its choice")
         async for msg in ws:
             if msg.type == WSMsgType.TEXT:
                 m = json.loads(msg.data)
@@ -173,6 +178,7 @@ async def ws_handler(request):
             # merely faint one. The ASR hides that: it keeps transcribing while the model
             # stops reacting (#18). Level it here, before both consumers.
             raw_peak = float(np.sqrt(np.mean(frame * frame))) if frame.size else 0.0
+            if sess_dir: raw_all.append(frame.copy())
             if leveller is not None:
                 raw_tail.append(frame)
                 frame = leveller.process(frame)
@@ -191,6 +197,7 @@ async def ws_handler(request):
                                             "target": TARGET_LUFS,
                                             "quiet": bool(lufs < TARGET_LUFS - 10)})
                     raw_tail.clear()
+            if sess_dir: lev_all.append(frame)
             heard.append(frame)
             if len(heard) > 2 * keep:
                 del heard[:keep]; base += keep
@@ -234,6 +241,16 @@ async def ws_handler(request):
                     ret_wait = i                        # mid-sentence, or the final transcript is still in the ASR (bounded)
                 else:
                     kick(i)                             # no utterance around: the fixed window
+        if sess_dir and raw_all:
+            try:
+                import soundfile as sf
+                os.makedirs(sess_dir, exist_ok=True)
+                stamp = time.strftime("%Y%m%d-%H%M%S", time.gmtime())
+                sf.write(os.path.join(sess_dir, f"{stamp}_user_raw.wav"), np.concatenate(raw_all), sr)
+                sf.write(os.path.join(sess_dir, f"{stamp}_user_levelled.wav"), np.concatenate(lev_all), sr)
+                log.info("session audio saved: %s/%s_user_{raw,levelled}.wav (%.0f s)", sess_dir, stamp, len(raw_all) * eng.frame_size / sr)
+            except Exception as e:
+                log.warning("session audio not saved: %s", e)
     return ws
 
 
