@@ -19,7 +19,7 @@
   <br>
 
   <!-- TODO(seonghyeon): replace XXXX.XXXXX with the arXiv id once the preprint is up -->
-  [![arXiv](https://img.shields.io/badge/arXiv-XXXX.XXXXX-b31b1b.svg)](https://arxiv.org/abs/XXXX.XXXXX) [![Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-context--spanning--7b-yellow)](https://huggingface.co/mindlogicinc/context-spanning-7b) [![Base Model](https://img.shields.io/badge/base-PersonaPlex--7B-76b900)](https://huggingface.co/nvidia/personaplex-7b-v1) [![Code License](https://img.shields.io/badge/code-MIT-blue.svg)](LICENSE) [![Weights License](https://img.shields.io/badge/weights-PersonaPlex%20license-76b900)](https://huggingface.co/nvidia/personaplex-7b-v1)
+  [![arXiv](https://img.shields.io/badge/arXiv-XXXX.XXXXX-b31b1b.svg)](https://arxiv.org/abs/XXXX.XXXXX) [![Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-context--spanning--7b-yellow)](https://huggingface.co/mindlogicinc/context-spanning-7b) [![Base Model](https://img.shields.io/badge/base-PersonaPlex--7B-76b900)](https://huggingface.co/nvidia/personaplex-7b-v1) [![Code License](https://img.shields.io/badge/code-MIT-blue.svg)](LICENSE) [![Weights License](https://img.shields.io/badge/weights-NVIDIA%20Open%20Model%20License-76b900)](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/)
   <!-- TODO(seonghyeon): add a Demo / Project Page badge here if one goes live -->
 
 </div>
@@ -89,7 +89,7 @@ fine-tuned from [`nvidia/personaplex-7b-v1`](https://huggingface.co/nvidia/perso
 full-text QA. Two-group selective text loss: the tokens of the asked-for answer form one group and the rest of the
 text row the other, weighted by a detached softmax over the two group losses; audio codebook losses as in PersonaPlex;
 span and prefix columns masked out. Sequence convention: `<ret>` = 4, Context Span open = 12, close = 13 (checkpoints
-trained before 2026-09-08 used 12 on both sides: set `CS_SPAN_CLOSE_ID=12`). Three released voices (`f0`, `f1`, `f2`).
+trained before 2026-09-08 used 12 on both sides: set `CS_SPAN_CLOSE_ID=12`). Eight released voices (`f0`-`f3` female, `m0`-`m3` male).
 
 | benchmark (step 8000) | resp | ref | P(resp \| ref) | `<ret>` rate |
 |---|---|---|---|---|
@@ -266,7 +266,9 @@ benchmark authors' own. `contextspan/moshi/` is the PersonaPlex fork of Kyutai's
 ## License
 
 Code: MIT — see `LICENSE`. `contextspan/moshi/` carries its own license files. The released weights are
-fine-tuned from `nvidia/personaplex-7b-v1` and inherit the
-[PersonaPlex model license](https://huggingface.co/nvidia/personaplex-7b-v1) (NVIDIA Open Model License;
-PersonaPlex builds on `kyutai/moshiko-pytorch-bf16`, CC-BY-4.0). The voice prompts are derived from VCTK
-(CC BY 4.0). See the [model card](https://huggingface.co/mindlogicinc/context-spanning-7b).
+fine-tuned from `nvidia/personaplex-7b-v1` and are distributed under the
+[NVIDIA Open Model License](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/),
+the license of the PersonaPlex weights. (PersonaPlex itself was initialised from `kyutai/moshiko-pytorch-bf16`,
+whose weights are CC-BY-4.0; that attribution is carried, it is not the license of this model.) The voice
+prompts are built from CC0 voice recordings ([Kyutai Unmute Voice Donation](https://huggingface.co/kyutai/tts-voices), volunteers
+who released their voice under CC0). See the [model card](https://huggingface.co/mindlogicinc/context-spanning-7b).
