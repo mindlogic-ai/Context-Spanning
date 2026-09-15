@@ -165,10 +165,12 @@ def run_stream(eng, backend, asr, pcm, ctx=None, asr_window_s=12.0, realtime=Tru
     pending = [False]
     transcripts = []                       # (t_end_s, partial|final, text) for the caller's record
 
-    def kick(i, question=None):
-        lo = max(0, (i + 1) * fs - int(asr_window_s * sr))
+    def kick(i, question=None, end=None):
+        """`i` = the <ret> frame (t_ret); the audio window ends at `end` (default `i`)."""
+        end = i if end is None else end
+        lo = max(0, (end + 1) * fs - int(asr_window_s * sr))
         said = eng.decode_text([t for t in tokens[-64:] if t is not None])
-        r = retrieve_for_ret(backend, asr, pcm[lo:(i + 1) * fs], sr, ctx, db, said, events, question=question)
+        r = retrieve_for_ret(backend, asr, pcm[lo:(end + 1) * fs], sr, ctx, db, said, events, question=question)
         r["t_ret"] = i / eng.frame_rate
         with lock:
             queue.append(r)
@@ -187,13 +189,13 @@ def run_stream(eng, backend, asr, pcm, ctx=None, asr_window_s=12.0, realtime=Tru
                 ret_wait[0] = None
                 threading.Thread(target=kick, args=(waiting, text or None), daemon=True).start()
 
-    fixed_kick = [None]                    # frame index at which a fixed-wait <ret> fires (benchmark)
+    fixed_kick = [None, None]              # (frame at which a fixed-wait <ret> fires, its <ret> frame) (benchmark)
 
     def start_ret(i):
         """The question for this <ret>: the fresh utterance transcript, else wait for the sentence, else the window."""
         pending[0] = True
         if ret_fixed_wait_s is not None:
-            fixed_kick[0] = i + int(round(ret_fixed_wait_s * eng.frame_rate))
+            fixed_kick[0], fixed_kick[1] = i + int(round(ret_fixed_wait_s * eng.frame_rate)), i
             return
         plan = ret_question_plan(cache, i / eng.frame_rate, utts.speaking)
         if plan == "cache":
@@ -223,8 +225,8 @@ def run_stream(eng, backend, asr, pcm, ctx=None, asr_window_s=12.0, realtime=Tru
         for kind, u0, u1 in utts.feed(i, frame):
             threading.Thread(target=transcribe_utt, args=(kind, u0, u1), daemon=True).start()
         if fixed_kick[0] is not None and i >= fixed_kick[0]:
-            fixed_kick[0] = None
-            threading.Thread(target=kick, args=(i,), daemon=True).start()   # the window so far is the question
+            ret_i, fixed_kick[0] = fixed_kick[1], None
+            threading.Thread(target=kick, args=(ret_i, None, i), daemon=True).start()   # window up to now
         if RET_CUT_F and ret_wait[0] is not None and utts.speaking and utts.usil >= RET_CUT_F:
             ev = utts.end_now(i)               # <ret> already out and the user quiet for RET_CUT_S: the question is over
             if ev is not None:
