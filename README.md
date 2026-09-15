@@ -25,7 +25,7 @@
 </div>
 
 <p align="center">
-  <img src="assets/figures/architecture.png" alt="Context Spanning architecture: the full-duplex frontend streams user speech, agent speech and agent text on one timeline; on the ret token the backend runs ASR, an LLM over the Context Memory DB and a tool, and the result is written back into the stream as a Context Span." width="100%">
+  <img src="assets/figures/architecture.png" alt="Context Spanning architecture: the frontend streams user audio, agent audio and agent text on one timeline; after the ret token the agent keeps talking (lead portion) while the backend passes the Streaming ASR user text and the Context DB to an LLM, whose tool result is written back as a Context Span (sine wave on user audio, silence on agent audio, sos … eos on agent text) before the body portion." width="100%">
 </p>
 
 Official PyTorch implementation of **Context Spanning**, a communication framework that lets a
@@ -51,7 +51,7 @@ and strong results on Question Answering tasks, demonstrating its potential.
 ## How it works
 
 <p align="center">
-  <img src="assets/figures/context_span.png" alt="A Context Span on the Moshi token frame: after the ret token the backend's answer is written into the text row between sos and eos, with silence and a sine placeholder in the audio rows, and prefilled in a single KV pass." width="90%">
+  <img src="assets/figures/context_span.png" alt="A Context Span on the token frame: five rows (user acoustic and semantic, agent acoustic and semantic, agent text); after the ret token the span holds sos … eos on the text row, a sine wave on both user rows and silence on both agent rows, and is read in a single KV prefill pass without taking a step index." width="90%">
 </p>
 
 A full-duplex speech model calls an external backend while it keeps listening and talking. When the

@@ -39,7 +39,7 @@ questions) returns one reference, and that reference is written into the model's
 (time, weather, prices, distances) instead of a latent summary.
 
 <p align="center">
-  <img src="assets/figures/architecture.png" alt="Context Spanning architecture: the full-duplex frontend streams user speech, agent speech and agent text on one timeline; on the ret token the backend runs ASR, an LLM over the Context Memory DB and a tool, and the result is written back into the stream as a Context Span." width="100%">
+  <img src="assets/figures/architecture.png" alt="Context Spanning architecture: the frontend streams user audio, agent audio and agent text on one timeline; after the ret token the agent keeps talking (lead portion) while the backend passes the Streaming ASR user text and the Context DB to an LLM, whose tool result is written back as a Context Span (sine wave on user audio, silence on agent audio, sos … eos on agent text) before the body portion." width="100%">
 </p>
 
 <!-- assets/figures/architecture.png is uploaded to this model repo together with the card -->
