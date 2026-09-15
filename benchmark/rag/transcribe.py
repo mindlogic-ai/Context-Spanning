@@ -1,8 +1,8 @@
 """OpenAudioBench-protocol response transcription: whisper-large-v3 over a run dir.
 
-    python -m eval.rag.transcribe <run_dir>          (needs `transformers`, a GPU)
+    python -m benchmark.rag.transcribe <run_dir>          (needs `transformers`, a GPU)
 
-Writes `hyp_whisper` into each item's run_events.json and <run_dir>/whisper_hyps.json; eval.rag.score
+Writes `hyp_whisper` into each item's run_events.json and <run_dir>/whisper_hyps.json; benchmark.rag.score
 uses it when present. The decoded array is passed to the pipeline (not the file path): the pipeline's
 own long-form loader dropped the whole answer segment on clips with a long pause after the greeting.
 """

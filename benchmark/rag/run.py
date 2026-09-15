@@ -1,12 +1,12 @@
 """MoshiRAG RAG suite (paper: knowledge grounding): spoken QA through the real frame-clock stack.
 
-    python -m eval.rag.run <mode> <data_root> <out_root> [--checkpoint ckpt.pt] [--limit N] [--arm ARM]
+    python -m benchmark.rag.run <mode> <data_root> <out_root> [--checkpoint ckpt.pt] [--limit N] [--arm ARM]
 
 mode      halueval | math | llama_questions | web_questions | trivia_qa
 data_root halueval / math: a dir with meta.json [{id, text, answer, knowledge?}] and audios/<id>.wav
           OpenAudioBench sets: <root>/<mode>/<mode>.csv + <root>/<mode>/audios/
 arm       real      the deployed backend answers (MoshiRAG Table 9 protocol; default for QA sets)
-          moshirag  MoshiRAG-isomorphic backend (eval/rag/moshirag.py): the conversation so far and the
+          moshirag  MoshiRAG-isomorphic backend (benchmark/rag/moshirag.py): the conversation so far and the
                     moshi-rag reference prompt go to the reference LLM, no tools, no abstain clause
           router    HaluEval: the gold passage is handed to the ROUTER as Context DB and its answer
                     is the span (the deployed 4-element path: question + Context DB + router + prompt)
@@ -22,8 +22,8 @@ import os
 import numpy as np
 import soundfile as sf
 
-from eval.rag.moshirag import MoshiRagBackend
-from eval.stack import RealtimeBackend, Stack, load_mono, transcript
+from benchmark.rag.moshirag import MoshiRagBackend
+from benchmark.stack import RealtimeBackend, Stack, load_mono, transcript
 
 TAIL_S = 14.0     # answer window after the question
 PROMPT = "You are a wise and friendly teacher. Answer questions or provide advice in a clear and engaging way."

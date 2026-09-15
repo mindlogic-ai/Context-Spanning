@@ -146,7 +146,7 @@ model's response. Our router is Gemma 4.
 The step-8000 checkpoint in this repository was measured again after the paper runs on the `semi`
 protocol (120 items per set): HaluEvalAudio resp 0.642 / ref 0.725 / P(resp | ref) 0.851, math word
 problems (40) P(resp | ref) 1.00, `<ret>` rate 0.925. Protocols and scorers:
-[`eval/README.md`](https://github.com/mindlogic-ai/ContextSpanning/blob/main/eval/README.md).
+[`benchmark/README.md`](https://github.com/mindlogic-ai/ContextSpanning/blob/main/benchmark/README.md).
 
 ## Quickstart
 

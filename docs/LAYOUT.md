@@ -22,7 +22,7 @@ contextspan/
   duetaspan/                    backend runtime (see its README)
   datasets/moshicp/             tool bank, SQLite world, geo index, TOOLS.md
   moshi/                        vendored PersonaPlex fork of Kyutai's moshi (third-party)
-eval/                           benchmark harness (stack.py + rag/ fdb/ live/)
+benchmark/                           benchmark harness (stack.py + rag/ fdb/ live/)
 scripts/                        backends.sh, env.sh, prefill_timing.py
 docs/                           BACKENDS.md, PROTOCOL.md, TRAINING.md, LAYOUT.md, demo/
 ```
@@ -42,7 +42,7 @@ docs/                           BACKENDS.md, PROTOCOL.md, TRAINING.md, LAYOUT.md
 | `contextspan/web/` | `contextspan/runtime/web/` |
 | `contextspan/web/PROTOCOL.md` | `docs/PROTOCOL.md` |
 | `contextspan/train.py` | `contextspan/training/prepare.py` + `contextspan/training/finetune.py` |
-| `eval/common.py` | `eval/stack.py` |
+| `benchmark/common.py` | `benchmark/stack.py` |
 | `tools/prefill_timing.py`, `tools/prefill_passage.txt` | `scripts/` |
 
 Import paths that stay valid: `from contextspan.model import Engine, load_model, load_voice`

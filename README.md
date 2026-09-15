@@ -97,7 +97,7 @@ trained before 2026-09-08 used 12 on both sides: set `CS_SPAN_CLOSE_ID=12`). Nin
 | math word problems (40) | 0.80 | 0.80 | **1.00** | 0.925 |
 | Full-Duplex-Bench v1.0 (40/task) | pause TOR 0.725 (lower is better) · interruption rating 4.43 / take-turn 0.925 / latency 1.21 s · backchannel TOR 0.65, JSD 0.73 | | | |
 
-Protocols and scorers: [`eval/README.md`](eval/README.md). All numbers are `resp`/`ref` accuracy in [0, 1], higher is better.
+Protocols and scorers: [`benchmark/README.md`](benchmark/README.md). All numbers are `resp`/`ref` accuracy in [0, 1], higher is better.
 
 ## Results
 
@@ -151,7 +151,7 @@ papers (Full-Duplex-Bench) and from MoshiRAG (spoken QA and math); their rows ar
 
 The step-8000 checkpoint on the Hub was measured again after the paper runs, on the `semi` protocol
 (120 items per set); those numbers are in [Released Weights](#released-weights) and the two must not be
-mixed. Protocols, arms and scorers: [`eval/README.md`](eval/README.md).
+mixed. Protocols, arms and scorers: [`benchmark/README.md`](benchmark/README.md).
 
 ## Install
 
@@ -226,8 +226,8 @@ MoshiRAG-sampled delays and fine-tunes with the selective loss. Data format and 
 
 ## Evaluation
 
-`eval/` is the benchmark harness — MoshiRAG RAG suite, Full-Duplex-Bench v1/v1.5/v2/v3, a live-session
-benchmark — separate from the runtime and run on the same stack a user talks to. See [`eval/README.md`](eval/README.md).
+`benchmark/` is the benchmark harness — MoshiRAG RAG suite, Full-Duplex-Bench v1/v1.5/v2/v3, a live-session
+benchmark — separate from the runtime and run on the same stack a user talks to. See [`benchmark/README.md`](benchmark/README.md).
 
 ## Layout
 
@@ -240,7 +240,7 @@ benchmark — separate from the runtime and run on the same stack a user talks t
 | `contextspan/duetaspan/` | the backend runtime: tool router, tool bank + MCP servers, LLM-RAG, Context DB, ASR client and server |
 | `contextspan/datasets/` | the shipped tool bank, its SQLite world and geo index |
 | `contextspan/moshi/` | vendored PersonaPlex fork of `moshi` (third-party) |
-| `eval/` | benchmark harness |
+| `benchmark/` | benchmark harness |
 | `scripts/` | `backends.sh`, `env.sh`, `prefill_timing.py` |
 | `docs/` | `BACKENDS.md`, `PROTOCOL.md`, `TRAINING.md`, `LAYOUT.md` (rename map from the previous layout) |
 

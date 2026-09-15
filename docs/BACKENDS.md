@@ -37,7 +37,7 @@ Footprint on one 96 GB GPU with everything on it: the router needs its own GPU (
 the ASR (~5 GB) and the speech model (~20 GB) share another. The router server also answers the RAG
 fallback and judges evaluations; set `RAG_MODEL` (and `RAG_GPUS`) to put those two on a separate server so
 a smaller model can take the tool pick. The acceptance test for a smaller router is FDB v3 tool-selection
-and argument accuracy (`eval/`), which is exactly the job it would do (#13).
+and argument accuracy (`benchmark/`), which is exactly the job it would do (#13).
 
 ## Why these vLLM flags
 
