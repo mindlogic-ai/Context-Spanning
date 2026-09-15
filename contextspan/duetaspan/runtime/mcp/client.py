@@ -174,8 +174,7 @@ _SYSTEM_PROMPT = (
     "Only when the text is mangled or truncated so badly that the actual request "
     "cannot be recovered, NEVER guess or invent a meaning (do not define garbled "
     "words, do not answer a question the user might have meant) -- answer exactly: "
-    "(no information found). Also answer exactly that when you cannot answer "
-    "reliably. A wrong confident answer is far worse than abstaining. "
+    "(no information found). "
     "If no argument value is known, OMIT that argument entirely; never pass "
     "placeholder strings like 'null', '<null>', 'none', or 'unknown'. "
     "Never call more than one tool. "
@@ -190,7 +189,8 @@ _SYSTEM_PROMPT = (
     "ASR_TRANSCRIPT for the requests it does NOT yet answer, take the LAST such request, and "
     "CALL ITS TOOL. Do not describe what you would do and do not reply that the answer is "
     "already known: emit the tool call itself. Answer directly (no tool) only when EVERY "
-    "request in the transcript is already answered. "
+    "request in the transcript is already answered. A greeting, a filler, or a sentence that "
+    "has not yet stated the fact does NOT count as an answer. "
     # Scope limit: a reply covers only the single LAST unanswered request. No restating.
     # Observed (2026-08-03): besides the tool call, the router produced a direct answer bundling
     # already-answered facts ("It is 11:32 AM ... and the weather is 32°C..."). Fed in as a span,
@@ -696,6 +696,15 @@ class MCPRouter:
             return None
         if picked.get("answer"):                      # single-call direct answer (general knowledge/abstain)
             return {"answer": str(picked["answer"]).strip()}
+        # The contract key is "name", but the router model writes the same call as {"tool": ...},
+        # {"call": ...} or {"function": ...} often enough to matter (full v7 8000 bench 2026-09-15:
+        # 48 of the WebQuestions + TriviaQA no-info spans were well-formed calls under another key).
+        for alias in ("tool", "call", "function", "tool_name"):
+            if not picked.get("name") and isinstance(picked.get(alias), str):
+                picked["name"] = picked.pop(alias)
+        for alias in ("args", "parameters", "params"):
+            if "arguments" not in picked and isinstance(picked.get(alias), dict):
+                picked["arguments"] = picked.pop(alias)
         if not picked.get("name"):
             return None
         return picked
@@ -799,13 +808,6 @@ class MCPRouter:
             else:
                 logger.info("txn-guard: %s vetoed (no booking verb) -> no-tool", name)
                 return None
-        # llama3.2:3b cannot reliably suppress web_search for ordinary
-        # general-knowledge questions via prompting alone (verified: it calls
-        # web_search for "who wrote Dune" even when told not to). Gate web_search
-        # to explicit search intent so plain factual questions fall back to the
-        # caller's LLM-RAG path, per the routing contract.
-        if name == "web_search" and not _has_search_intent(query):
-            return None
         # per-tool intent gate — origin: a hard block from when llama3.2:3b over-called get_weather
         # for "capital of France". With the single-call design (direct answer/abstain available) and
         # an a4b-class router the tool choice is deliberate, so a hard gate kills correct routing
