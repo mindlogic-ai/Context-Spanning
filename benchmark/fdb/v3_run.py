@@ -8,7 +8,7 @@ with exactly the keys the official evaluators (evaluate_tool_calls.py / evaluate
 The tool universe is the benchmark's own 12 tools (fdb_v3_toolpack.py) and nothing else.
 
     export FDB_V3_DIR=<Full-Duplex-Bench clone>/v3
-    python -m eval.fdb.v3_run <data_root> [--checkpoint ckpt.pt] [--limit N] [--provider ours]
+    python -m benchmark.fdb.v3_run <data_root> [--checkpoint ckpt.pt] [--limit N] [--provider ours]
 """
 import argparse
 import glob
@@ -19,7 +19,7 @@ import sys
 
 import numpy as np
 
-from eval.stack import Stack, load_mono, transcript
+from benchmark.stack import Stack, load_mono, transcript
 
 # The official agent's system prompt (v3/lk_agent_tool.py VoiceAgent.instructions), verbatim.
 PERSONA = (

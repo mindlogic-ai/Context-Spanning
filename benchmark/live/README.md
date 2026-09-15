@@ -7,8 +7,8 @@ injected span, and what the model said with it. A number from here is a number a
 produced by talking to the demo.
 
 ```bash
-python -m eval.live.build_clips eval/live/cases.json <clips_dir>     # TTS the questions (macOS `say`)
-python -m eval.live.run http://localhost:8080 <clips_dir> runs/live  # one browser session per case
+python -m benchmark.live.build_clips benchmark/live/cases.json <clips_dir>     # TTS the questions (macOS `say`)
+python -m benchmark.live.run http://localhost:8080 <clips_dir> runs/live  # one browser session per case
 ```
 
 Needs `pip install playwright && playwright install chromium`, and a `python main.py serve` to talk

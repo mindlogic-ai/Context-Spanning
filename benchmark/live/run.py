@@ -1,11 +1,11 @@
 """Live-session benchmark: score the demo the way a person uses it.
 
-Every other runner in `eval/` streams a benchmark's own audio through the library. This one drives
+Every other runner in `benchmark/` streams a benchmark's own audio through the library. This one drives
 the **browser page** with a fake microphone, one question per session, and scores what the page
 actually rendered — so it measures the thing that ships: ASR, the router, the deadline, the span,
 and what the model said with it.
 
-    python -m eval.live.run <url> <clips_dir> <out_dir> [--limit N]
+    python -m benchmark.live.run <url> <clips_dir> <out_dir> [--limit N]
 
 `clips_dir` holds `<id>.wav` (the spoken question, already padded with lead-in and tail silence) and
 `cases.json` (`[{id, question, kind, expect: [...], not_expect: [...]}]`). Per case it records the

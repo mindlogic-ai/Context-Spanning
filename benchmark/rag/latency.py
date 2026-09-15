@@ -1,6 +1,6 @@
 """MoshiRAG latency metrics (TTFAT / KD / E2EKD) for a run dir.
 
-    python -m eval.rag.latency <run_dir>       (needs nemo_toolkit[asr] for parakeet word timestamps, a GPU)
+    python -m benchmark.rag.latency <run_dir>       (needs nemo_toolkit[asr] for parakeet word timestamps, a GPU)
 
 TTFAT = question end -> first voiced agent audio; KD = response onset -> first mention of the answer
 keyword; E2EKD = TTFAT + KD. Keyword = MoshiRAG Table 17 extraction (LLM judge) over the transcript;

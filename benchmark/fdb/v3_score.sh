@@ -1,6 +1,6 @@
 #!/bin/bash
 # Full-Duplex-Bench v3 official scorers on our results (provider=ours by default).
-#   FDB_V3_DIR=<clone>/v3  V3_DATA=<released data dir with result_ours.json per sample>  bash eval/fdb/v3_score.sh
+#   FDB_V3_DIR=<clone>/v3  V3_DATA=<released data dir with result_ours.json per sample>  bash benchmark/fdb/v3_score.sh
 # evaluate_tool_calls (tool-selection F1, argument accuracy, response quality) and evaluate_pass_rate
 # (strict binary) use a gpt-4o judge: export OPENAI_API_KEY. analyze_tool_latency is best-effort: this
 # token path carries frame-time `timestamp_start` only, not the audio timings the official LiveKit run has.

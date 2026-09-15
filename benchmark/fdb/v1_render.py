@@ -2,7 +2,7 @@
 1.0x frame clock and the agent audio is written in the official layout ({task}/{id}/output.wav, plus
 clean_output.wav for v1.5 overlap tasks), ready for the benchmark's own scorers.
 
-    python -m eval.fdb.v1_render <data_root> <out_root> [--checkpoint ckpt.pt] [--limit N] [--tasks a,b]
+    python -m benchmark.fdb.v1_render <data_root> <out_root> [--checkpoint ckpt.pt] [--limit N] [--tasks a,b]
 
 Prompts are the ones the benchmark specifies for PersonaPlex: the teacher prompt for interruption
 tasks, "You enjoy having a good conversation." otherwise.
@@ -16,7 +16,7 @@ import shutil
 import numpy as np
 import soundfile as sf
 
-from eval.stack import Stack, load_mono, transcript
+from benchmark.stack import Stack, load_mono, transcript
 
 P_TEACHER = "You are a wise and friendly teacher. Answer questions or provide advice in a clear and engaging way."
 P_CONV = "You enjoy having a good conversation."

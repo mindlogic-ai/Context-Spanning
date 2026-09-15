@@ -1,9 +1,9 @@
 """RAG-suite scorer (MoshiRAG Table 1 protocol): ref. / resp. accuracy split + latency.
 
-    python -m eval.rag.score <run_dir> [--judge-url URL] [--judge-model M] [--asr-url URL] [--math]
+    python -m benchmark.rag.score <run_dir> [--judge-url URL] [--judge-model M] [--asr-url URL] [--math]
 
 resp acc  = LLM judge (MoshiRAG Table 16 prompt, verbatim): does the transcript of what the agent said
-            contain the gold answer?  The transcript is `hyp_whisper` from eval.rag.transcribe when
+            contain the gold answer?  The transcript is `hyp_whisper` from benchmark.rag.transcribe when
             present (OpenAudioBench protocol: whisper-large-v3), else the ASR endpoint.
 ref acc   = literal containment of the gold string in the arrived span text, else the same judge
 ret latency = t_ret - question_end ; inj latency = t_inj - t_ret ; answer onset = first voiced agent frame
@@ -101,11 +101,11 @@ def asr_file(url, path):
 
 
 def score_moshirag(a, dirs):
-    """MoshiRAG-isomorphic scoring (see eval/rag/moshirag.py). The judged answer is the model's text
+    """MoshiRAG-isomorphic scoring (see benchmark/rag/moshirag.py). The judged answer is the model's text
     stream with the <ret>/<span> markers removed; the reference is the injected span text. A judge
     returns None on empty text and -1 when unparseable; both are excluded from the averages, as in
     moshi-rag's evaluate/score.py. P(resp|ref) and the timing fields are kept as extra columns."""
-    from eval.rag.moshirag import MoshiRagJudge, strip_tags
+    from benchmark.rag.moshirag import MoshiRagJudge, strip_tags
     mode = a.mode or os.path.basename(os.path.normpath(a.run_dir))
     judge = MoshiRagJudge(mode)
 
@@ -155,7 +155,7 @@ def main(argv=None):
     ap.add_argument("--math", action="store_true", help="MoshiRAG math judge (Yes/No)")
     ap.add_argument("--protocol", default="ours", choices=["ours", "moshirag"],
                     help="moshirag: judge the model's own text stream with the moshi-rag judges "
-                         "(eval/rag/moshirag.py) and average as moshi-rag's score.py does")
+                         "(benchmark/rag/moshirag.py) and average as moshi-rag's score.py does")
     ap.add_argument("--mode", default=None, help="dataset name for --protocol moshirag (default: run_dir basename)")
     ap.add_argument("--threads", type=int, default=8)
     a = ap.parse_args(argv)

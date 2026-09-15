@@ -1,6 +1,6 @@
 """TTS the benchmark questions into the clips the fake microphone plays.
 
-    python -m eval.live.build_clips eval/live/cases.json <clips_dir>
+    python -m benchmark.live.build_clips benchmark/live/cases.json <clips_dir>
 
 Each clip is lead-in silence, the question, then a long tail of silence so the session has room to
 answer while the fake device keeps playing. macOS `say` is the default because it is deterministic
