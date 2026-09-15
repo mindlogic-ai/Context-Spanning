@@ -1,8 +1,8 @@
 """MoshiRAG protocol pieces, copied from kyutai-labs/moshi-rag (arXiv 2604.12928): the reference generator
 (LLMReferenceGenerator + LLMClient + RAGManager defaults) run on our router model, and the QA judges
 (evaluate/judge) with moshi-rag's averaging rules. The full statement of the protocol is benchmark/README.md.
-Server addresses come from the environment (MOSHIRAG_LLM_URL, MOSHIRAG_GEMMA_JUDGE_URL, OPENAI_API_KEY);
-models and parameters do not.
+Server addresses come from the environment (MOSHIRAG_LLM_URL and the model id that server serves,
+MOSHIRAG_LLM_MODEL; MOSHIRAG_GEMMA_JUDGE_URL; OPENAI_API_KEY); the method and its parameters do not.
 """
 import ast
 import json
@@ -33,7 +33,7 @@ class MoshiRagBackend(RealtimeBackend):
     def __init__(self):
         super().__init__(cache=False)
         self.url = os.environ.get("MOSHIRAG_LLM_URL", "http://localhost:8004").rstrip("/")
-        self.model = REFERENCE_MODEL
+        self.model = os.environ.get("MOSHIRAG_LLM_MODEL", REFERENCE_MODEL)   # the server's model id; reported runs: A4B
         self.rag_timeout = RAG_TIMEOUT_S
         self.max_tokens = MAX_REFERENCE_TOKENS
         self.prompt = open(PROMPT_FILE).read()

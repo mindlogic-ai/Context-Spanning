@@ -31,7 +31,8 @@ The reference that answers a `<ret>` is decided by the set, not by an option:
 - **HaluEvalAudio**: the set's gold passage is the reference (MoshiRAG Table 8, GT reference).
 - **every other set**: the moshi-rag reference generator (`rag/moshirag.py`) on our router model
   `google/gemma-4-26B-A4B-it` (vLLM, `--gpu-memory-utilization 0.70`, `--max-model-len 8192`,
-  `--enable-prefix-caching`): kyutai-labs/moshi-rag `reference_prompt_template.txt` copied verbatim
+  `--enable-prefix-caching`; `MOSHIRAG_LLM_URL` and `MOSHIRAG_LLM_MODEL` name the server, and a run
+  with another reference LLM is reported as such): kyutai-labs/moshi-rag `reference_prompt_template.txt` copied verbatim
   (`rag/reference_prompt_template.txt`), system prompt `You are a helpful assistant.`, the conversation so
   far as `Human:` / `moshi:` lines with earlier references interleaved, temperature 1.0, 64 tokens, stop at
   the first newline, 10 s timeout (the defaults of moshi-rag `run_inference.py`, its offline evaluation
@@ -93,6 +94,16 @@ encodes the layout used for the paper (4 x 96 GB):
 
 Lane A: WebQuestions, math, HaluEval shard 0/2. Lane B: TriviaQA, LlamaQuestions, HaluEval shard 1/2.
 FDB v1 and v3 follow on lane B with the same servers.
+
+Running it elsewhere: the environment names only servers and keys.
+
+| variable | meaning |
+| --- | --- |
+| `MOSHIRAG_LLM_URL`, `MOSHIRAG_LLM_MODEL` | OpenAI-compatible server of the reference LLM and the model id it serves (default `http://localhost:8004`, `google/gemma-4-26B-A4B-it`) |
+| `MOSHIRAG_GEMMA_JUDGE_URL` | vLLM server of `google/gemma-3-27b-it` (default `http://localhost:8007`) |
+| `OPENAI_API_KEY` | `gpt-4o-2024-08-06` judge, FDB interruption judge, FDB v3 evaluators |
+| `MOSHICP_ASR_URL`, `MOSHICP_ASR_MODEL` | the Qwen3-ASR server (`scripts/backends.sh`) |
+| `MCP_ROUTER_LLM_URL`, `MCP_ROUTER_LLM_MODEL` | the deployed router, used by the FDB runs only |
 
 ```bash
 CHECKPOINT=/path/keep_step8000.pt DATA=/data OUT=runs/full OPENAI_API_KEY=... bash benchmark/run_full.sh
