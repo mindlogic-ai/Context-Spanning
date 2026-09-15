@@ -6,6 +6,8 @@ mode      halueval | math | llama_questions | web_questions | trivia_qa
 data_root halueval / math: a dir with meta.json [{id, text, answer, knowledge?}] and audios/<id>.wav
           OpenAudioBench sets: <root>/<mode>/<mode>.csv + <root>/<mode>/audios/
 arm       real      the deployed backend answers (MoshiRAG Table 9 protocol; default for QA sets)
+          moshirag  MoshiRAG-isomorphic backend (eval/rag/moshirag.py): the conversation so far and the
+                    moshi-rag reference prompt go to the reference LLM, no tools, no abstain clause
           router    HaluEval: the gold passage is handed to the ROUTER as Context DB and its answer
                     is the span (the deployed 4-element path: question + Context DB + router + prompt)
           gold      HaluEval: the gold passage itself is the span (Table 8 GT-reference protocol)
@@ -20,6 +22,7 @@ import os
 import numpy as np
 import soundfile as sf
 
+from eval.rag.moshirag import MoshiRagBackend
 from eval.stack import RealtimeBackend, Stack, load_mono, transcript
 
 TAIL_S = 14.0     # answer window after the question
@@ -74,7 +77,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("mode"); ap.add_argument("data_root"); ap.add_argument("out_root")
     ap.add_argument("--checkpoint", default=None); ap.add_argument("--limit", type=int, default=0)
-    ap.add_argument("--arm", default=None, choices=["real", "router", "gold", "off"])
+    ap.add_argument("--shard", default=None, help="K/N: run items K, K+N, K+2N... (parallel lanes share out_root)")
+    ap.add_argument("--arm", default=None, choices=["real", "router", "gold", "off", "moshirag"])
     ap.add_argument("--lead-s", type=float, default=0.0, help="silence before the question (lets the greeting end)")
     ap.add_argument("--prompt", default=PROMPT); ap.add_argument("--voice", default=None)
     ap.add_argument("--temp", type=float, default=0.8); ap.add_argument("--temp-text", type=float, default=0.7)
@@ -83,7 +87,10 @@ def main(argv=None):
     items = list(load_items(a.mode, a.data_root))
     if a.limit:
         items = items[: a.limit]
-    print(f"[rag] {a.mode}: {len(items)} items, arm={arm}", flush=True)
+    if a.shard:
+        k, n_sh = (int(x) for x in a.shard.split("/"))
+        items = items[k::n_sh]
+    print(f"[rag] {a.mode}: {len(items)} items, arm={arm}, shard={a.shard}", flush=True)
     st = Stack(a.checkpoint, a.temp, a.temp_text, backend=OffBackend() if arm == "off" else None, voice=a.voice)
     done = 0
     for sid, wav, question, answer, knowledge in items:
@@ -100,6 +107,8 @@ def main(argv=None):
             backend = GoldSpanBackend(str(knowledge))
         elif a.mode == "halueval" and arm == "router":
             backend = RouterCondensedBackend(str(knowledge))
+        elif arm == "moshirag":
+            backend = MoshiRagBackend()            # one per conversation: it owns the reference history
         res = st.run(a.prompt, sid, pcm, backend=backend)
         sf.write(f"{odir}/output.wav", res["agent"], st.sr)
         json.dump({"question": question, "answer": answer, "knowledge": (str(knowledge)[:2000] if knowledge else None),
@@ -107,6 +116,9 @@ def main(argv=None):
                   open(f"{odir}/meta.json", "w"), ensure_ascii=False)
         evs = [{"q": e.get("question"), "ref": e.get("reference"), "inject": e.get("inject"), "src": e.get("src"),
                 "t": e.get("t_ret"), "t_inj": e.get("t_inj"), "frames": e.get("frames")} for e in res["events"]]
+        if arm == "moshirag" and evs:
+            evs[-1]["backend_status"] = backend.last_status     # ok | timeout | error | empty
+            evs[-1]["backend_s"] = backend.last_elapsed_s
         json.dump({"transcript": transcript(st.eng.spm, res["tokens"]), "events": evs},
                   open(f"{odir}/run_events.json", "w"), ensure_ascii=False)
         done += 1

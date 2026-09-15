@@ -427,8 +427,7 @@ class RealtimeBackend:
         # intents. The LLM router picks a tool + args (ctx fills timezone/city defaults) or no tool.
         if self.mcp_on:
             try:
-                from contextspan.duetaspan.runtime.mcp.client import (
-                    mcp_route as _mcp_route, _has_search_intent as _has_search_intent_q)
+                from contextspan.duetaspan.runtime.mcp.client import mcp_route as _mcp_route
                 # convo = Context DB working_text() snapshot (accumulated conversation state)
                 # — a first-class input for routing and argument filling: it lets the chain refer
                 # to earlier tool results/values that lie outside the ASR window.
@@ -448,12 +447,11 @@ class RealtimeBackend:
                     else:
                         self._trace("llm-direct(1call)", _ans != NO_INFO, _ans)
                         return _ans
-                # web_search used to be excluded to stop it being misused for general
-                # knowledge, but when the user explicitly asks for a search ("검색해줘",
-                # "search the web") its result IS the answer — excluding it lets _rag's
-                # news-abstain rule kill even an explicit request.
-                if m and m.get("tool") and (m.get("tool") != "web_search"
-                                            or _has_search_intent_q(q)):
+                # A tool the router picked runs, web_search included: the keyword gate that used to
+                # drop web_search without a "search" phrase turned every such pick into
+                # "(no information found)" (full v7 8000 bench 2026-09-15: 184 of the 203 WebQuestions
+                # no-info spans were router web_search picks discarded here, not abstains).
+                if m and m.get("tool"):
                     self._trace(f"mcp:{m['tool']}", True, m.get("reference", ""))
                     self.last_args = m.get("args")   # tool-use capture: surface router args
 

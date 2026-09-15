@@ -116,7 +116,8 @@ def instant_answer(query: str) -> str:
 
 @mcp.tool()
 def web_search(query: str) -> str:
-    """Search the web for a single factual answer to a general-knowledge question.
+    """Search the web when the user explicitly asks for a web search or needs live information the
+    assistant cannot already know. Ordinary general-knowledge questions are answered directly.
 
     Args:
         query: The natural-language question or search query.

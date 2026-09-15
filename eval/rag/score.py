@@ -100,6 +100,52 @@ def asr_file(url, path):
     return re.sub(r"^language\s+\w+<asr_text>\s*", "", text.strip())   # vLLM qwen-asr-serve prefix
 
 
+def score_moshirag(a, dirs):
+    """MoshiRAG-isomorphic scoring (see eval/rag/moshirag.py). The judged answer is the model's text
+    stream with the <ret>/<span> markers removed; the reference is the injected span text. A judge
+    returns None on empty text and -1 when unparseable; both are excluded from the averages, as in
+    moshi-rag's evaluate/score.py. P(resp|ref) and the timing fields are kept as extra columns."""
+    from eval.rag.moshirag import MoshiRagJudge, strip_tags
+    mode = a.mode or os.path.basename(os.path.normpath(a.run_dir))
+    judge = MoshiRagJudge(mode)
+
+    def one(d):
+        m = json.load(open(f"{d}/meta.json")); ev = json.load(open(f"{d}/run_events.json"))
+        events = ev.get("events", []); spans = [s for s in events if s.get("inject")]
+        text = strip_tags(ev.get("transcript", ""))
+        ref_text = " ".join(str(s.get("inject") or "") for s in spans)
+        q, gold, qe = m["question"], m["answer"], m["question_end_s"]
+        row = {"id": os.path.basename(d), "resp": judge(q, gold, text), "ref": judge(q, gold, ref_text) if spans else None,
+               "n_span": len(spans), "n_ret": len(events), "text": text[:300], "hyp": (ev.get("hyp_whisper") or "")[:300],
+               "backend_status": events[-1].get("backend_status") if events else None}
+        if spans:
+            s0 = spans[0]
+            if s0.get("t") is not None:
+                row["ret_lat_s"] = round(float(s0["t"]) - qe, 2)
+            if s0.get("t_inj") is not None and s0.get("t") is not None:
+                row["inj_lat_s"] = round(float(s0["t_inj"]) - float(s0["t"]), 2)
+        return row
+
+    with cf.ThreadPoolExecutor(a.threads) as ex:
+        rows = list(ex.map(one, dirs))
+    n = max(len(rows), 1)
+    judged = lambda k: [r[k] for r in rows if r.get(k) is not None and r[k] >= 0]
+    avg = lambda xs: round(float(np.mean(xs)), 4) if xs else None
+    both = [r for r in rows if r.get("ref") == 1 and r.get("resp") is not None and r["resp"] >= 0]
+    lat = lambda k: avg([r[k] for r in rows if r.get(k) is not None])
+    summary = {"run": a.run_dir, "protocol": "moshirag", "n": len(rows),
+               "resp_acc": avg(judged("resp")), "n_resp_judged": len(judged("resp")),
+               "ref_acc": avg(judged("ref")), "n_ref_judged": len(judged("ref")),
+               "P(resp|ref)": avg([r["resp"] for r in both]), "n_ref_correct": len(both),
+               "resp_acc_all": round(sum(1 for r in rows if r.get("resp") == 1) / n, 4),
+               "ref_acc_all": round(sum(1 for r in rows if r.get("ref") == 1) / n, 4),
+               "span_rate": round(sum(1 for r in rows if r["n_span"]) / n, 4), "ret_rate": round(sum(1 for r in rows if r["n_ret"]) / n, 4),
+               "backend_timeout": sum(1 for r in rows if r.get("backend_status") == "timeout"),
+               "ret_lat_s": lat("ret_lat_s"), "inj_lat_s": lat("inj_lat_s")}
+    json.dump({"summary": summary, "rows": rows}, open(f"{a.run_dir}/rag_report_moshirag.json", "w"), ensure_ascii=False, indent=1)
+    print(json.dumps(summary, indent=1))
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("run_dir")
@@ -107,10 +153,16 @@ def main(argv=None):
     ap.add_argument("--judge-model", default=os.environ.get("JUDGE_LLM_MODEL", "google/gemma-3-27b-it"))
     ap.add_argument("--asr-url", default=os.environ.get("MOSHICP_ASR_URL", "http://localhost:8990/transcribe"))
     ap.add_argument("--math", action="store_true", help="MoshiRAG math judge (Yes/No)")
+    ap.add_argument("--protocol", default="ours", choices=["ours", "moshirag"],
+                    help="moshirag: judge the model's own text stream with the moshi-rag judges "
+                         "(eval/rag/moshirag.py) and average as moshi-rag's score.py does")
+    ap.add_argument("--mode", default=None, help="dataset name for --protocol moshirag (default: run_dir basename)")
     ap.add_argument("--threads", type=int, default=8)
     a = ap.parse_args(argv)
     judge = Judge(a.judge_url, a.judge_model, a.math)
     dirs = sorted(d for d in glob.glob(f"{a.run_dir}/*") if os.path.exists(f"{d}/output.wav"))
+    if a.protocol == "moshirag":
+        return score_moshirag(a, dirs)
 
     def one(d):
         m = json.load(open(f"{d}/meta.json")); ev = json.load(open(f"{d}/run_events.json"))
