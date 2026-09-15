@@ -1,18 +1,17 @@
 #!/bin/bash
-# The full benchmark protocol of benchmark/PROTOCOL.md, end to end: servers, the five RAG sets on two lanes,
+# The full benchmark protocol of benchmark/README.md, end to end: servers, the five RAG sets on two lanes,
 # scoring with the moshi-rag judges, then Full-Duplex-Bench v1 (all clips, official scorers) and v3.
 #
 #   CHECKPOINT=/path/keep_step8000.pt DATA=/data OUT=runs/full bash benchmark/run_full.sh
 #
 # DATA holds halueval_audio/, math_audio/, openaudiobench/eval_datas/, full_duplex_bench/ (the benchmark
-# clone with v1_v1.5/ and v3/, plus v3_data/fdb_v3_data_released). Models: ROUTER_MODEL (default
-# google/gemma-4-26B-A4B-it), JUDGE_MODEL (google/gemma-3-27b-it), ASR_MODEL (Qwen/Qwen3-ASR-1.7B);
-# OPENAI_API_KEY for the OpenAudioBench judge, the FDB interruption judge and the v3 evaluators.
-# GPU layout (PROTOCOL.md section 5): GPU_ROUTER_A GPU_ROUTER_B GPU_JUDGE GPU_LANE_B; lane A shares GPU_ROUTER_A.
+# clone with v1_v1.5/ and v3/, plus v3_data/fdb_v3_data_released). The models are the protocol's and are not
+# arguments (ASR_MODEL may point at a local copy of Qwen/Qwen3-ASR-1.7B). OPENAI_API_KEY for the
+# OpenAudioBench judge, the FDB interruption judge and the v3 evaluators.
+# GPU layout (README.md section 5): GPU_ROUTER_A GPU_ROUTER_B GPU_JUDGE GPU_LANE_B; lane A shares GPU_ROUTER_A.
 set -euo pipefail
 : "${CHECKPOINT:?set CHECKPOINT}"; : "${DATA:?set DATA}"; : "${OUT:?set OUT}"; : "${OPENAI_API_KEY:?set OPENAI_API_KEY}"
-ROUTER_MODEL="${ROUTER_MODEL:-google/gemma-4-26B-A4B-it}"; JUDGE_MODEL="${JUDGE_MODEL:-google/gemma-3-27b-it}"
-ASR_MODEL="${ASR_MODEL:-Qwen/Qwen3-ASR-1.7B}"
+ROUTER_MODEL=google/gemma-4-26B-A4B-it; JUDGE_MODEL=google/gemma-3-27b-it; ASR_MODEL="${ASR_MODEL:-Qwen/Qwen3-ASR-1.7B}"
 GPU_ROUTER_A="${GPU_ROUTER_A:-1}"; GPU_ROUTER_B="${GPU_ROUTER_B:-0}"; GPU_JUDGE="${GPU_JUDGE:-2}"; GPU_LANE_B="${GPU_LANE_B:-3}"
 PY="${PYTHON:-python}"; FDBPY="${FDB_PYTHON:-$PY}"; LOG="$OUT/logs"; mkdir -p "$OUT" "$LOG"
 log(){ echo "$(date '+%F %T') [bench] $*" | tee -a "$LOG/chain.log"; }
@@ -32,34 +31,32 @@ for i in $(seq 1 120); do up_llm 8004 "$ROUTER_MODEL" && up_llm 8006 "$ROUTER_MO
 up_asr 8990 || asr "$GPU_JUDGE" 8990; up_asr 8991 || asr "$GPU_LANE_B" 8991
 for i in $(seq 1 60); do up_asr 8990 && up_asr 8991 && break; sleep 10; done
 up_llm 8004 "$ROUTER_MODEL" && up_llm 8006 "$ROUTER_MODEL" && up_llm 8007 "$JUDGE_MODEL" && up_asr 8990 && up_asr 8991 || { log "servers not ready, see $LOG"; exit 2; }
-# one warm request each (PROTOCOL.md section 5)
+# one warm request each (README.md section 5)
 for p in 8004 8006 8007; do curl -s -m 60 "localhost:$p/v1/chat/completions" -H 'Content-Type: application/json' \
   -d "{\"model\":\"$( [ $p = 8007 ] && echo $JUDGE_MODEL || echo $ROUTER_MODEL)\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"max_tokens\":4}" > /dev/null; done
 log "servers up and warm"
-export MOSHIRAG_LLM_MODEL="$ROUTER_MODEL" MOSHIRAG_PROMPT_STYLE=original MOSHIRAG_RAG_TIMEOUT_S=1.5
-export MOSHIRAG_GEMMA_JUDGE_URL=http://localhost:8007 MOSHIRAG_GEMMA_JUDGE_MODEL="$JUDGE_MODEL"
+export MOSHIRAG_GEMMA_JUDGE_URL=http://localhost:8007
 export MCP_ROUTER_LLM_API=openai MCP_ROUTER_LLM_MODEL="$ROUTER_MODEL" MOSHICP_MCP=1 MOSHICP_ASR_MODEL=qwen3-asr
 R="$OUT/rag"; mkdir -p "$R"
-run_set(){ # $1 mode  $2 data root  $3 arm  $4 gpu  $5 shard-or-empty
-  local sh=""; [ -n "$5" ] && sh="--shard $5"
-  CUDA_VISIBLE_DEVICES="$4" "$PY" -m benchmark.rag.run "$1" "$2" "$R/$1" --checkpoint "$CHECKPOINT" --arm "$3" $sh \
-    > "$LOG/rag_$1${5:+_shard${5%/*}}.log" 2>&1 || log "$1 run failed (gpu $4, shard '$5')"
-  log "$1 rendered (gpu $4, shard '$5')"; }
-score_set(){ # $1 mode  $2 gpu
-  CUDA_VISIBLE_DEVICES="$2" "$PY" -m benchmark.rag.transcribe "$R/$1" >> "$LOG/rag_$1.log" 2>&1
-  "$PY" -m benchmark.rag.score "$R/$1" --protocol moshirag --mode "$1" >> "$LOG/rag_$1.log" 2>&1
-  log "$1: $("$PY" -c "import json;s=json.load(open('$R/$1/rag_report_moshirag.json'))['summary'];print({k:s.get(k) for k in ('n','resp_acc','n_resp_judged','ref_acc','n_ref_judged','P(resp|ref)','ret_rate','span_rate','inj_lat_s')})")"; }
+run_set(){ # $1 set  $2 data root  $3 gpu  $4 shard-or-empty
+  local sh=""; [ -n "$4" ] && sh="--shard $4"
+  CUDA_VISIBLE_DEVICES="$3" "$PY" -m benchmark.rag.run "$1" "$2" "$R/$1" --checkpoint "$CHECKPOINT" $sh \
+    > "$LOG/rag_$1${4:+_shard${4%/*}}.log" 2>&1 || log "$1 run failed (gpu $3, shard '$4')"
+  log "$1 rendered (gpu $3, shard '$4')"; }
+score_set(){ # $1 set
+  "$PY" -m benchmark.rag.score "$R/$1" >> "$LOG/rag_$1.log" 2>&1
+  log "$1: $("$PY" -c "import json;s=json.load(open('$R/$1/rag_report.json'))['summary'];print({k:s.get(k) for k in ('n','resp_acc','n_resp_judged','ref_acc','n_ref_judged','P(resp|ref)','ret_rate','span_rate','inj_lat_s')})")"; }
 ( export MOSHIRAG_LLM_URL=http://localhost:8004 MCP_ROUTER_LLM_URL=http://localhost:8004 MOSHICP_ASR_URL=http://localhost:8990/v1/audio/transcriptions
-  run_set web_questions "$DATA/openaudiobench/eval_datas" moshirag "$GPU_ROUTER_A" ""; score_set web_questions "$GPU_ROUTER_A"
-  run_set math "$DATA/math_audio" moshirag "$GPU_ROUTER_A" "";                        score_set math "$GPU_ROUTER_A"
-  run_set halueval "$DATA/halueval_audio" gold "$GPU_ROUTER_A" 0/2 ) &
+  run_set web_questions "$DATA/openaudiobench/eval_datas" "$GPU_ROUTER_A" ""; score_set web_questions
+  run_set math "$DATA/math_audio" "$GPU_ROUTER_A" "";                        score_set math
+  run_set halueval "$DATA/halueval_audio" "$GPU_ROUTER_A" 0/2 ) &
 A=$!
 ( export MOSHIRAG_LLM_URL=http://localhost:8006 MCP_ROUTER_LLM_URL=http://localhost:8006 MOSHICP_ASR_URL=http://localhost:8991/v1/audio/transcriptions
-  run_set trivia_qa "$DATA/openaudiobench/eval_datas" moshirag "$GPU_LANE_B" "";       score_set trivia_qa "$GPU_LANE_B"
-  run_set llama_questions "$DATA/openaudiobench/eval_datas" moshirag "$GPU_LANE_B" ""; score_set llama_questions "$GPU_LANE_B"
-  run_set halueval "$DATA/halueval_audio" gold "$GPU_LANE_B" 1/2 ) &
+  run_set trivia_qa "$DATA/openaudiobench/eval_datas" "$GPU_LANE_B" "";       score_set trivia_qa
+  run_set llama_questions "$DATA/openaudiobench/eval_datas" "$GPU_LANE_B" ""; score_set llama_questions
+  run_set halueval "$DATA/halueval_audio" "$GPU_LANE_B" 1/2 ) &
 B=$!
-wait $A $B; score_set halueval "$GPU_LANE_B"
+wait $A $B; score_set halueval
 # Full-Duplex-Bench v1 (all clips, official scorers) and v3, on lane B's GPU with router B
 export MCP_ROUTER_LLM_URL=http://localhost:8006 MOSHICP_ASR_URL=http://localhost:8991/v1/audio/transcriptions
 FDB="$DATA/full_duplex_bench"; V1="$OUT/fdb_v1"; V3="$OUT/fdb_v3"

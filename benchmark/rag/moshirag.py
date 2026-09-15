@@ -1,23 +1,8 @@
-"""MoshiRAG-isomorphic bench protocol (kyutai-labs/moshi-rag, arXiv 2604.12928).
-
-Owner 2026-09-15: "모든 조건을 MoshiRAG에 동형해. 벤치마크에서는 말이야." with one exception, the reference
-LLM stays our router model. Everything below is copied from the moshi-rag repository:
-
-  Backend   LLMReferenceGenerator: the conversation so far as "Human:"/"moshi:" lines, the bundled
-            reference prompt (reference_prompt_template.txt, the single-profile default "original"),
-            system prompt "You are a helpful assistant.", temperature 1.0, max 512 tokens, stop at the
-            first newline, RAGManager rag_timeout 1.5 s (timeout -> empty reference -> nothing injected).
-            There is no tool call and no abstain clause: the LLM always writes a reference.
-  Judges    evaluate/judge: HaluEval -> SimpleQALLMJudge on vLLM gemma-3-27b-it, math -> MathQALLMJudge on
-            the same, TriviaQA / WebQuestions -> TriviaQAJudge on gpt-4o-2024-08-06 (temperature 0),
-            LlamaQuestions -> LLamaQuestionsJudge on gpt-4o-2024-08-06. The judged text is the model's
-            own text stream (inner monologue), not an ASR transcript of its speech.
-  Averages  score.py: reference_correctness is averaged over items whose reference text is non-empty,
-            correctness over items whose model text is non-empty (the judge returns None otherwise).
-
-Environment: MOSHIRAG_LLM_URL / MOSHIRAG_LLM_MODEL (reference LLM, OpenAI-compatible base URL),
-MOSHIRAG_PROMPT_STYLE=original|simplified, MOSHIRAG_RAG_TIMEOUT_S (1.5), MOSHIRAG_GEMMA_JUDGE_URL /
-MOSHIRAG_GEMMA_JUDGE_MODEL (HaluEval and math judge), OPENAI_API_KEY (OpenAudioBench judge).
+"""MoshiRAG protocol pieces, copied from kyutai-labs/moshi-rag (arXiv 2604.12928): the reference generator
+(LLMReferenceGenerator + LLMClient + RAGManager defaults) run on our router model, and the QA judges
+(evaluate/judge) with moshi-rag's averaging rules. The full statement of the protocol is benchmark/README.md.
+Server addresses come from the environment (MOSHIRAG_LLM_URL, MOSHIRAG_GEMMA_JUDGE_URL, OPENAI_API_KEY);
+models and parameters do not.
 """
 import ast
 import json
@@ -30,8 +15,10 @@ import requests
 from contextspan.duetaspan.runtime.backend.realtime import RealtimeBackend
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-PROMPT_FILES = {"original": f"{_HERE}/moshirag_prompts/reference_prompt_template.txt",
-                "simplified": f"{_HERE}/moshirag_prompts/reference_prompt_template_simplified.txt"}
+PROMPT_FILE = f"{_HERE}/reference_prompt_template.txt"
+REFERENCE_MODEL = "google/gemma-4-26B-A4B-it"
+RAG_TIMEOUT_S = 1.5
+MAX_REFERENCE_TOKENS = 512
 
 
 class MoshiRagBackend(RealtimeBackend):
@@ -41,20 +28,17 @@ class MoshiRagBackend(RealtimeBackend):
     def __init__(self):
         super().__init__(cache=False)
         self.url = os.environ.get("MOSHIRAG_LLM_URL", "http://localhost:8004").rstrip("/")
-        self.model = os.environ.get("MOSHIRAG_LLM_MODEL", "google/gemma-4-26B-A4B-it")
-        self.style = os.environ.get("MOSHIRAG_PROMPT_STYLE", "original")
-        self.rag_timeout = float(os.environ.get("MOSHIRAG_RAG_TIMEOUT_S", "1.5"))
-        self.max_tokens = int(os.environ.get("MOSHIRAG_MAX_REFERENCE_TOKENS", "512"))
-        self.prompt = open(PROMPT_FILES[self.style]).read()
+        self.model = REFERENCE_MODEL
+        self.rag_timeout = RAG_TIMEOUT_S
+        self.max_tokens = MAX_REFERENCE_TOKENS
+        self.prompt = open(PROMPT_FILE).read()
         self.history = []            # (num_turns_at_generation, reference_text), as ReferenceHistory
         self.last_elapsed_s = None
         self.last_status = None      # ok | timeout | error | empty
 
     @staticmethod
     def _turns(convo):
-        """Context DB working_text -> MoshiRAG turns [(role, text)]. Consecutive same-role lines merge
-        into one turn (MoshiRAG's TurnManager emits one user line per VAD turn; our Context DB has one
-        line per silence-split utterance)."""
+        """Context DB working_text -> [(role, text)]; consecutive same-role utterances merge into one turn."""
         turns = []
         for line in (convo or "").split("\n"):
             if line.startswith("user:"):
@@ -71,8 +55,7 @@ class MoshiRagBackend(RealtimeBackend):
         return turns
 
     def _context(self, convo, said):
-        # process_reference_text: drop a trailing moshi turn (the partial turn that needs RAG) and a
-        # leading moshi turn; interleave earlier references after the turn they were generated at.
+        # process_reference_text: drop a trailing and a leading moshi turn, interleave earlier references.
         turns = self._turns(convo)
         if said and said.strip() and (not turns or turns[-1][0] != "moshi"):
             turns.append(("moshi", said.strip()))
@@ -91,8 +74,7 @@ class MoshiRagBackend(RealtimeBackend):
     def retrieve(self, query, kind="auto", ctx=None, aux_context=None, history=None, convo=None):
         self.last_source, self.last_args, self.last_trace = None, None, []
         context, n_turns = self._context(convo, aux_context)
-        if n_turns == 0:
-            # The Context DB may lag the utterance that fired <ret>: fall back to the question itself.
+        if n_turns == 0:                # the Context DB may lag the utterance that fired <ret>
             if not (query or "").strip():
                 self.last_status = "empty"; return None
             context, n_turns = f"Human: {query.strip()}\nReference:", 1
@@ -119,7 +101,6 @@ class MoshiRagBackend(RealtimeBackend):
         return text
 
 
-# ---------------------------------------------------------------------------------------------------
 # Judges (moshi/moshi/evaluate/judge, verbatim prompts)
 SIMPLE_QA = ('\'\n## Background\nYou are a professional QA evaluation expert. You need to assess whether the model\'s answer is correct based on the standard answer.\n\n\n## Scoring Criteria\nCorrect: The answer matches or is equivalent to the standard answer, or contains the same core concept. \n\nIncorrect: The answer is wrong or irrelevant to the question \n\n\n## Evaluation Guidelines\n1. The expression of answers can be flexible, not requiring exact matches. For example: \n\n   - Numbers can be expressed in either Arabic numerals or words \n\n   - Differences in punctuation or simple spelling mistakes can be ignored \n\n2. Focus on whether the core meaning of the answer is correct \n\n## Output Format\nProvide the reasoning for your score, then generate the result in "[]" format and make sure it contains "the score is [Correct]" or "the score is [Incorrect]", for example:\n\nThe answer is correct and equivalent to the standard answer, the score is [Correct]\n\nor\n\nThe answer is incorrect and does not match the standard answer, the score is [Incorrect]\n\n\n\n## Question:\n{question}\n## Standard Answer:\n{valid_answers}\n## Model\'s Answer:\n{answer}\n\'')
 LLAMA_Q = ('\'\n## Background\nYou are a professional QA evaluation expert. You need to assess whether the model\'s answer is correct based on the standard answer.\n\n\n## Scoring Criteria\nCorrect: The answer matches or is equivalent to the standard answer \n\nIncorrect: The answer is wrong or irrelevant to the question \n\n\n## Evaluation Guidelines\n1. The expression of answers can be flexible, not requiring exact matches. For example: \n\n   - Numbers can be expressed in either Arabic numerals or words \n\n   - Proper nouns can be in either English or Chinese \n\n   - Differences in punctuation can be ignored \n\n2. Focus on whether the core meaning of the answer is correct \n\n## Output Format\nProvide the reasoning for your score, then generate the result in "[]" format and make sure it contains "the score is [Correct]" or "the score is [Incorrect]", for example:\n\nThe answer is correct and equivalent to the standard answer, the score is [Correct]\n\nor\n\nThe answer is incorrect and does not match the standard answer, the score is [Incorrect]\n\n\n\n## Question:\n{question}\n## Standard Answer:\n{valid_answers}\n## Model\'s Answer:\n{answer}\n\'')
@@ -140,8 +121,7 @@ JUDGE_FOR_SET = {"halueval": ("gemma", SIMPLE_QA, "score"), "math": ("gemma", MA
 
 
 def answer_variants(gold):
-    """Our gold string ("x | aliases: a, b" or "a;b") -> the list MoshiRAG's extract_answer_variants
-    feeds the judge as str(list)."""
+    """Gold string ("x | aliases: a, b" or "a;b") -> the alias list the judge sees as str(list)."""
     g = str(gold)
     parts = re.split(r"\s*\|\s*aliases:\s*", g, maxsplit=1)
     out = [p.strip() for p in re.split(r"\s*;\s*", parts[0]) if p.strip()]
@@ -159,14 +139,13 @@ def strip_tags(text):
 
 
 class MoshiRagJudge:
-    """LLMJudge.__call__: None when the answer text (or question) is empty; up to 3 tries; parse per
-    judge class. -1 (unparseable) and None are excluded from the averages, as in score.py."""
+    """LLMJudge.__call__: None on empty text, up to 3 tries, -1 when unparseable (both left out of averages)."""
 
     def __init__(self, mode):
         self.kind, self.template, self.parse = JUDGE_FOR_SET[mode]
         if self.kind == "gemma":
             self.url = os.environ.get("MOSHIRAG_GEMMA_JUDGE_URL", "http://localhost:8007").rstrip("/") + "/v1/chat/completions"
-            self.model = os.environ.get("MOSHIRAG_GEMMA_JUDGE_MODEL", "google/gemma-3-27b-it")
+            self.model = "google/gemma-3-27b-it"
             self.temperature, self.headers = 1.0, {}
         else:
             self.url = "https://api.openai.com/v1/chat/completions"

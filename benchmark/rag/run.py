@@ -1,18 +1,16 @@
-"""MoshiRAG RAG suite (paper: knowledge grounding): spoken QA through the real frame-clock stack.
+"""RAG suite (MoshiRAG protocol): spoken QA through the real frame-clock stack.
 
-    python -m benchmark.rag.run <mode> <data_root> <out_root> [--checkpoint ckpt.pt] [--limit N] [--arm ARM]
+    python -m benchmark.rag.run <set> <data_root> <out_root> --checkpoint ckpt.pt [--limit N] [--shard K/N]
 
-mode      halueval | math | llama_questions | web_questions | trivia_qa
-data_root halueval / math: a dir with meta.json [{id, text, answer, knowledge?}] and audios/<id>.wav
-          OpenAudioBench sets: <root>/<mode>/<mode>.csv + <root>/<mode>/audios/
-arm       real      the deployed backend answers (MoshiRAG Table 9 protocol; default for QA sets)
-          moshirag  MoshiRAG-isomorphic backend (benchmark/rag/moshirag.py): the conversation so far and the
-                    moshi-rag reference prompt go to the reference LLM, no tools, no abstain clause
-          router    HaluEval: the gold passage is handed to the ROUTER as Context DB and its answer
-                    is the span (the deployed 4-element path: question + Context DB + router + prompt)
-          gold      HaluEval: the gold passage itself is the span (Table 8 GT-reference protocol)
-          off       retrieval off: <ret> may fire, nothing arrives
-Per item: output.wav (agent, 24 kHz mono), meta.json, run_events.json (transcript + span events).
+set        halueval | math | llama_questions | web_questions | trivia_qa
+data_root  halueval / math: a dir with meta.json [{id, text, answer, knowledge?}] and audios/<id>.wav
+           OpenAudioBench sets: <root>/<set>/<set>.csv + <root>/<set>/audios/
+
+There is one method (benchmark/README.md). The reference that answers a `<ret>` is the set's gold
+passage when the set provides one (HaluEvalAudio, MoshiRAG Table 8) and otherwise the moshi-rag reference
+generator on the router model (benchmark/rag/moshirag.py, MoshiRAG Table 9). Persona prompt, sampling
+temperatures, lead silence and voice assignment are fixed here and are not arguments.
+Per item: output.wav (agent, 24 kHz mono), meta.json, run_events.json (text stream + span events).
 """
 import argparse
 import csv
@@ -26,32 +24,16 @@ from benchmark.rag.moshirag import MoshiRagBackend
 from benchmark.stack import RealtimeBackend, Stack, load_mono, transcript
 
 TAIL_S = 14.0     # answer window after the question
+TEMP, TEMP_TEXT = 0.8, 0.7
 PROMPT = "You are a wise and friendly teacher. Answer questions or provide advice in a clear and engaging way."
 
 
-class GoldSpanBackend(RealtimeBackend):
-    """HaluEval Table 8 arm: the gold reference document IS the retrieval result."""
+class GoldReferenceBackend(RealtimeBackend):
+    """The set's gold passage IS the reference (HaluEvalAudio; MoshiRAG Table 8)."""
     def __init__(self, ref):
         super().__init__(cache=False); self._ref = ref
     def retrieve(self, query, **kw):
-        self.last_source = "halueval_ref"; return self._ref
-
-
-class RouterCondensedBackend(RealtimeBackend):
-    """HaluEval deployment-faithful arm: the gold document goes to the router as Context DB text; the
-    router's own answer is the span. The raw passage never reaches the speech model."""
-    def __init__(self, doc):
-        super().__init__(cache=False); self._doc = doc
-    def retrieve(self, query, kind="auto", ctx=None, aux_context=None, history=None, convo=None):
-        db = f"[context db] {self._doc}" + (f"\n{convo}" if convo else "")
-        return super().retrieve(query, kind=kind, ctx=ctx, aux_context=aux_context, history=history, convo=db)
-
-
-class OffBackend(RealtimeBackend):
-    def __init__(self):
-        super().__init__(cache=False)
-    def retrieve(self, query, **kw):
-        self.last_source = "off"; return None
+        self.last_source = "gold_passage"; return self._ref
 
 
 def load_items(mode, root):
@@ -75,23 +57,20 @@ def load_items(mode, root):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("mode"); ap.add_argument("data_root"); ap.add_argument("out_root")
-    ap.add_argument("--checkpoint", default=None); ap.add_argument("--limit", type=int, default=0)
-    ap.add_argument("--shard", default=None, help="K/N: run items K, K+N, K+2N... (parallel lanes share out_root)")
-    ap.add_argument("--arm", default=None, choices=["real", "router", "gold", "off", "moshirag"])
-    ap.add_argument("--lead-s", type=float, default=0.0, help="silence before the question (lets the greeting end)")
-    ap.add_argument("--prompt", default=PROMPT); ap.add_argument("--voice", default=None)
-    ap.add_argument("--temp", type=float, default=0.8); ap.add_argument("--temp-text", type=float, default=0.7)
+    ap.add_argument("mode", choices=["halueval", "math", "llama_questions", "web_questions", "trivia_qa"])
+    ap.add_argument("data_root"); ap.add_argument("out_root")
+    ap.add_argument("--checkpoint", required=True)
+    ap.add_argument("--limit", type=int, default=0, help="first N items in dataset order (semi = 120)")
+    ap.add_argument("--shard", default=None, help="K/N: items K, K+N, K+2N... (lanes sharing one set)")
     a = ap.parse_args(argv)
-    arm = a.arm or ("router" if a.mode == "halueval" else "real")
     items = list(load_items(a.mode, a.data_root))
     if a.limit:
         items = items[: a.limit]
     if a.shard:
         k, n_sh = (int(x) for x in a.shard.split("/"))
         items = items[k::n_sh]
-    print(f"[rag] {a.mode}: {len(items)} items, arm={arm}, shard={a.shard}", flush=True)
-    st = Stack(a.checkpoint, a.temp, a.temp_text, backend=OffBackend() if arm == "off" else None, voice=a.voice)
+    print(f"[rag] {a.mode}: {len(items)} items, shard={a.shard}", flush=True)
+    st = Stack(a.checkpoint, TEMP, TEMP_TEXT)
     done = 0
     for sid, wav, question, answer, knowledge in items:
         odir = f"{a.out_root}/{sid}"
@@ -99,24 +78,19 @@ def main(argv=None):
             continue
         os.makedirs(odir, exist_ok=True)
         pcm = load_mono(wav, st.sr)
-        pcm = np.concatenate([np.zeros(int(a.lead_s * st.sr), np.float32), pcm])
         q_end = len(pcm) / st.sr
         pcm = np.concatenate([pcm, np.zeros(int(TAIL_S * st.sr), np.float32)])
-        backend = None
-        if a.mode == "halueval" and arm == "gold":
-            backend = GoldSpanBackend(str(knowledge))
-        elif a.mode == "halueval" and arm == "router":
-            backend = RouterCondensedBackend(str(knowledge))
-        elif arm == "moshirag":
-            backend = MoshiRagBackend()            # one per conversation: it owns the reference history
-        res = st.run(a.prompt, sid, pcm, backend=backend)
+        backend = GoldReferenceBackend(str(knowledge)) if knowledge else MoshiRagBackend()
+        res = st.run(PROMPT, sid, pcm, backend=backend)
         sf.write(f"{odir}/output.wav", res["agent"], st.sr)
-        json.dump({"question": question, "answer": answer, "knowledge": (str(knowledge)[:2000] if knowledge else None),
-                   "question_start_s": round(a.lead_s, 2), "question_end_s": round(q_end, 2), "arm": arm},
+        json.dump({"set": a.mode, "question": question, "answer": answer,
+                   "knowledge": (str(knowledge)[:2000] if knowledge else None),
+                   "question_start_s": 0.0, "question_end_s": round(q_end, 2),
+                   "reference": "gold_passage" if knowledge else "moshirag_llm"},
                   open(f"{odir}/meta.json", "w"), ensure_ascii=False)
         evs = [{"q": e.get("question"), "ref": e.get("reference"), "inject": e.get("inject"), "src": e.get("src"),
                 "t": e.get("t_ret"), "t_inj": e.get("t_inj"), "frames": e.get("frames")} for e in res["events"]]
-        if arm == "moshirag" and evs:
+        if evs and isinstance(backend, MoshiRagBackend):
             evs[-1]["backend_status"] = backend.last_status     # ok | timeout | error | empty
             evs[-1]["backend_s"] = backend.last_elapsed_s
         json.dump({"transcript": transcript(st.eng.spm, res["tokens"]), "events": evs},
