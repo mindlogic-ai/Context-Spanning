@@ -24,7 +24,7 @@ asr(){ CUDA_VISIBLE_DEVICES="$1" setsid nohup qwen-asr-serve "$ASR_MODEL" --port
 up_llm(){ curl -s -m 5 "localhost:$1/v1/models" 2>/dev/null | grep -q "$2"; }
 up_asr(){ [ "$(curl -s -m 5 -o /dev/null -w '%{http_code}' "localhost:$1/health" 2>/dev/null)" = "200" ]; }
 log "start: $CHECKPOINT; router $ROUTER_MODEL; judge $JUDGE_MODEL; ASR $ASR_MODEL; commit $(git rev-parse --short HEAD 2>/dev/null || echo ?)"
-up_llm 8004 "$ROUTER_MODEL" || serve "$GPU_ROUTER_A" "$ROUTER_MODEL" 8004 0.70 routerA
+up_llm 8004 "$ROUTER_MODEL" || serve "$GPU_ROUTER_A" "$ROUTER_MODEL" 8004 0.62 routerA
 up_llm 8006 "$ROUTER_MODEL" || serve "$GPU_ROUTER_B" "$ROUTER_MODEL" 8006 0.70 routerB
 up_llm 8007 "$JUDGE_MODEL"  || serve "$GPU_JUDGE" "$JUDGE_MODEL" 8007 0.70 judge
 for i in $(seq 1 120); do up_llm 8004 "$ROUTER_MODEL" && up_llm 8006 "$ROUTER_MODEL" && up_llm 8007 "$JUDGE_MODEL" && break; sleep 10; done
