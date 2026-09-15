@@ -19,6 +19,11 @@ PROMPT_FILE = f"{_HERE}/reference_prompt_template.txt"
 REFERENCE_MODEL = "google/gemma-4-26B-A4B-it"
 RAG_TIMEOUT_S = 10.0          # run_inference.py --rag-timeout default (the offline evaluation), not the live server's 1.5
 MAX_REFERENCE_TOKENS = 64     # run_inference.py --max-reference-tokens default
+STT_WAIT_S = 0.5              # run_inference.py --stt-wait-time default: wait after <ret>, then send the transcript so far
+
+
+def _norm(t):
+    return " ".join(re.sub(r"[^a-z0-9 ]", " ", t.lower()).split())
 
 
 class MoshiRagBackend(RealtimeBackend):
@@ -49,7 +54,14 @@ class MoshiRagBackend(RealtimeBackend):
                 continue                       # profile / tool lines are not conversation turns
             text = "".join(c for c in text if c.isprintable()).strip()
             if turns and turns[-1][0] == role:
-                turns[-1] = (role, (turns[-1][1] + " " + text).strip())
+                prev = turns[-1][1]
+                # the window transcript at the trigger re-covers the utterances already in the Context DB
+                if prev and _norm(prev) in _norm(text):
+                    turns[-1] = (role, text)
+                elif text and _norm(text) in _norm(prev):
+                    pass
+                else:
+                    turns[-1] = (role, (prev + " " + text).strip())
             else:
                 turns.append((role, text))
         return turns

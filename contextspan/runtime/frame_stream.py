@@ -149,9 +149,12 @@ def retrieve_for_ret(backend, asr, clip, sample_rate, ctx, db, said_text, events
 
 
 def run_stream(eng, backend, asr, pcm, ctx=None, asr_window_s=12.0, realtime=True, verbose=True,
-               ret_deadline_s=RET_DEADLINE_S):
+               ret_deadline_s=RET_DEADLINE_S, ret_fixed_wait_s=None):
     """Streams `pcm` (float32 mono at Mimi's rate) through the engine, one 80 ms frame per step.
-    `ctx` = user profile (name, city, timezone, lat, lon, notes). Returns dict(agent, tokens, events)."""
+    `ctx` = user profile (name, city, timezone, lat, lon, notes). Returns dict(agent, tokens, events).
+    `ret_fixed_wait_s`: benchmark only (moshi-rag run_inference.py `stt_wait_time`): every `<ret>` waits
+    exactly this long, then the audio window so far is transcribed and sent; the utterance plan and the
+    `<ret>` cut are not used. None (serving) keeps the utterance-transcript path."""
     fs, sr = eng.frame_size, int(eng.mimi.sample_rate)
     n = len(pcm) // fs
     ctx = dict(ctx or {})
@@ -184,9 +187,14 @@ def run_stream(eng, backend, asr, pcm, ctx=None, asr_window_s=12.0, realtime=Tru
                 ret_wait[0] = None
                 threading.Thread(target=kick, args=(waiting, text or None), daemon=True).start()
 
+    fixed_kick = [None]                    # frame index at which a fixed-wait <ret> fires (benchmark)
+
     def start_ret(i):
         """The question for this <ret>: the fresh utterance transcript, else wait for the sentence, else the window."""
         pending[0] = True
+        if ret_fixed_wait_s is not None:
+            fixed_kick[0] = i + int(round(ret_fixed_wait_s * eng.frame_rate))
+            return
         plan = ret_question_plan(cache, i / eng.frame_rate, utts.speaking)
         if plan == "cache":
             threading.Thread(target=kick, args=(i, cache["text"]), daemon=True).start()
@@ -214,6 +222,9 @@ def run_stream(eng, backend, asr, pcm, ctx=None, asr_window_s=12.0, realtime=Tru
         frame = pcm[i * fs:(i + 1) * fs]
         for kind, u0, u1 in utts.feed(i, frame):
             threading.Thread(target=transcribe_utt, args=(kind, u0, u1), daemon=True).start()
+        if fixed_kick[0] is not None and i >= fixed_kick[0]:
+            fixed_kick[0] = None
+            threading.Thread(target=kick, args=(i,), daemon=True).start()   # the window so far is the question
         if RET_CUT_F and ret_wait[0] is not None and utts.speaking and utts.usil >= RET_CUT_F:
             ev = utts.end_now(i)               # <ret> already out and the user quiet for RET_CUT_S: the question is over
             if ev is not None:

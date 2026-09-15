@@ -49,8 +49,7 @@ class Stack:
         names = list(self._voices)
         return self._voices[names[int(hashlib.md5(str(key).encode()).hexdigest()[:8], 16) % len(names)]]
 
-    def run(self, persona, key, pcm, backend=None, ctx=CTX, verbose=False, ret_deadline_s=None):
+    def run(self, persona, key, pcm, backend=None, ctx=CTX, verbose=False, **stream_kw):
         self.eng.reset()
         self.eng.set_persona(persona, self.voice_for(key))
-        kw = {} if ret_deadline_s is None else {"ret_deadline_s": ret_deadline_s}
-        return run_stream(self.eng, backend or self.backend, self.asr, pcm, ctx=ctx, verbose=verbose, **kw)
+        return run_stream(self.eng, backend or self.backend, self.asr, pcm, ctx=ctx, verbose=verbose, **stream_kw)

@@ -21,7 +21,7 @@ it end to end; a number is comparable with another only if both come from the sa
 | persona prompt | `You are a wise and friendly teacher. Answer questions or provide advice in a clear and engaging way.` | `rag/run.py`; FDB uses the PersonaPlex prompts in `fdb/v1_render.py` |
 | sampling | audio temperature 0.8, text temperature 0.7 | `rag/run.py` |
 | frame clock | 1.0x, 80 ms frames, one item at a time, one engine per lane | `contextspan/runtime/frame_stream.py` |
-| `<ret>` | the model's own token, never forced; question = the utterance transcript (`CS_RET_CUT_S` 0.4 s, `CS_RET_UTT_WAIT_S` 1.0 s); a span later than `CS_RET_DEADLINE_S` 2.5 s after `<ret>` is dropped | `contextspan/runtime/frame_stream.py` |
+| `<ret>` | the model's own token, never forced. As in moshi-rag `run_inference.py`: 0.5 s after `<ret>` (`stt_wait_time`) the transcript so far is sent to the reference LLM, and the reference is applied whenever it arrives within the 10 s timeout | `rag/run.py` (`ret_fixed_wait_s`, `ret_deadline_s`); the live page keeps its own utterance path |
 | ASR of the user | `Qwen/Qwen3-ASR-1.7B` on vLLM (`qwen-asr-serve`), utterance level | `scripts/backends.sh` |
 
 ## 2. Reference
@@ -107,7 +107,6 @@ Stated so the comparison is read correctly. Everything not listed here is the sa
 | item | moshi-rag `run_inference.py` | here |
 | --- | --- | --- |
 | user ASR | Kyutai streaming STT (`LocalSpeechToText`), word level, VAD turn switching | `Qwen/Qwen3-ASR-1.7B`, utterance level; the router sees the whole transcript so far either way |
-| wait after the trigger before the retrieval call | `stt_wait_time` 0.5 s | the utterance's final transcript, at most 1.0 s (`CS_RET_UTT_WAIT_S`), or the 0.4 s `<ret>` cut |
 | reference conditioning | a separate reference encoder summed into the token embeddings over several steps | the span prefilled as text into the model's own text stream |
 | end of a sample | after the input, until `max_consecutive_silence_frames` of model silence | a fixed 14 s window after the question |
 | clock | the stream pauses during the retrieval call and the measured latency is replayed as frames | the stream runs at 1.0x while the call is in flight |

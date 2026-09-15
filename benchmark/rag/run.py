@@ -20,7 +20,7 @@ import os
 import numpy as np
 import soundfile as sf
 
-from benchmark.rag.moshirag import RAG_TIMEOUT_S, MoshiRagBackend
+from benchmark.rag.moshirag import RAG_TIMEOUT_S, STT_WAIT_S, MoshiRagBackend
 from benchmark.stack import RealtimeBackend, Stack, load_mono, transcript
 
 TAIL_S = 14.0     # answer window after the question
@@ -81,8 +81,10 @@ def main(argv=None):
         q_end = len(pcm) / st.sr
         pcm = np.concatenate([pcm, np.zeros(int(TAIL_S * st.sr), np.float32)])
         backend = GoldReferenceBackend(str(knowledge)) if knowledge else MoshiRagBackend()
-        # MoshiRAG applies a reference whenever it arrives within rag_timeout; no later-than-X drop.
-        res = st.run(PROMPT, sid, pcm, backend=backend, ret_deadline_s=RAG_TIMEOUT_S)
+        # moshi-rag run_inference.py: every <ret> waits stt_wait_time, then the transcript so far goes to the
+        # reference LLM; the reference is applied whenever it arrives within rag_timeout (no later-than-X drop).
+        res = st.run(PROMPT, sid, pcm, backend=backend, ret_deadline_s=RAG_TIMEOUT_S, ret_fixed_wait_s=STT_WAIT_S,
+                     asr_window_s=60.0)
         sf.write(f"{odir}/output.wav", res["agent"], st.sr)
         json.dump({"set": a.mode, "question": question, "answer": answer,
                    "knowledge": (str(knowledge)[:2000] if knowledge else None),
