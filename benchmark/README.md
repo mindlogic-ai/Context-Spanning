@@ -33,9 +33,13 @@ The reference that answers a `<ret>` is decided by the set, not by an option:
   `google/gemma-4-26B-A4B-it` (vLLM, `--gpu-memory-utilization 0.70`, `--max-model-len 8192`,
   `--enable-prefix-caching`): kyutai-labs/moshi-rag `reference_prompt_template.txt` copied verbatim
   (`rag/reference_prompt_template.txt`), system prompt `You are a helpful assistant.`, the conversation so
-  far as `Human:` / `moshi:` lines with earlier references interleaved, temperature 1.0, 512 tokens, stop at
-  the first newline, 1.5 s timeout (a timeout injects nothing). No tools, no abstain clause (MoshiRAG
-  Table 9, LLM reference).
+  far as `Human:` / `moshi:` lines with earlier references interleaved, temperature 1.0, 64 tokens, stop at
+  the first newline, 10 s timeout (the defaults of moshi-rag `run_inference.py`, its offline evaluation
+  driver; a timeout injects nothing). No tools, no abstain clause (MoshiRAG Table 9, LLM reference).
+
+A reference is injected whenever it arrives within the timeout: the runtime's late-span drop
+(`CS_RET_DEADLINE_S`) is set to the same 10 s for the benchmark, as `run_inference.py` applies the
+reference at trigger step + measured retrieval steps with no cut-off.
 
 The deployed tool router (`contextspan/duetaspan/runtime/mcp`) is not part of the benchmark.
 
@@ -96,7 +100,20 @@ python -m benchmark.rag.run web_questions <openaudiobench/eval_datas> runs/webq 
 python -m benchmark.rag.score runs/webq                                                                # -> rag_report.json
 ```
 
-## 6. Live session
+## 6. Where this differs from moshi-rag's own driver
+
+Stated so the comparison is read correctly. Everything not listed here is the same procedure.
+
+| item | moshi-rag `run_inference.py` | here |
+| --- | --- | --- |
+| user ASR | Kyutai streaming STT (`LocalSpeechToText`), word level, VAD turn switching | `Qwen/Qwen3-ASR-1.7B`, utterance level; the router sees the whole transcript so far either way |
+| wait after the trigger before the retrieval call | `stt_wait_time` 0.5 s | the utterance's final transcript, at most 1.0 s (`CS_RET_UTT_WAIT_S`), or the 0.4 s `<ret>` cut |
+| reference conditioning | a separate reference encoder summed into the token embeddings over several steps | the span prefilled as text into the model's own text stream |
+| end of a sample | after the input, until `max_consecutive_silence_frames` of model silence | a fixed 14 s window after the question |
+| clock | the stream pauses during the retrieval call and the measured latency is replayed as frames | the stream runs at 1.0x while the call is in flight |
+| speech model | Moshi (MoshiRAG fine-tune), one voice | DuetaSpan v7 8000 (PersonaPlex fine-tune), released voices |
+
+## 7. Live session
 
 `live/` drives the shipped page through Playwright with synthetic TTS clips of twelve hand-written
 questions (`live/cases.json`) and matches the answer on the page's text stream. It checks a deployment

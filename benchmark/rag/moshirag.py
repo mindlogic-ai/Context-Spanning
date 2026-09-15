@@ -17,8 +17,8 @@ from contextspan.duetaspan.runtime.backend.realtime import RealtimeBackend
 _HERE = os.path.dirname(os.path.abspath(__file__))
 PROMPT_FILE = f"{_HERE}/reference_prompt_template.txt"
 REFERENCE_MODEL = "google/gemma-4-26B-A4B-it"
-RAG_TIMEOUT_S = 1.5
-MAX_REFERENCE_TOKENS = 512
+RAG_TIMEOUT_S = 10.0          # run_inference.py --rag-timeout default (the offline evaluation), not the live server's 1.5
+MAX_REFERENCE_TOKENS = 64     # run_inference.py --max-reference-tokens default
 
 
 class MoshiRagBackend(RealtimeBackend):

@@ -148,7 +148,8 @@ def retrieve_for_ret(backend, asr, clip, sample_rate, ctx, db, said_text, events
     return {"question": question, "reference": ref, "inject": inject, "src": src, "args": args}
 
 
-def run_stream(eng, backend, asr, pcm, ctx=None, asr_window_s=12.0, realtime=True, verbose=True):
+def run_stream(eng, backend, asr, pcm, ctx=None, asr_window_s=12.0, realtime=True, verbose=True,
+               ret_deadline_s=RET_DEADLINE_S):
     """Streams `pcm` (float32 mono at Mimi's rate) through the engine, one 80 ms frame per step.
     `ctx` = user profile (name, city, timezone, lat, lon, notes). Returns dict(agent, tokens, events)."""
     fs, sr = eng.frame_size, int(eng.mimi.sample_rate)
@@ -200,7 +201,7 @@ def run_stream(eng, backend, asr, pcm, ctx=None, asr_window_s=12.0, realtime=Tru
             ready = queue.pop(0) if queue else None
         if ready is not None:
             ready["t_inj"] = i / eng.frame_rate
-            ready["late"] = ready["inject"] is not None and (ready["t_inj"] - ready["t_ret"]) > RET_DEADLINE_S
+            ready["late"] = ready["inject"] is not None and (ready["t_inj"] - ready["t_ret"]) > ret_deadline_s
             if ready["late"]:
                 ready["inject"] = None
             ready["frames"] = eng.inject_context_span(ready["inject"]) if ready["inject"] else 0
