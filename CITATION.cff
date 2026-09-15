@@ -1,0 +1,36 @@
+cff-version: 1.2.0
+message: "If you use this software or the released weights, please cite the paper below."
+title: "Context Spanning: A Communication Framework for Full-Duplex Speech Models and External LLM Backends"
+type: software
+authors:
+  - family-names: Go
+    given-names: Seonghyeon
+    affiliation: Mindlogic
+  - family-names: Kim
+    given-names: Yongwoo
+    affiliation: Mindlogic
+  - family-names: Cha
+    given-names: Hyeonjin
+    affiliation: Mindlogic
+  - family-names: Shin
+    given-names: Jaeho
+    affiliation: Mindlogic
+repository-code: "https://github.com/mindlogic-ai/ContextSpanning"
+license: MIT
+version: 1.0.0
+date-released: 2026-09-15
+preferred-citation:
+  type: article
+  title: "Context Spanning: A Communication Framework for Full-Duplex Speech Models and External LLM Backends"
+  authors:
+    - family-names: Go
+      given-names: Seonghyeon
+    - family-names: Kim
+      given-names: Yongwoo
+    - family-names: Cha
+      given-names: Hyeonjin
+    - family-names: Shin
+      given-names: Jaeho
+  year: 2026
+  journal: "arXiv preprint"
+  # TODO(seonghyeon): add  identifiers: [{type: other, value: "arXiv:XXXX.XXXXX"}]  and the venue once known

@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "contextspan"
+version = "1.0.0"
+description = "Context Spanning: a communication framework for full-duplex speech models and external LLM backends"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = [
+  "torch>=2.2", "numpy", "soundfile", "librosa", "requests", "sentencepiece", "huggingface_hub", "aiohttp",
+  "safetensors", "einops", "sphn", "pyloudnorm", "noisereduce", "webrtcvad-wheels", "scipy",
+  "mcp>=1.9,<2", "beautifulsoup4",
+]
+
+[project.optional-dependencies]
+asr-server = ["qwen-asr"]         # Qwen3-ASR: `qwen-asr-serve` (needs vllm) or python -m contextspan.duetaspan.runtime.asr_server
+benchmark = ["playwright", "word2number"]             # benchmark/live drives the browser page; then `playwright install chromium`
+
+[tool.setuptools.packages.find]
+include = ["contextspan*"]
+
+[tool.setuptools.package-data]
+contextspan = ["runtime/web/*", "moshi/LICENSE.*", "datasets/moshicp/mcp_tool_bank.json", "datasets/moshicp/TOOLS.md", "datasets/moshicp/*.sqlite"]
