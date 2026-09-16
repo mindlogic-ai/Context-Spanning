@@ -50,12 +50,27 @@ The deployed tool router (`contextspan/duetaspan/runtime/mcp`) is not part of th
 | --- | --- | --- | --- |
 | HaluEvalAudio | 1000 | HaluEvalAudio release (question audio + gold passage) | `meta.json` + `audios/<id>.wav` |
 | TriviaQA / WebQuestions / LlamaQuestions | 1000 / 1000 / 300 | OpenAudioBench release | `eval_datas/<set>/<set>.csv` + `audios/` |
-| math | 100 | MoshiRAG Table 10 items, synthesised with the Kyutai TTS VCTK preset voices | `meta.json` + `audios/` |
+| math | 3822: AddSub 395, MultiArith 600, SingleEq 508, SVAMP 1000, GSM8K 1319 | the five public math word-problem test sets of STITCH / MoshiRAG, spoken with the Kyutai TTS (built by `math/`, below) | `meta.json` + `audios/<id>.wav` |
 | Full-Duplex-Bench v1 | 727 clips, 5 tasks | `v1_v1.5/dataset/data/v1.0` | the benchmark's |
 | Full-Duplex-Bench v3 | 100 scenarios | `fdb_v3_data_released` | the benchmark's |
 
 Items are taken in dataset order. `--limit N` is the first N items (`semi` = 120, labelled as such);
 `--shard K/N` is every N-th item from K, for two lanes sharing one set.
+
+The math set is built from its public sources on any machine with one GPU (`pip install moshi` for the Kyutai
+TTS; the questions come from GitHub, the model and the voices from the Hugging Face Hub):
+
+```bash
+python benchmark/math/prepare_questions.py /data/math_audio   # -> questions/<set>.jsonl, 3822 rows
+python benchmark/math/build_audio.py /data/math_audio         # -> meta.json + audios/<id>.wav
+```
+
+`build_audio.py --limit 100` builds only the first 100 items, a quick subset laid out and noised exactly as
+those items are in the full build; `--dry-run` prints the item counts and voice assignment without a GPU, and
+an interrupted build resumes. Each question is spoken with a voice from the raw `voice-donations/` recordings of
+`kyutai/tts-voices`, chosen by a hash of the item id, and written as 24 kHz stereo with 0.35 s of lead silence,
+the speech on the left channel and low-level noise on the right (the HaluEvalAudio layout); the docstring of
+`build_audio.py` gives the full recipe.
 
 ## 4. Judges and metrics (`rag/score.py`, copied from moshi-rag `evaluate`)
 
