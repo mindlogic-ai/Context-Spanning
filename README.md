@@ -16,7 +16,7 @@
     <a href="https://mindlogic.ai">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="assets/figures/mindlogic_logo_white.png">
-        <img width="170" alt="Mindlogic" src="assets/figures/mindlogic_logo.png">
+        <img width="170" alt="Mindlogic" src="assets/figures/mindlogic_logo_blue.png">
       </picture>
     </a>
   </p>
