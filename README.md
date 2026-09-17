@@ -13,7 +13,12 @@
     <b>Seonghyeon Go</b> &nbsp;•&nbsp; <b>Yongwoo Kim</b> &nbsp;•&nbsp; <b>Hyeonjin Cha</b> &nbsp;•&nbsp; <b>Jaeho Shin</b>
   </p>
   <p>
-    <b>Mindlogic</b>
+    <a href="https://mindlogic.ai">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="assets/figures/mindlogic_logo_white.png">
+        <img width="170" alt="Mindlogic" src="assets/figures/mindlogic_logo.png">
+      </picture>
+    </a>
   </p>
 
   <br>
