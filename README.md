@@ -34,9 +34,9 @@
 </p>
 
 Official PyTorch implementation of **Context Spanning**, a communication framework that lets a
-full-duplex speech model call an external LLM backend (retrieval, tool calls, memory) *while it keeps
-listening and talking*, and read the result back **as-is** as a block of text tokens in its own context
-stream. Code, the released **DuetaSpan-7B** weights, the tool bank and the benchmark harness are all here.
+full-duplex speech model call an external LLM backend (retrieval, tool calls, memory).
+
+Code, the released **DuetaSpan-7B** weights, the tool bank and the benchmark harness are all here.
 
 Keywords: full-duplex spoken dialogue, speech-to-speech models, retrieval-augmented generation, tool calling
 
@@ -60,48 +60,15 @@ and strong results on Question Answering tasks, demonstrating its potential.
 </p>
 
 A full-duplex speech model calls an external backend while it keeps listening and talking. When the
-model emits `<ret>`, the recent user audio is transcribed, the backend (a tool router over a tool bank,
-with an LLM for knowledge questions) returns one reference, and that reference is written into the
-model's context stream as a masked *Context Span* block at whatever frame it arrives. The frame clock
-never waits. Training and inference share one sequence convention (`contextspan/model/sequence_convention.py`).
+model emits `<ret>`, the recent user audio is transcribed, the backend returns reference, and that reference is written into the
+model's context stream as a masked *Context Span* block at whatever frame it arrives. 
 
-- **One primitive.** Retrieval, tools and memory all come back through the same `<sos> … <eos>` span, so
-  the model reads exact values (time, temperature, prices, distances) instead of a latent summary.
-- **No stall.** The span is prefilled in a single KV pass after the acoustic delay; the model only
-  updates its cache and keeps stepping at the 80 ms frame clock.
-- **Same convention in training and inference.** `<ret>` = 4, span open = 12, span close = 13, silence
-  in the agent audio rows and a sine placeholder in the user rows for the span frames.
-
-## Contents
-
-- [Released Weights](#released-weights)
-- [Results](#results)
-- [Install](#install)
-- [Backends](#backends)
-- [Run](#run)
-- [Training](#training)
-- [Evaluation](#evaluation)
-- [Layout](#layout)
-- [Citation](#citation)
-- [Acknowledgements](#acknowledgements)
-- [License](#license)
 
 ## Released Weights
 
-[mindlogicinc/context-spanning-7b](https://huggingface.co/mindlogicinc/context-spanning-7b) — **DuetaSpan v7, step 8000**,
-fine-tuned from [`nvidia/personaplex-7b-v1`](https://huggingface.co/nvidia/personaplex-7b-v1) on
-`manifest_v6h`: 823,659 dialogues, ~10,009 h indexed, every dialogue passed a frame-level audio QA and a
-full-text QA. Masked cross-entropy on the text row and on the audio codebooks as in PersonaPlex, with the span and
-prefix columns masked out. Sequence convention: `<ret>` = 4, Context Span open = 12, close = 13 (checkpoints
-trained before 2026-09-08 used 12 on both sides: set `CS_SPAN_CLOSE_ID=12`). Nine released voices: `f0`-`f3` (female) and `m0`-`m3` (male) from CC0 volunteer recordings, and `seonghyeon`, a team member's own voice recorded for this release.
+[mindlogicinc/context-spanning-7b](https://huggingface.co/mindlogicinc/context-spanning-7b) 
+fine-tuned from [`nvidia/personaplex-7b-v1`](https://huggingface.co/nvidia/personaplex-7b-v1)
 
-| benchmark (step 8000) | resp | ref | P(resp \| ref) | `<ret>` rate |
-|---|---|---|---|---|
-| HaluEvalAudio (120, router: Gemma-4-26B-A4B) | 0.642 | 0.725 | **0.851** | 0.925 |
-| math word problems (40) | 0.80 | 0.80 | **1.00** | 0.925 |
-| Full-Duplex-Bench v1.0 (40/task) | pause TOR 0.725 (lower is better) · interruption rating 4.43 / take-turn 0.925 / latency 1.21 s · backchannel TOR 0.65, JSD 0.73 | | | |
-
-Protocols and scorers: [`benchmark/README.md`](benchmark/README.md). All numbers are `resp`/`ref` accuracy in [0, 1], higher is better.
 
 ## Results
 
@@ -153,23 +120,7 @@ papers (Full-Duplex-Bench) and from MoshiRAG (spoken QA and math); their rows ar
 | Vanilla Moshi† | | 8.3 | | 9.8 | | 18.4 | | 9.7 | | 2.1 |
 | **Ours (Gemma 4)** | 75.0 | 50.0 | 65.0 | 55.0 | 65.0 | 55.0 | 60.0 | 25.0 | 35.0 | 30.0 |
 
-The step-8000 checkpoint on the Hub was measured again after the paper runs, on the `semi` protocol
-(120 items per set); those numbers are in [Released Weights](#released-weights) and the two must not be
-mixed. Protocols, arms and scorers: [`benchmark/README.md`](benchmark/README.md).
 
-## Install
-
-```bash
-pip install torch --index-url https://download.pytorch.org/whl/cu128
-pip install -e .
-export HF_TOKEN=<token with access to nvidia/personaplex-7b-v1 and the weights repo>
-```
-
-Everything the model needs is in this repository: `contextspan/moshi/` is the PersonaPlex fork of Kyutai's
-`moshi` package (MIT, license files alongside). Only the weights come from the Hub; `CS_BASE_DIR` /
-`CS_WEIGHTS_DIR` point at local copies instead. Voice prompts are always taken from the weights repo on the
-Hub (a pinned checkpoint snapshot may carry stale `voices/`); set `CS_VOICES_DIR` to a local `voices/` directory
-for offline use.
 
 ## Backends
 
@@ -183,24 +134,6 @@ pip install -e '.[asr-server]' vllm
 bash scripts/backends.sh start        # router on GPU 1, ASR on GPU 0; waits until both answer
 source scripts/env.sh
 ```
-
-The defaults assume two GPUs: the router alone takes ~82 GB at `ROUTER_MEM=0.85`, and the ASR (~5 GB)
-shares the other GPU with the speech model (~20 GB). On a single 96 GB GPU start it with
-`ROUTER_GPUS=0 ASR_GPU=0 ROUTER_MEM=0.6 bash scripts/backends.sh start`; the span latency figures below
-were measured on the two-GPU layout.
-
-Where the `<ret>` -> span time goes (24 HaluEval questions, wall clock, v7-class checkpoint): the question's
-final transcript 0.45 s median with the transformers ASR server (it queues behind the running partial
-transcript on the shared GPU), the router 0.27 s, frame pickup 0.04 s. The vLLM ASR server takes the same
-clip in 0.13 s, and once the model has emitted `<ret>` the utterance is closed after 0.4 s of silence
-(`CS_RET_CUT_S`) instead of the 0.72 s end-of-utterance rule, so the final transcript starts earlier. Both
-are on by default; `ASR_BACKEND=transformers CS_RET_CUT_S=0` restores the previous path.
-
-On `<ret>` the router picks ONE tool (or answers a knowledge question directly); the tool runs for real —
-time, weather, prices, web search, places and routes, SGD-seeded bookings — and its result is the span.
-The shipped bank is the 60 tools whose result is something a voice assistant says
-([`contextspan/datasets/moshicp/TOOLS.md`](contextspan/datasets/moshicp/TOOLS.md)). Servers, GPU layout,
-vLLM flags, latency knobs and the environment variables: [`docs/BACKENDS.md`](docs/BACKENDS.md).
 
 ## Run
 
@@ -228,25 +161,6 @@ python main.py train   --data-dir data/prepared --out-dir runs/ft
 MoshiRAG-sampled delays and fine-tunes with the masked cross-entropy. Data format and the v7 recipe:
 [`docs/TRAINING.md`](docs/TRAINING.md).
 
-## Evaluation
-
-`benchmark/` is the benchmark harness — MoshiRAG RAG suite, Full-Duplex-Bench v1/v1.5/v2/v3, a live-session
-benchmark — separate from the runtime and run on the same stack a user talks to. See [`benchmark/README.md`](benchmark/README.md).
-
-## Layout
-
-| path | role |
-|---|---|
-| `main.py` | entry point: `infer` / `serve` / `prepare` / `train` |
-| `contextspan/model/` | the speech model: `weights.py`, `engine.py`, `context_span_block.py`, `sequence_convention.py` |
-| `contextspan/runtime/` | the live loop: `frame_stream.py` (wav), `websocket_server.py` + `web/` (browser), `user_leveller.py`, `default_persona.py` |
-| `contextspan/training/` | `prepare.py`, `finetune.py` |
-| `contextspan/duetaspan/` | the backend runtime: tool router, tool bank + MCP servers, LLM-RAG, Context DB, ASR client and server |
-| `contextspan/datasets/` | the shipped tool bank, its SQLite world and geo index |
-| `contextspan/moshi/` | vendored PersonaPlex fork of `moshi` (third-party) |
-| `benchmark/` | benchmark harness |
-| `scripts/` | `backends.sh`, `env.sh`, `prefill_timing.py` |
-| `docs/` | `BACKENDS.md`, `PROTOCOL.md`, `TRAINING.md`, `LAYOUT.md` (rename map from the previous layout) |
 
 ## Citation
 
@@ -261,20 +175,11 @@ benchmark — separate from the runtime and run on the same stack a user talks t
 }
 ```
 
-## Acknowledgements
-
-The speech model is fine-tuned from [PersonaPlex-7B](https://huggingface.co/nvidia/personaplex-7b-v1)
-(NVIDIA), which builds on [Moshi](https://github.com/kyutai-labs/moshi) and the Mimi codec (Kyutai). The
-retrieval pipeline, the data generation pipeline and the RAG-suite protocol follow
-[MoshiRAG](https://arxiv.org/abs/2604.12928). Full-Duplex-Bench v1/v3 and their scorers are the
-benchmark authors' own. `contextspan/moshi/` is the PersonaPlex fork of Kyutai's `moshi` package (MIT).
 
 ## License
 
 Code: MIT — see `LICENSE`. `contextspan/moshi/` carries its own license files. The released weights are
 fine-tuned from `nvidia/personaplex-7b-v1` and are distributed under the
 [NVIDIA Open Model License](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/),
-the license of the PersonaPlex weights. (PersonaPlex itself was initialised from `kyutai/moshiko-pytorch-bf16`,
-whose weights are CC-BY-4.0; that attribution is carried, it is not the license of this model.) The voice
-prompts are built from CC0 voice recordings ([Kyutai Unmute Voice Donation](https://huggingface.co/kyutai/tts-voices), volunteers
+The voice prompts are built from CC0 voice recordings ([Kyutai Unmute Voice Donation](https://huggingface.co/kyutai/tts-voices), volunteers
 who released their voice under CC0). See the [model card](https://huggingface.co/mindlogicinc/context-spanning-7b).
