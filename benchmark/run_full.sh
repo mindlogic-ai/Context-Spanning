@@ -4,8 +4,8 @@
 #
 #   CHECKPOINT=/path/keep_step8000.pt DATA=/data OUT=runs/full bash benchmark/run_full.sh
 #
-# DATA holds halueval_audio/, math_audio/, openaudiobench/eval_datas/, full_duplex_bench/ (the benchmark
-# clone with v1_v1.5/ and v3/, plus v3_data/fdb_v3_data_released). The models are the protocol's and are not
+# DATA holds halueval_audio/, math_audio/ (built by benchmark/math/, README.md section 3), openaudiobench/eval_datas/,
+# full_duplex_bench/ (the benchmark clone with v1_v1.5/ and v3/, plus v3_data/fdb_v3_data_released). The models are the protocol's and are not
 # arguments (ASR_MODEL may point at a local copy of Qwen/Qwen3-ASR-1.7B). OPENAI_API_KEY for the
 # OpenAudioBench judge, the FDB interruption judge and the v3 evaluators.
 # GPU layout (README.md section 5): GPU_ROUTER_A GPU_ROUTER_B GPU_JUDGE GPU_LANE_B; lane A shares GPU_ROUTER_A.
