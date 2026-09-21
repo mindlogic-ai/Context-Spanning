@@ -1,7 +1,8 @@
-"""The per-connection prefix (voice codes, persona text) read into the stream in one forward (#38).
+"""The per-connection prefix (voice codes, persona text) read into the stream in one forward.
 
-`Engine.set_persona` used to force the prefix through `lm_gen.step` one column at a time: ~100 voice
-frames + ~70 persona tokens + separators = ~180 steps of ~30 ms, 5.5 s before the page could listen.
+Forcing the prefix through `lm_gen.step` one column at a time costs ~100 voice frames + ~70 persona
+tokens + separators = ~180 steps of ~30 ms, ~5.5 s before the page can listen; one batched forward
+takes ~0.1 s.
 Every prefix column is fully forced (text row, agent audio rows, user audio rows), so a step does
 nothing but write the column into the cache ring and advance the backbone KV by one position; the
 depformer and the samplers are no-ops on it. The bookkeeping is kept exactly as `step` does it - the

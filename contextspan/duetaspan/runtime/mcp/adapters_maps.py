@@ -1,20 +1,19 @@
 """Real map tools over keyless open services.
 
-The bank carries 32 map names because it merged two vendors: Google Maps
-(``maps_geocode``) and Amap (``map_geocode``, ``maps_regeocode``). Both want API
-keys we do not have, and both are thin wrappers over the same handful of
-operations. So there are ~13 real implementations here, backed by open services
-that need no key, and the bank's names are aliased onto them.
+The bank carries 19 map names because it merged two vendors' tool sets: Google Maps
+(``maps_search_places``) and Amap (``map_search_places``, ``maps_around_search``).
+Both want API keys, and both are thin wrappers over the same handful of
+operations. So there are a few real implementations here, backed by open services
+that need no key, and the bank's names are aliased onto them (see ``TOOLS``).
 
-  geocode / reverse / search / details  -> OpenStreetMap Nominatim
-  directions / distance matrix          -> OSRM public router
-  elevation                             -> Open-Elevation
+  place search / details                -> OpenStreetMap Nominatim + Overpass, local index
+  directions / distance matrix          -> OSRM (FOSSGIS public routers)
+  transit directions                    -> Transitous (public MOTIS instance)
   weather                               -> open-meteo
-  ip location                           -> ipapi.co
+  Korean addresses (optional key)       -> Kakao Local
 
-``map_road_traffic`` and ``maps_direction_transit_integrated`` have no keyless
-source and are deliberately absent; the registry reports them unsupported rather
-than inventing a congestion level or a bus timetable.
+``map_road_traffic`` has no keyless source and is deliberately absent; the registry
+reports it unsupported rather than inventing a congestion level.
 
 Nominatim's usage policy requires an identifying User-Agent and at most one
 request per second — both are enforced here.
@@ -26,7 +25,6 @@ import os
 import re
 import threading
 import time
-import urllib.parse
 from typing import Any
 
 import requests
@@ -36,17 +34,15 @@ from contextspan.duetaspan.runtime.mcp import cache, geo_index
 _UA = {"User-Agent": "DuetaSpan-MCP/1.0 (research)"}
 
 # Every one of these hosts is in Europe. A fresh TCP+TLS handshake per call costs about
-# 800 ms of the ~1030 ms an open-meteo request takes from here; on a reused connection the
+# 800 ms of the ~1030 ms a cold open-meteo request takes; on a reused connection the
 # same request is 239 ms. The server is long-lived, so keep the connections.
 _http = requests.Session()
 _http.headers.update(_UA)
 _NOMINATIM = "https://nominatim.openstreetmap.org"
-_ELEV = "https://api.open-elevation.com/api/v1/lookup"
 _METEO = "https://api.open-meteo.com/v1/forecast"
-_IPAPI = "https://ipapi.co/json/"
-# overpass.kumi.systems used to sit here as a fallback. It is unreachable from this
-# network — every call read-timed out at 60 s — so it turned each failover on the primary
-# into a minute of waiting for nothing. A fallback that cannot answer is not a fallback.
+# One endpoint, no fallback mirror: a mirror that is unreachable from some networks
+# read-times out at 60 s and turns each failover on the primary into a minute of waiting
+# for nothing. A fallback that cannot answer is not a fallback.
 _OVERPASS = ("https://overpass-api.de/api/interpreter",)
 _TRANSITOUS = "https://api.transitous.org/api/v1/plan"
 
@@ -61,8 +57,7 @@ def warm_connections(block: float = 0.0) -> None:
     """Open the TLS connections now so the first real question does not pay for them.
 
     The handshake is ~800 ms of a ~1050 ms first request; every later request on the same
-    connection is ~240 ms. Open-Elevation is worse — its first call took 9.7 s and its
-    second 226 ms, which is what made `maps_elevation` look like a broken tool.
+    connection is ~240 ms.
 
     `block` waits that many seconds for the handshakes to land. A server should wait, since
     startup happens before anyone asks anything; a test importing the module should not.
@@ -75,24 +70,22 @@ def warm_connections(block: float = 0.0) -> None:
             pass
 
     # A real GET, not a HEAD. Several of these hosts answer HEAD with 405 and
-    # `Connection: close`, which tears down the connection the warm-up just opened —
-    # `maps_elevation` still paid 3.3 s after a "successful" HEAD warm-up.
+    # `Connection: close`, which tears down the connection the warm-up just opened, so the
+    # first real call still pays the handshake after a "successful" HEAD warm-up.
     #
     # One entry per distinct host: FOSSGIS serves each routing profile from its own path
     # but a single host, and the pool is keyed by host.
     probes: list[tuple[str, dict | None]] = [
         (_NOMINATIM + "/status.php", None),
         (_METEO, {"latitude": 37.5, "longitude": 127.0, "current": "temperature_2m"}),
-        (_ELEV, {"locations": "37.5,127.0"}),
-        (_IPAPI, None),
         (f"{_FOSSGIS}/routed-car/route/v1/driving/126.98,37.56;126.99,37.57",
          {"overview": "false"}),
-        # Transitous wants a real plan to hold the connection open: warming its root left
+        # Transitous wants a real plan to hold the connection open: warming its root leaves
         # the first journey at 693 ms, warming a plan leaves it at 498 ms.
         (_TRANSITOUS, {"fromPlace": "37.50448,127.04904",
                        "toPlace": "37.51025,127.04386", "time": _now_utc()}),
     ]
-    # Kakao is the first geocoder now, so its cold handshake (~525 ms) is on the critical
+    # Kakao is the first geocoder, so its cold handshake (~525 ms) is on the critical
     # path. Warm it too. No auth header — a 401 still completes the TLS handshake that the
     # first real, authenticated call would otherwise pay for.
     if _KAKAO_KEY:
@@ -161,7 +154,6 @@ _ROUTERS = {
     "walking": (f"{_FOSSGIS}/routed-foot", "foot"),
     "bicycling": (f"{_FOSSGIS}/routed-bike", "bike"),
 }
-_PROFILE = {mode: profile for mode, (_host, profile) in _ROUTERS.items()}
 
 # Soft geocoding bias: the user lives in South Korea (lon,lat,lon,lat corners).
 _HOME_VIEWBOX = os.environ.get("MOSHICP_MCP_VIEWBOX", "124.5,33.0,131.0,38.7")
@@ -243,26 +235,6 @@ def _place(address: str) -> dict:
     return _places(address, limit=1)[0]
 
 
-# ----- implementations --------------------------------------------------------
-def geocode(address: str = "", **_: Any) -> str:
-    hit = _place(address)
-    return f"{hit['display_name']}, lat {float(hit['lat']):.5f}, lon {float(hit['lon']):.5f}"
-
-
-def reverse_geocode(latitude: float = None, longitude: float = None,
-                    location: str = "", **_: Any) -> str:
-    if location and latitude is None:          # amap passes "lon,lat"
-        lon, _, lat = location.partition(",")
-        latitude, longitude = float(lat), float(lon)
-    if latitude is None or longitude is None:
-        raise MapError("reverse geocode needs latitude and longitude")
-    hit = _get(_NOMINATIM + "/reverse",
-               {"lat": latitude, "lon": longitude, "format": "jsonv2"}, throttle=True)
-    if "display_name" not in hit:
-        raise MapError("no address at those coordinates")
-    return hit["display_name"]
-
-
 def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Great-circle metres. Good enough to rank POIs inside one neighbourhood."""
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
@@ -303,8 +275,7 @@ def _overpass_raw(query: str, attempts: int = 3, timeout: int = 12) -> list[dict
                     time.sleep(wait)
                 _overpass_last[0] = time.monotonic()
             try:
-                # 12 s by default, not 60. The old fallback endpoint was unreachable
-                # from some networks, so every failover paid a minute for nothing.
+                # 12 s by default, not 60: an unreachable endpoint must not cost a minute.
                 # Callers whose query carries a longer server-side [timeout:N] must
                 # raise this too, or the client hangs up before the server answers.
                 resp = _http.post(endpoint, data={"data": query},
@@ -655,10 +626,9 @@ def transit_directions(origin: str = "", destination: str = "", start: str = "",
                        **_: Any) -> str:
     """Public-transit routing over Transitous, a keyless public MOTIS instance.
 
-    I called this impossible because OSRM has no transit profile. That was true and
-    beside the point: OSRM is not the only router. Transitous aggregates published
-    GTFS feeds, Seoul's among them, and answers 선릉역 -> 선정릉역 with the bus that
-    actually runs it. No key, no self-hosted OpenTripPlanner.
+    OSRM has no transit profile, but it is not the only router. Transitous aggregates
+    published GTFS feeds, Seoul's among them, and answers 선릉역 -> 선정릉역 with the bus
+    that actually runs it. No key, no self-hosted OpenTripPlanner.
     """
     if not origin or not destination:
         raise MapError("transit directions need an origin and a destination")
@@ -697,8 +667,8 @@ def attractions(location: str = "", **_: Any) -> str:
 
 
 # ---- SGD read tools, answered from real OSM data rather than a seeded catalog --------
-# The world's rows for these came from SGD's US catalog and from seed_korea.py: invented
-# names at invented prices. OpenStreetMap has the real restaurants, hotels and salons, and
+# The world's rows for these come from SGD's US catalog: invented names at invented
+# prices. OpenStreetMap has the real restaurants, hotels and salons, and
 # the local index carries them nationwide — no seeding, no key.
 #
 # Only the *reads* move. Reserving a table still records into the world, because doing
@@ -848,20 +818,6 @@ def distance_matrix(origins: Any = None, destinations: Any = None,
     return "; ".join(rows)
 
 
-def elevation(locations: Any = None, **_: Any) -> str:
-    points = []
-    for item in _as_list(locations):
-        if isinstance(item, dict):
-            points.append((item["latitude"], item["longitude"]))
-        else:
-            lat, _, lon = str(item).partition(",")
-            points.append((float(lat), float(lon)))
-    if not points:
-        raise MapError("elevation needs locations")
-    payload = _get(_ELEV, {"locations": "|".join(f"{a},{b}" for a, b in points)})
-    return "; ".join(f"{r['elevation']} m" for r in payload["results"])
-
-
 _DAILY = "temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max"
 
 
@@ -905,40 +861,6 @@ def weather(city: str = "", location: str = "", date: str = "", end_date: str = 
 weather_on = weather
 
 
-def ip_location(**_: Any) -> str:
-    payload = _get(_IPAPI)
-    if payload.get("error"):
-        raise MapError(payload.get("reason", "ip lookup failed"))
-    return (f"{payload['city']}, {payload['region']}, {payload['country_name']}, "
-            f"lat {payload['latitude']}, lon {payload['longitude']}")
-
-
-def _uri(scheme: str, **params: Any) -> str:
-    """Amap's schema_* tools return a deep link, not data — build it exactly."""
-    query = urllib.parse.urlencode({k: v for k, v in params.items() if v})
-    return f"androidamap://{scheme}?{query}"
-
-
-def navi(destination: str = "", **_: Any) -> str:
-    hit = _place(destination)
-    return _uri("navi", lat=hit["lat"], lon=hit["lon"], style=2)
-
-
-def take_taxi(destination: str = "", **_: Any) -> str:
-    hit = _place(destination)
-    return _uri("openFeature", featureName="OnRideNavi",
-                dlat=hit["lat"], dlon=hit["lon"], dname=destination)
-
-
-def mark(location: str = "", name: str = "", **_: Any) -> str:
-    hit = _place(location or name)
-    return _uri("viewMap", poiname=name or location, lat=hit["lat"], lon=hit["lon"])
-
-
-def personal_map(**_: Any) -> str:
-    return _uri("myMap")
-
-
 def _as_list(value: Any) -> list:
     if value is None:
         return []
@@ -949,9 +871,6 @@ def _as_list(value: Any) -> list:
 
 # ----- bank names -> implementations ------------------------------------------
 TOOLS: dict[str, Any] = {
-    "maps_geocode": geocode, "map_geocode": geocode, "maps_geo": geocode,
-    "maps_reverse_geocode": reverse_geocode, "map_reverse_geocode": reverse_geocode,
-    "maps_regeocode": reverse_geocode,
     "maps_search_places": search_places, "map_search_places": search_places,
     "maps_text_search": search_places, "maps_around_search": search_places,
     "maps_place_details": place_details, "map_place_details": place_details,
@@ -962,10 +881,6 @@ TOOLS: dict[str, Any] = {
     "maps_direction_bicycling": lambda **kw: directions(**dict(kw, mode="bicycling")),
     "maps_distance_matrix": distance_matrix, "map_directions_matrix": distance_matrix,
     "maps_distance": distance_matrix,
-    "maps_elevation": elevation,
     "map_weather": weather, "maps_weather": weather,
-    "map_ip_location": ip_location, "maps_ip_location": ip_location,
-    "maps_schema_navi": navi, "maps_schema_take_taxi": take_taxi,
-    "map_mark": mark, "maps_schema_personal_map": personal_map,
     "maps_direction_transit_integrated": transit_directions,
 }

@@ -1,9 +1,9 @@
-"""Real MCP client + LLM tool-router for MoshiCP.
+"""Real MCP client + LLM tool-router for the Context Spanning runtime.
 
 Spawns the four local FastMCP servers (stdio), discovers their tools, keeps the
 connections alive on a dedicated background event-loop thread, and exposes a
-synchronous ``mcp_route(query, ctx)`` that uses ollama function-calling to pick
-and execute the single most appropriate MCP tool.
+synchronous ``mcp_route(query, ctx)`` that asks an OpenAI-compatible chat model to
+pick the single most appropriate tool (JSON reply) and executes it.
 
 Public API:
     router = get_mcp_router()               # lazy singleton
@@ -14,8 +14,8 @@ A successful result is::
     {"reference": <spoken one-line str>, "tool": <name>,
      "server": <server name>, "args": <dict>}
 
-``None`` means no MCP tool applied (or it errored), so the caller falls back to
-its own LLM-RAG path.
+A direct answer (general knowledge / abstain) comes back as ``{"answer": <str>, "tool": None, ...}``.
+``None`` means no MCP tool applied (or it errored); the caller then injects nothing.
 """
 from __future__ import annotations
 
@@ -51,15 +51,13 @@ _SERVER_FILES = {
     "websearch": "websearch_server.py",
 }
 
-_LLM_URL = os.environ.get("MCP_ROUTER_LLM_URL", "http://localhost:11434")
-_LLM_MODEL = os.environ.get("MCP_ROUTER_LLM_MODEL", "llama3.2:3b")
-# "openai" -> route via an OpenAI-compatible /v1/chat/completions server (e.g. vLLM) using a
-# prompt-embedded catalog + JSON reply, because vLLM without --tool-call-parser rejects the
-# native tools API. Default stays ollama /api/chat.
-_LLM_API = os.environ.get("MCP_ROUTER_LLM_API", "ollama").lower()
+# The router LLM: any OpenAI-compatible /v1/chat/completions server (e.g. vLLM). The catalog is embedded
+# in the prompt and the reply is JSON, because vLLM without --tool-call-parser rejects the native tools API.
+_LLM_URL = os.environ.get("MCP_ROUTER_LLM_URL", "http://localhost:8004")
+_LLM_MODEL = os.environ.get("MCP_ROUTER_LLM_MODEL", "google/gemma-4-26B-A4B-it")
 # Decode is the router's cost (~38 ms/token on a 27B model): bound the reply and the wait, and ask
-# the server for a JSON object so no preamble is generated (ContextSpanning #12). The reply
-# contract is unchanged: {"name","arguments"} or {"answer"}.
+# the server for a JSON object so no preamble is generated. The reply contract is
+# {"name","arguments"} or {"answer"}.
 _MAX_TOKENS = int(os.environ.get("MCP_ROUTER_MAX_TOKENS", "120"))
 _TIMEOUT_S = float(os.environ.get("MCP_ROUTER_TIMEOUT_S", "8"))
 _JSON_MODE = os.environ.get("MCP_ROUTER_JSON_MODE", "1") not in ("0", "false", "off")
@@ -76,9 +74,8 @@ def _post_chat(payload, headers, timeout):
 
 
 # ── English-only speech model: tool results are anglicized before they become a span ──────────
-# DuetaSpan working tree (2026-08-27; adopted here 2026-09-07 with the owner's explicit approval as
-# the one change to the vendored runtime): Hangul/CJK inside a span is tokenized into byte pieces the
-# speech model never saw, and the model then invents or avoids the names (ContextSpanning #11).
+# Hangul/CJK inside a span is tokenized into byte pieces the speech model never saw, and the model
+# then invents or avoids the names.
 _NONLATIN_RE = re.compile(r"[\u1100-\u11ff\u3130-\u318f\uac00-\ud7af\u3040-\u30ff\u4e00-\u9fff]")
 
 
@@ -93,7 +90,7 @@ def anglicize_reference(text: str) -> str:
     if not text or not _NONLATIN_RE.search(text):
         return text
     payload = {"model": _LLM_MODEL, "temperature": 0.0,
-               "max_tokens": int(os.environ.get("MCP_ROUTER_MAX_TOKENS", "120")),
+               "max_tokens": _MAX_TOKENS,
                "messages": [
                    {"role": "system", "content":
                     "Rewrite the given tool result as ONE plain English line for a voice assistant to read aloud. "
@@ -114,16 +111,14 @@ def anglicize_reference(text: str) -> str:
         out = "(tool result) " + out
     return out
 # gpt-5.x / o-series (e.g. gpt-5.6-luna) reject max_tokens + temperature!=1 and need a bearer key.
-import re as _re
 _rz = os.environ.get("MCP_ROUTER_LLM_REASONING", "").strip().lower()
 if _rz in ("1", "true", "on"):
     _LLM_REASONING = True
 elif _rz in ("0", "false", "off"):
     _LLM_REASONING = False
 else:
-    _LLM_REASONING = bool(_re.search(r"(gpt-5|luna|\bo[1-9])", _LLM_MODEL, _re.I))
-_LLM_KEY = (os.environ.get("MCP_ROUTER_LLM_KEY") or os.environ.get("API_BACKEND_KEY")
-            or os.environ.get("OPENAI_API_KEY"))
+    _LLM_REASONING = bool(re.search(r"(gpt-5|luna|\bo[1-9])", _LLM_MODEL, re.I))
+_LLM_KEY = os.environ.get("MCP_ROUTER_LLM_KEY") or os.environ.get("OPENAI_API_KEY")
 
 _SYSTEM_PROMPT = (
     "You are a tool-routing controller for a voice assistant. "
@@ -133,13 +128,13 @@ _SYSTEM_PROMPT = (
     "Only call get_time for current time/date, get_weather for current weather, "
     "and get_stock_price for live stock or crypto prices. "
     # Live values must never be answered directly. Clock/temperature/price are values the model
-    # cannot know, so prose answers are fabrications (observed: weather restated with no tool).
+    # cannot know, so prose answers are fabrications (e.g. weather restated with no tool).
     "The current time, the current weather, and a live price are values you CANNOT know: "
     "never state them from your own knowledge and never restate them from earlier text. "
     "If such a request is unanswered, you MUST call its tool — answering directly is forbidden. "
-    # (2026-08-25 incident: the model fabricated weather before the span arrived -> the router
-    # read it as 'already answered' and abstained from get_weather -> self-reinforcing loop where
-    # the fabrication kills the corrective tool call)
+    # The model can fabricate weather before the span arrives; the router then reads it as
+    # 'already answered' and abstains from get_weather, so the fabrication kills the corrective
+    # tool call (a self-reinforcing loop).
     "IGNORE any time/weather/price statement inside ASSISTANT_ALREADY_SAID unless the history "
     "shows the tool call that produced it — with no tool result behind it, that statement is a "
     "HALLUCINATION and the request is still UNANSWERED. For time/weather/price requests, calling "
@@ -151,14 +146,13 @@ _SYSTEM_PROMPT = (
     "or chit-chat) -- for those, call NO tool and instead ANSWER DIRECTLY with one "
     "concise factual spoken sentence (this answer is used verbatim, so make it "
     "complete and correct; resolve pronouns from any provided context). "
-    # 2026-08-25 (observed failure: in 40s of running speech the whole cumulative transcript came
-    # in and routing picked the FIRST question (get_time) instead of the last one -> the time was
-    # injected for a stock question). Even when the utterance-level window collapses and several
-    # questions arrive together, the rule states the routing target is always the single most
-    # recent UNANSWERED question (owner: "even if the whole cumulative transcript comes in, it
-    # must still be able to answer the most recent question").
-    # (2026-08-25 owner design) Location/timezone arguments are filled by the router from the
-    # profile, not by a code fallback.
+    # In long running speech the whole cumulative transcript can arrive at once; without this rule
+    # routing picks the FIRST question (e.g. get_time) instead of the last one, and the time is
+    # injected for a stock question. Even when the utterance-level window collapses and several
+    # questions arrive together, the routing target is always the single most recent UNANSWERED
+    # question.
+    # Location/timezone arguments are filled by the router from the profile; _inject_ctx only
+    # covers the ones it leaves empty.
     "The conversation context may include the user's PROFILE (home city, timezone). "
     "When a tool needs a location or timezone argument and the user did not name one, fill it "
     "from the profile yourself (profile says Seoul + 'how's the weather?' -> city='Seoul'; "
@@ -183,7 +177,6 @@ _SYSTEM_PROMPT = (
     "those are done — route the newest request that has NOT been answered yet, and "
     "never re-route an already-answered one. "
     # What the agent already SAID counts as answered too — absent from history (the tool ledger), present in speech.
-    # What the agent already SAID counts as answered too — absent from history (the tool ledger), present in speech.
     "An ASSISTANT_ALREADY_SAID block, when present, is the assistant's own spoken answer so "
     "far. Any request it already answers is DONE — never route that one again. Then look at "
     "ASR_TRANSCRIPT for the requests it does NOT yet answer, take the LAST such request, and "
@@ -192,7 +185,7 @@ _SYSTEM_PROMPT = (
     "request in the transcript is already answered. A greeting, a filler, or a sentence that "
     "has not yet stated the fact does NOT count as an answer. "
     # Scope limit: a reply covers only the single LAST unanswered request. No restating.
-    # Observed (2026-08-03): besides the tool call, the router produced a direct answer bundling
+    # Without it the router produces, besides the tool call, a direct answer bundling
     # already-answered facts ("It is 11:32 AM ... and the weather is 32°C..."). Fed in as a span,
     # the model gets the same fact twice and either repeats it or wavers over which one to say.
     "SCOPE — whatever you return covers EXACTLY ONE request: the LAST one that is still "
@@ -219,15 +212,15 @@ _SYSTEM_PROMPT = (
     "'scratch that', 'not X, Y'), ONLY the latest corrected intent and values are "
     "valid — the pre-correction tool choice and argument values are void; never use "
     "them. "
-    # Block near-duplicate re-issues (fix for 16 r4 precision failures): no repackaged call for the same request.
+    # Block near-duplicate re-issues: no repackaged call for the same request.
     "A repeat of an ALREADY-MADE call whose arguments differ only in formatting, "
     "spelling, or a superseded pre-correction value is still a repeat — FORBIDDEN. "
     "Call the same tool again only for a genuinely NEW request or the user's FINAL "
     "corrected values not yet executed."
-    # (2026-08-03) A rule "no tool if the request is incomplete" was added and then reverted: the
-    # 26B router escaped into direct answers (hallucinated 'ABC12' / transcript parroting) instead
-    # of a tool call even after the ID was complete (probe: calls=[] 2/2). Premature-duplicate
-    # calls are caught by router model quality (31B is the bench standard), not by the prompt.
+    # There is deliberately no rule "no tool if the request is incomplete": with it a 26B router
+    # escapes into direct answers (a hallucinated id / transcript parroting) instead of a tool call
+    # even after the ID is complete. Premature-duplicate calls are left to router model quality,
+    # not to the prompt.
 )
 
 
@@ -255,36 +248,9 @@ def _with_history(query: str, history, convo: Optional[str] = None) -> str:
 _NULLISH = {"", "null", "none", "<null>", "<none>", "unknown", "n/a", "na", "<unknown>"}
 
 
-# Phrases that signal the user explicitly wants a live web lookup. web_search
-# is gated to these so ordinary general-knowledge questions fall back to the
-# caller's LLM-RAG path instead of being answered from the open web.
-_SEARCH_INTENT = (
-    "search",
-    "look up",
-    "lookup",
-    "google",
-    "browse the web",
-    "on the web",
-    "on the internet",
-    "latest news",
-    "find online",
-    "look it up",
-    "검색",
-    "찾아봐",
-    "찾아 줘",
-    "찾아줘",
-    "알아봐",
-)
-
-
-def _has_search_intent(query: str) -> bool:
-    q = query.lower()
-    return any(phrase in q for phrase in _SEARCH_INTENT)
-
-
 # Per-tool intent gates — a small router model over-calls tools (e.g. picks get_weather for
 # "capital of France"). A tool only fires when the query actually expresses that intent; otherwise
-# the turn falls back to the caller's LLM-RAG path.
+# no tool is called.
 _WEATHER_INTENT = {"weather", "temperature", "forecast", "rain", "raining", "sunny", "cloudy",
                    "hot", "cold", "humid", "wind", "windy", "degrees", "climate", "snow", "snowing",
                    "날씨", "기온", "기상", "습도", "더워", "추워", "덥", "춥", "맑", "흐리"}
@@ -298,12 +264,10 @@ _STOCK_INTENT = {"stock", "stocks", "share", "shares", "price", "priced", "tradi
 def _has_intent(query: str, words: set) -> bool:
     """Latin words match as tokens (typo-tolerant), Korean gate words by containment.
 
-    2026-08-25 (ported from the router_speed experiment): the old exact-match matcher let ASR
-    typos ('tmie') slip past the gate, so hard gating could not be enabled. Adding difflib ratio
-    >= 0.78 fuzzy matching gives typo tolerance — the precondition for restoring the hard gate."""
-    import re as _re
+    An exact-match matcher lets ASR typos ('tmie') miss the gate words, and a hard gate then kills
+    correct routing. difflib ratio >= 0.78 fuzzy matching gives the typo tolerance the hard gate needs."""
     import difflib as _dl
-    toks = set(_re.findall(r"[a-z']+", query.lower()))
+    toks = set(re.findall(r"[a-z']+", query.lower()))
     if toks & words:
         return True
     lat = [w for w in words if not any("가" <= c <= "힣" for c in w)]
@@ -320,10 +284,8 @@ _TOOL_INTENT_GATE = {
     "get_stock_price": _STOCK_INTENT,
 }
 
-# ── Structural removal of wrong tool calls (2026-08-25 owner: "get rid of wrong tool calls
-# entirely" — production port of router_speed's _canonical/_post_guard/safe-abstain) ───────────
-_TXN_RE = __import__("re").compile(
-    r"buy|reserve|book|pay|order|transfer|schedule|cancel|delete", __import__("re").IGNORECASE)
+# ── Structural removal of wrong tool calls: deterministic name recovery + booking-verb guard ──
+_TXN_RE = re.compile(r"buy|reserve|book|pay|order|transfer|schedule|cancel|delete", re.IGNORECASE)
 # Explicit verb evidence that licenses a booking/payment tool (judged by fuzzy _has_intent)
 _TXN_VERBS = {"book", "reserve", "reservation", "buy", "purchase", "order", "pay", "send",
               "transfer", "schedule", "cancel", "delete", "tickets", "예약", "예매", "끊어",
@@ -331,7 +293,7 @@ _TXN_VERBS = {"book", "reserve", "reservation", "buy", "purchase", "order", "pay
 
 
 def _canonical_name(bank: dict, name: str):
-    """Deterministic recovery of a tool name the LLM mangled (ported _canonical, no LLM involved).
+    """Deterministic recovery of a tool name the LLM mangled (no LLM involved).
     exact → case/underscore-insensitive → sole candidate in the same domain → difflib(0.6).
     Guard: a search-intent name (no _TXN match) is never recovered into a booking/payment tool."""
     import difflib as _dl
@@ -364,8 +326,8 @@ def _canonical_name(bank: dict, name: str):
 def _coerce_types(args: dict[str, Any], schema: dict[str, Any]) -> dict[str, Any]:
     """Deterministically coerce argument values to the schema-declared types (post-processing, the
     model is never touched). number/integer/boolean the LLM stringified as "1500"/"true" go back to
-    their declared type — r4: 3 grading failures from type mismatch alone (housing_03/08/24). The
-    values themselves are never changed."""
+    their declared type; a type mismatch alone fails an otherwise correct call. The values
+    themselves are never changed."""
     props = (schema or {}).get("properties") or {}
     out: dict[str, Any] = {}
     for k, v in args.items():
@@ -386,9 +348,9 @@ def _coerce_types(args: dict[str, Any], schema: dict[str, Any]) -> dict[str, Any
                     # Any field -> natural JSON type: "1500"→1500, "true"→true, else keep str.
                     if s.lower() in ("true", "false"):
                         v = s.lower() == "true"
-                    elif _re.fullmatch(r"-?\d+", s):
+                    elif re.fullmatch(r"-?\d+", s):
                         v = int(s)
-                    elif _re.fullmatch(r"-?\d+\.\d+", s):
+                    elif re.fullmatch(r"-?\d+\.\d+", s):
                         v = float(s)
             except Exception:
                 pass
@@ -421,11 +383,9 @@ class MCPRouter:
         self._stack: Optional[AsyncExitStack] = None
         # tool name -> {"session": ClientSession, "server": str, "schema": dict}
         self._tools: dict[str, dict[str, Any]] = {}
-        self._ready = threading.Event()
 
         # build connections synchronously (blocks until all servers attempted)
         self._submit(self._async_setup()).result()
-        self._ready.set()
 
     # ----- background event loop plumbing -------------------------------------
     def _run_loop(self) -> None:
@@ -439,7 +399,7 @@ class MCPRouter:
     # ----- async setup: spawn + connect + discover ----------------------------
     async def _async_setup(self) -> None:
         self._stack = AsyncExitStack()
-        # RUN-SCOPED isolation (FDB-v3 etc.): when a toolpack is mounted with
+        # RUN-SCOPED isolation: when a toolpack is mounted with
         # MOSHICP_TOOLPACK_ONLY=1 the router's tool universe is EXACTLY the pack
         # (no live MCP servers, no registry bank) so a benchmark sees the same
         # tool set its official agent does — a clean, faithful baseline.
@@ -483,10 +443,9 @@ class MCPRouter:
                 )
             except Exception as exc:
                 logger.warning("MCP server '%s' failed to start: %s", server_name, exc)
-        # ── registry tool-bank merge (2026-07-27): expose SGD actions (stateful simulation) and
-        # other support tools in the router catalog — connects the bench (cases100/FDB-v3) tool
-        # universe to its backend. Schemas are slimmed (prompt budget: gemma len 4096) — name,
-        # short description and types only.
+        # ── registry tool-bank merge: expose SGD actions (stateful simulation) and other support
+        # tools in the router catalog. Schemas are slimmed (prompt budget: a 4096-token router
+        # context) — name, short description and types only.
         try:
             if toolpack_only:
                 raise _SkipMerge()
@@ -523,8 +482,8 @@ class MCPRouter:
         except Exception as exc:
             logger.warning("registry merge failed: %s", exc)
 
-        # ── run-scoped toolpack merge (MOSHICP_EXTRA_TOOLPACK): expose the bench's (FDB-v3)
-        # official tools in the router catalog for this run only. The pack module exports
+        # ── run-scoped toolpack merge (MOSHICP_EXTRA_TOOLPACK): expose a benchmark's official
+        # tools in the router catalog for this run only. The pack module exports
         #   TOOLS = {name: {"description":.., "parameters": <json schema>, "fn": callable}}
         # (+ optional DOMAIN). Same contract as the registry merge (argschema/domain/domain-first
         # two-stage) but dispatch calls the pack's fn directly. On a name clash the pack wins
@@ -602,32 +561,6 @@ class MCPRouter:
         return [entry["schema"] for entry in self._tools.values()]
 
     @staticmethod
-    def _llm_pick_ollama(query: str, tools: list[dict[str, Any]],
-                         history: Optional[list[str]] = None) -> Optional[dict[str, Any]]:
-        query = _with_history(query, history)
-        payload = {
-            "model": _LLM_MODEL,
-            "stream": False,
-            "messages": [
-                {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": query},
-            ],
-            "tools": tools,
-            "options": {"temperature": 0.0},
-            "keep_alive": -1,        # pin the model resident — never unload while idle (avoids cold starts)
-        }
-        try:
-            resp = requests.post(f"{_LLM_URL}/api/chat", json=payload, timeout=30)
-            data = resp.json()
-        except Exception as exc:
-            logger.warning("MCP router LLM call failed: %s", exc)
-            return None
-        calls = (data.get("message") or {}).get("tool_calls") or []
-        if not calls:
-            return None
-        return calls[0].get("function") or {}
-
-    @staticmethod
     def _llm_pick_openai(query: str, tools: list[dict[str, Any]],
                          history: Optional[list[str]] = None,
                          convo: Optional[str] = None,
@@ -658,12 +591,6 @@ class MCPRouter:
             payload["temperature"] = 0.0
             payload["max_tokens"] = _MAX_TOKENS
         headers = {"Authorization": "Bearer " + _LLM_KEY} if _LLM_KEY else None
-        # With MCP_ROUTER_DEBUG=1, print the user message exactly as it entered the router.
-        # (The 124-tool catalog is too long to include — the system rules are fixed in code.)
-        if os.environ.get("MCP_ROUTER_DEBUG") == "1":
-            _ts = _time.strftime("%H:%M:%S") + f".{int(_time.time() % 1 * 1000):03d}"
-            print(f"\n[{_ts}] [router-in stage={stage}] ─────────────────────────\n{query}\n"
-                  f"[/router-in]", flush=True)
         _t0 = _time.time()
         try:
             resp = _post_chat(payload, headers, _TIMEOUT_S)
@@ -672,13 +599,9 @@ class MCPRouter:
             logger.warning("MCP router LLM call failed: %s", exc)
             return None
         finally:
-            # Measured router latency (wall-time per call) — to verify the +20% budget vs r4.
+            # Measured router latency (wall-time per call).
             print(f"[{_time.strftime('%H:%M:%S')}] [router-llm] stage={stage} "
                   f"dt={_time.time() - _t0:.2f}s", flush=True)
-        if os.environ.get("MCP_ROUTER_DEBUG") == "1":
-            _ts = _time.strftime("%H:%M:%S") + f".{int(_time.time() % 1 * 1000):03d}"
-            print(f"[{_ts}] [router-out stage={stage}] dt={_time.time()-_t0:.2f}s "
-                  f"{content.strip()[:300]!r}", flush=True)
         text = content.strip()
         if text.startswith("```"):
             text = text.strip("`\n")
@@ -690,15 +613,15 @@ class MCPRouter:
         try:
             picked = json.loads(text[text.index("{"): text.rindex("}") + 1])
         except Exception:
-            # Not JSON = the model answered in prose — keep it as a direct answer (dropping it = 2 RAG calls).
+            # Not JSON = the model answered in prose — keep it as a direct answer instead of dropping it.
             return {"answer": text} if len(text) > 2 else None
         if not isinstance(picked, dict):
             return None
         if picked.get("answer"):                      # single-call direct answer (general knowledge/abstain)
             return {"answer": str(picked["answer"]).strip()}
         # The contract key is "name", but the router model writes the same call as {"tool": ...},
-        # {"call": ...} or {"function": ...} often enough to matter (full v7 8000 bench 2026-09-15:
-        # 48 of the WebQuestions + TriviaQA no-info spans were well-formed calls under another key).
+        # {"call": ...} or {"function": ...} often enough to matter: on a WebQuestions + TriviaQA
+        # run, 48 no-info spans were well-formed calls under another key.
         for alias in ("tool", "call", "function", "tool_name"):
             if not picked.get("name") and isinstance(picked.get(alias), str):
                 picked["name"] = picked.pop(alias)
@@ -720,11 +643,10 @@ class MCPRouter:
         tools = self._tool_schemas()
         if not tools:
             return None
-        # ── Catch prompt length up front (2026-08-25 owner: "the router has to be fast, so an
-        # over-long prompt must be caught in advance too"): when the utterance-level window
-        # collapses the whole cumulative transcript comes in, routing slows down and is pulled to
-        # the first question. Over the cap, log a WARN (window-collapse signal — trigger a VAD/AGC
-        # check) and keep only the tail. Consistent with the 'last question' rule.
+        # ── Catch prompt length up front: when the utterance-level window collapses the whole
+        # cumulative transcript comes in, routing slows down and is pulled to the first question.
+        # Over the cap, log a WARN (window-collapse signal — trigger a VAD/AGC check) and keep only
+        # the tail. Consistent with the 'last question' rule.
         self._last_convo = convo or ""     # for hallucinated-city checks (profile-sourced args are legit)
         _qcap = int(os.environ.get("MOSHICP_ROUTER_QUERY_CAP", "480") or 480)
         if len(query) > _qcap:
@@ -733,70 +655,66 @@ class MCPRouter:
             query = query[-_qcap:]
         if aux and len(aux) > _qcap:
             aux = aux[-_qcap:]
-        # aux = the agent's own inner monologue (= the answer it already said aloud). The old label
-        # "Context (earlier conversation)" did not name the source, so the router could not read it
-        # as 'already answered' — observed: it picked get_time again from the same transcript after
-        # the agent had already said the time (2026-08-03). Naming the source and its implication
-        # makes it move on to the unanswered request. The label states FACTS only: adding
-        # instructions here ("do not route it again" etc.) made the router reply conversationally,
-        # emitting 'call:get_weather{...}' as text instead of JSON. All rules belong to
-        # _SYSTEM_PROMPT; the user message carries labelled material only.
+        # aux = the agent's own inner monologue (= the answer it already said aloud). A generic label
+        # such as "Context (earlier conversation)" does not name the source, so the router cannot
+        # read it as 'already answered' and picks get_time again from the same transcript after the
+        # agent has already said the time. Naming the source and its implication makes it move on to
+        # the unanswered request. The label states FACTS only: instructions here ("do not route it
+        # again" etc.) make the router reply conversationally, emitting 'call:get_weather{...}' as
+        # text instead of JSON. All rules belong to _SYSTEM_PROMPT; the user message carries
+        # labelled material only.
         msg = (f"ASSISTANT_ALREADY_SAID (the assistant's own spoken answer so far):\n{aux}"
                f"\n\nASR_TRANSCRIPT:\n{query}") if aux else query
-        if _LLM_API == "openai":
-            # Domain-first two-stage (when the registry merge pushes the catalog over budget):
-            # stage0 = live tools individually + registry as domain groups → stage1 = that domain's tools+schemas.
-            regs = {n: e for n, e in self._tools.items()
-                    if e.get("server") in ("registry", "toolpack")}
-            if regs:
-                live = [e["schema"] for n, e in self._tools.items()
-                        if e.get("server") not in ("registry", "toolpack")]
-                doms: dict[str, list[str]] = {}
-                dom_desc: dict[str, str] = {}
-                for n, e in regs.items():
-                    d = e.get("domain") or "misc"
-                    doms.setdefault(d, []).append(n)
-                    if e.get("domain_desc") and d not in dom_desc:
-                        dom_desc[d] = str(e["domain_desc"])
-                stage0 = live + [
-                    {"type": "function",
-                     "function": {"name": f"domain::{d}",
-                                  "description": ((dom_desc[d] + " — tools: ") if d in dom_desc
-                                                  else "tool group: ")
-                                                 + ", ".join(sorted(ns)[:12]),
-                                  "parameters": {"type": "object", "properties": {}}}}
-                    for d, ns in sorted(doms.items())]
-                fn = self._llm_pick_openai(msg, stage0, history, convo, stage="stage0")
-                if isinstance(fn, dict) and str(fn.get("name", "")).startswith("domain::"):
-                    d = str(fn["name"])[8:]
-                    sub = [{"type": "function",
-                            "function": {"name": n,
-                                         "description": (self._tools[n]["schema"]["function"]
-                                                         .get("description") or ""),
-                                         "parameters": (self._tools[n].get("argschema")
-                                                        or {"type": "object", "properties": {}})}}
-                           for n in doms.get(d, [])]
-                    fn = self._llm_pick_openai(msg, sub, history, convo,
-                                               stage="stage1") if sub else None
-            else:
-                fn = self._llm_pick_openai(msg, tools, history, convo, stage="flat")
+        # Domain-first two-stage (when the registry merge pushes the catalog over budget):
+        # stage0 = live tools individually + registry as domain groups → stage1 = that domain's tools+schemas.
+        regs = {n: e for n, e in self._tools.items()
+                if e.get("server") in ("registry", "toolpack")}
+        if regs:
+            live = [e["schema"] for n, e in self._tools.items()
+                    if e.get("server") not in ("registry", "toolpack")]
+            doms: dict[str, list[str]] = {}
+            dom_desc: dict[str, str] = {}
+            for n, e in regs.items():
+                d = e.get("domain") or "misc"
+                doms.setdefault(d, []).append(n)
+                if e.get("domain_desc") and d not in dom_desc:
+                    dom_desc[d] = str(e["domain_desc"])
+            stage0 = live + [
+                {"type": "function",
+                 "function": {"name": f"domain::{d}",
+                              "description": ((dom_desc[d] + " — tools: ") if d in dom_desc
+                                              else "tool group: ")
+                                             + ", ".join(sorted(ns)[:12]),
+                              "parameters": {"type": "object", "properties": {}}}}
+                for d, ns in sorted(doms.items())]
+            fn = self._llm_pick_openai(msg, stage0, history, convo, stage="stage0")
+            if isinstance(fn, dict) and str(fn.get("name", "")).startswith("domain::"):
+                d = str(fn["name"])[8:]
+                sub = [{"type": "function",
+                        "function": {"name": n,
+                                     "description": (self._tools[n]["schema"]["function"]
+                                                     .get("description") or ""),
+                                     "parameters": (self._tools[n].get("argschema")
+                                                    or {"type": "object", "properties": {}})}}
+                       for n in doms.get(d, [])]
+                fn = self._llm_pick_openai(msg, sub, history, convo,
+                                           stage="stage1") if sub else None
         else:
-            fn = self._llm_pick_ollama(msg, tools, history)
+            fn = self._llm_pick_openai(msg, tools, history, convo, stage="flat")
         if isinstance(fn, dict) and fn.get("answer"):
             return {"answer": fn["answer"]}
         if fn is None:
             return None
         name = fn.get("name")
         if name not in self._tools:
-            # Deterministic name recovery (ported _canonical) — unrecoverable means a safe no-tool
+            # Deterministic name recovery — unrecoverable means a safe no-tool
             name = _canonical_name(self._tools, name)
             if name is None:
                 return None
-        # ── SEARCH vs BOOK enforced in code (ported safe-abstain): a booking/payment tool is
-        # allowed only with explicit booking-verb evidence in the utterance. Without it, demote to
-        # the domain's sole search tool, and if there is none, no-tool — this structurally turns a
-        # 'confidently wrong call' into an abstain (heavy-noise: a wrong tool call is far more
-        # harmful than abstaining — NOISE_ROBUSTNESS.md).
+        # ── SEARCH vs BOOK enforced in code: a booking/payment tool is allowed only with explicit
+        # booking-verb evidence in the utterance. Without it, demote to the domain's sole search
+        # tool, and if there is none, no-tool — this structurally turns a 'confidently wrong call'
+        # into an abstain (under heavy noise a wrong tool call is far more harmful than abstaining).
         if _TXN_RE.search(name) and not _has_intent(query, _TXN_VERBS):
             parts = name.split("_")
             dom = f"{parts[0]}_{parts[1]}_" if len(parts) >= 3 and parts[1].isdigit() else None
@@ -808,21 +726,12 @@ class MCPRouter:
             else:
                 logger.info("txn-guard: %s vetoed (no booking verb) -> no-tool", name)
                 return None
-        # per-tool intent gate — origin: a hard block from when llama3.2:3b over-called get_weather
-        # for "capital of France". With the single-call design (direct answer/abstain available) and
-        # an a4b-class router the tool choice is deliberate, so a hard gate kills correct routing
-        # whenever an ASR typo ("tmie") misses the keywords. Default SOFT (warn only);
-        # MCP_ROUTER_HARD_GATES=1 restores it.
+        # per-tool intent gate (hard): a live tool fires only when the utterance carries its intent
+        # words. The matcher is fuzzy, so an ASR typo ("tmie") does not veto correct routing.
         gate = _TOOL_INTENT_GATE.get(name)
         if gate is not None and not _has_intent(query, gate):
-            # 2026-08-25: now the matcher is fuzzy (typo-tolerant), the reason for backing off to
-            # soft ('tmie'-type typos killing correct routing) is gone → default HARD restored
-            # (owner: "get rid of wrong tool calls entirely"). Only MCP_ROUTER_SOFT_GATES=1 brings
-            # back the old soft behaviour.
-            if not os.environ.get("MCP_ROUTER_SOFT_GATES"):
-                logger.info("intent-gate veto (hard): %s for %r -> no-tool", name, query[:60])
-                return None
-            logger.info("intent-gate miss (soft): %s for %r — trusting router", name, query[:60])
+            logger.info("intent-gate veto: %s for %r -> no-tool", name, query[:60])
+            return None
         args = fn.get("arguments") or {}
         if isinstance(args, str):
             import json
@@ -834,12 +743,9 @@ class MCPRouter:
         if not isinstance(args, dict):
             args = {}
         args = _clean_args(args)
-        # (2026-08-25 owner design: "no fallback, no extra implementation — give the router LLM the
-        # information and let it make the tool call") — this used to delete any city absent from the
-        # query, wiping even arguments the LLM had correctly filled from the profile, and
-        # _inject_ctx then deterministically re-injected them. Profile arg filling is the LLM's job
-        # now: only a city found neither in the query nor in the conversation context (profile
-        # included) counts as a hallucination and is dropped.
+        # The router LLM may fill the city from the profile, so a city absent from the query is not
+        # by itself a hallucination: only a city found neither in the query nor in the conversation
+        # context (profile included) is dropped.
         if name == "get_weather":
             city = str(args.get("city") or "")
             if city and city.lower() not in query.lower() \
@@ -906,12 +812,6 @@ class MCPRouter:
         else:
             payload.update({"temperature": 0.0, "max_tokens": _MAX_TOKENS})
         headers = {"Authorization": "Bearer " + _LLM_KEY} if _LLM_KEY else None
-        # With MCP_ROUTER_DEBUG=1, print the user message exactly as it entered the router.
-        # (The 124-tool catalog is too long to include — the system rules are fixed in code.)
-        if os.environ.get("MCP_ROUTER_DEBUG") == "1":
-            _ts = _time.strftime("%H:%M:%S") + f".{int(_time.time() % 1 * 1000):03d}"
-            print(f"\n[{_ts}] [router-in stage=fill] ─────────────────────────\n{query}\n"
-                  f"[/router-in]", flush=True)
         _t0 = _time.time()
         try:
             resp = _post_chat(payload, headers, _TIMEOUT_S)
@@ -959,7 +859,7 @@ class MCPRouter:
         if selection is None:
             return None
         if isinstance(selection, dict) and selection.get("answer"):
-            # Single-call direct answer: the router answers general knowledge/abstain itself — no extra RAG call.
+            # Single-call direct answer: the router answers general knowledge/abstain itself — no extra LLM call.
             return {"answer": selection["answer"], "tool": None, "server": None, "args": {}}
         name, args = selection
         entry = self._tools.get(name, {})
@@ -968,9 +868,9 @@ class MCPRouter:
                 args = self._llm_fill_args(name, query, history, convo)  # stage 2: generate args
             # ── final required-args guard right before dispatch ────────────────
             # A missing required arg means a backend TypeError → 'the call itself is lost' (not
-            # recorded even when the pick was correct; r2: add_to_cart quantity). Validate → retry
-            # fill once → otherwise a sensible per-type default. Being recorded always beats dying
-            # on empty args.
+            # recorded even when the pick was correct; e.g. add_to_cart without quantity). Validate →
+            # retry fill once → otherwise a sensible per-type default. Being recorded always beats
+            # dying on empty args.
             sch = entry.get("argschema") or {}
             req = sch.get("required") or []
             missing = [k for k in req if k not in args]
@@ -988,8 +888,8 @@ class MCPRouter:
             # Schema type coercion (post-processing): "1500"→1500, "true"→true — type only, value unchanged.
             args = _coerce_types(args, sch)
         # Profile arguments for the live tools without a second LLM call: a `get_time` with no timezone or a
-        # `get_weather` with no place takes the user's profile value (ContextSpanning #12: the argument
-        # round trip cost as much as the pick). Values the router did give are never overwritten.
+        # `get_weather` with no place takes the user's profile value (an argument round trip costs as
+        # much as the pick). Values the router did give are never overwritten.
         args = self._inject_ctx(name, args, ctx)
 
         try:
@@ -1012,14 +912,6 @@ class MCPRouter:
     def list_tools(self) -> dict[str, str]:
         """Return {tool_name: server_name} for diagnostics."""
         return {n: e["server"] for n, e in self._tools.items()}
-
-    def close(self) -> None:
-        try:
-            if self._stack is not None:
-                self._submit(self._stack.aclose()).result(timeout=10)
-        except Exception:
-            pass
-        self._loop.call_soon_threadsafe(self._loop.stop)
 
 
 # ----- module-level singleton -------------------------------------------------

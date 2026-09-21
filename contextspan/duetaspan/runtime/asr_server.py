@@ -2,7 +2,7 @@
 """Qwen3-ASR HTTP server (:8990) — the endpoint contextspan.duetaspan.align.asr.ASR prefers.
 
 Runs Qwen3-ASR-1.7B via the transformers backend (no vLLM engine, ~4GB) so it can share
-GPU2 with the gemma router/RAG server. POST /transcribe with a wav file (multipart `file`
+a GPU with the router LLM server. POST /transcribe with a wav file (multipart `file`
 field, as asr.py sends, or a raw wav body) -> {"text": ...}. GET /health -> ok.
 
 Launch: CUDA_VISIBLE_DEVICES=<gpu> python -m contextspan.duetaspan.runtime.asr_server
@@ -19,9 +19,9 @@ import torch
 from contextspan.duetaspan.common import paths
 MODEL_DIR = os.environ.get("QWEN_ASR_DIR", f"{paths.MODELS}/Qwen3-ASR-1.7B")
 PORT = int(os.environ.get("ASR_PORT", "8990"))
-# No context/hotword bias is accepted or applied (user decree, 2026-08-25): a biased
-# transcript invents the words it was primed with, which is exactly the failure this
-# endpoint exists to measure. `language` is the only conditioning left.
+# No context/hotword bias is accepted or applied: a biased transcript invents the words
+# it was primed with, which is exactly the failure this endpoint exists to measure.
+# `language` is the only conditioning.
 
 print(f"[asr_server] loading {MODEL_DIR} (transformers backend, bf16)", flush=True)
 from qwen_asr import Qwen3ASRModel  # noqa: E402  (heavy import after banner)
@@ -29,8 +29,8 @@ MODEL = Qwen3ASRModel.from_pretrained(MODEL_DIR, dtype=torch.bfloat16, device_ma
 print(f"[asr_server] ready on :{PORT}", flush=True)
 
 # Qwen3-ASR wants a language *name* ("Korean"), and the client passes MOSHICP_ASR_LANGUAGE
-# through untouched, so the natural setting "ko" was rejected on every request and the
-# client turned that into an empty transcript with no error in the runtime log.
+# through untouched, so without this mapping the natural setting "ko" is rejected on every
+# request and the client turns that into an empty transcript with no error in the runtime log.
 _LANG_NAMES = {"zh": "Chinese", "en": "English", "yue": "Cantonese", "ar": "Arabic", "de": "German",
                "fr": "French", "es": "Spanish", "pt": "Portuguese", "id": "Indonesian",
                "it": "Italian", "ko": "Korean", "ru": "Russian", "th": "Thai", "vi": "Vietnamese",

@@ -22,6 +22,9 @@ a third of the turn) marks where the lead-in ends; the span must have arrived by
 delay is sampled between `<ret>` and that frame. `prepare` encodes both channels with Mimi (12.5 Hz, 8
 codebooks each), writes the text row from the word times, and saves one `.npz` per dialogue.
 
+A complete pair to try it on is in `assets/example/`:
+`python main.py prepare --in-dir assets/example --out-dir data/prepared`.
+
 ## What `train` does
 
 Every step draws `--accum` dialogues (`contextspan/training/finetune.py`):
@@ -44,6 +47,6 @@ Checkpoints are written every `--ckpt-every` steps as `{"model": state_dict}` an
 Fine-tuned from `nvidia/personaplex-7b-v1` on `manifest_v6h` — 823,659 dialogues, ~10,009 h indexed —
 with this sequence convention. Every dialogue in the manifest passed a frame-level audio QA (alignment,
 levels, silence) and a full-text QA that removed fabricated lookups without `<ret>`. Persona prefixes
-carry the user's name and city in the phrasing `persona_text` produces (#33). The convention, the
+carry the user's name and city in the phrasing `persona_text` produces. The convention, the
 placeholders and the delay sampler in this repository are the ones the corpus was written with, so a
 checkpoint produced by `main.py train` on new data is directly comparable.

@@ -7,26 +7,21 @@ the agent rows, SINE on the user rows) and are masked out of the loss. Everythin
 how such a sequence is laid out lives here, so the assembler that writes the training data and
 the engine that reads a span at inference cannot drift apart.
 """
-import os
 import random
 
 import torch
 
 TEXT_PAD = 3          # zero_text_code between words
 RET_TOKEN_ID = 4      # `<ret>`: MoshiRAG rag_token_id (spm '<0x00>')
-# Span delimiters. Checkpoints trained since 2026-09-08 (the released v7 weights included) close the
-# block with a distinct token so the frame after the block carries an unambiguous "context ended,
-# speak" signal: open = 12 (spm '<0x08>'), close = 13 (spm '<0x09>'). Older checkpoints used 12 on
-# both sides; run those with CS_SPAN_CLOSE_ID=12. Training (moshicp) reads the same convention.
+# Span delimiters. The block closes with a distinct token so the frame after it carries an unambiguous
+# "context ended, speak" signal: open = 12 (spm '<0x08>'), close = 13 (spm '<0x09>').
 SPAN_OPEN_ID = 12
-SPAN_CLOSE_ID = int(os.environ.get("CS_SPAN_CLOSE_ID", "13"))
-SPAN_TOKEN_ID = SPAN_OPEN_ID   # legacy alias for the opening delimiter; never use it for pairing
+SPAN_CLOSE_ID = 13
 N_AUDIO_CB = 8        # 8 agent + 8 user codebooks -> 17 rows with ch0
 SINE_TOKENS = [430, 1268, 381, 1611, 1095, 1495, 56, 472]         # user audio on prefix/span frames
 SILENCE_TOKENS = [948, 243, 1178, 546, 1736, 1030, 1978, 2008]    # agent audio on prefix/span frames
 RAG_DELAY = {"start_delay": 1.0, "end_gap": 1.0, "random_sampling_proba": 0.2}  # MoshiRAG Eq.3
 FRAME_RATE = 12.5
-REF_DROPOUT = 0.0
 
 
 def persona_prompt(text: str) -> str:
@@ -40,7 +35,7 @@ def persona_text(persona: str, user: dict | None = None) -> str:
 
     Dialogues where the agent addresses the user by name carry
     `<system> {persona} The user's name is {name}. The user is in {city}. <system>`; a prefix that
-    names nobody teaches the model to invent a name (#33). `user` uses the ContextProfile keys.
+    names nobody teaches the model to invent a name. `user` uses the ContextProfile keys.
     """
     t = (persona or "").strip()
     user = user or {}
@@ -110,7 +105,7 @@ def persona_prefix(system_prompt: str, voice_codes, spm):
     return torch.cat(parts, 1) if parts else torch.zeros(1 + 2 * N_AUDIO_CB, 0, dtype=torch.long)
 
 
-def assemble_training_sequence(codes, audio_mask, spans, spm, rng=None, ref_dropout=REF_DROPOUT):
+def assemble_training_sequence(codes, audio_mask, spans, spm):
     """Splice Context Span blocks into clean codes at their inject frames.
 
     codes [17, T] (ch0 text, agent, user), audio_mask [T] bool, spans = [{inject_frame, reference}].
@@ -118,14 +113,12 @@ def assemble_training_sequence(codes, audio_mask, spans, spm, rng=None, ref_drop
     (text_mask=False) and carry SILENCE/SINE audio; the acoustic codebooks of frame f-1 MOVE to the
     block's last column so the model reads real audio exactly once around the block.
     """
-    rng = rng or random.Random()
     codes = codes.to(torch.int64).clone()
     tmask = torch.ones(codes.shape[1], dtype=torch.bool)
     amask = audio_mask.clone()
     ag, us = torch.tensor(SILENCE_TOKENS), torch.tensor(SINE_TOKENS)
     for s in sorted(spans, key=lambda x: x["inject_frame"], reverse=True):
-        ref = "" if (ref_dropout > 0 and rng.random() < ref_dropout) else s.get("reference", "")
-        ids = context_span_ids(ref, spm)
+        ids = context_span_ids(s.get("reference", ""), spm)
         n, f = len(ids), max(0, min(int(s["inject_frame"]), codes.shape[1] - 1))
         block = torch.cat([torch.tensor(ids)[None], ag[:, None].repeat(1, n), us[:, None].repeat(1, n)], 0)
         if f > 0:

@@ -19,7 +19,7 @@ Binary frames are float32 PCM at the sample rate given in `ready`, one frame (`f
 persona followed by ` The user's name is {name}.` and ` The user is in {location}.` (each only when
 set, in that order, nothing else added). This is the exact phrasing of the training corpus, whose
 dialogues with a named user carry `<system> {persona} The user's name is Priya. The user is in Sydney. <system>`;
-a prefix that omits the name while the profile has one taught the model to invent one (#33). The `persona`
+a prefix that omits the name while the profile has one taught the model to invent one. The `persona`
 in `ready` is the persona alone, without these sentences.
 
 ## Server → client

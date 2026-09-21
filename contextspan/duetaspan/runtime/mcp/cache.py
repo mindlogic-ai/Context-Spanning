@@ -6,15 +6,15 @@ usage policy is one request per second, and Overpass hands out query slots and a
 A voice turn cannot afford that twice, and `directions` pays it twice: once per endpoint.
 
 Almost nothing these endpoints return actually changes. Seolleung Station's coordinates are the
-same today as last year; so is the road geometry between two points, and the elevation
-of a mountain. The answer is to ask once. On a hit the caller skips the sleep *and* the
+same today as last year; so is the road geometry between two points. The answer is to
+ask once. On a hit the caller skips the sleep *and* the
 round trip — which is why `get` has to be consulted before the throttle, not after.
 
 What genuinely changes gets a short TTL instead of a long one:
 
-  ttl=FOREVER   geocoding, POI, routes, elevation   (OSM edits; nobody notices)
-  ttl=HOUR      weather, web search
-  ttl=5*MINUTE  transit plans
+  ttl=FOREVER   geocoding, POI, routes   (OSM edits; nobody notices)
+  ttl=HOUR      weather forecasts, web search
+  ttl=MINUTE    transit plans
 
 Values are JSON. A cached ``null`` would be indistinguishable from a miss, so `put`
 refuses to store one.
@@ -42,7 +42,6 @@ FOREVER = 30 * DAY
 
 _lock = threading.Lock()
 _conn: sqlite3.Connection | None = None
-_stats = {"hit": 0, "miss": 0}
 
 
 def _db() -> sqlite3.Connection:
@@ -66,9 +65,7 @@ def get(k: str) -> Any | None:
     with _lock:
         row = _db().execute("SELECT v, expires FROM http WHERE k = ?", (k,)).fetchone()
     if row is None or row[1] < time.time():
-        _stats["miss"] += 1
         return None
-    _stats["hit"] += 1
     return json.loads(row[0])
 
 
@@ -81,10 +78,6 @@ def put(k: str, value: Any, ttl: float) -> None:
             (k, json.dumps(value, ensure_ascii=False), time.time() + ttl),
         )
         _db().commit()
-
-
-def stats() -> dict[str, int]:
-    return dict(_stats)
 
 
 if __name__ == "__main__":
@@ -103,4 +96,4 @@ if __name__ == "__main__":
     assert get(expired) is None, "an expired row must read as a miss"
     put(key("none"), None, FOREVER)
     assert get(key("none")) is None, "null must not be storable"
-    print("cache ok", stats())
+    print("cache ok")

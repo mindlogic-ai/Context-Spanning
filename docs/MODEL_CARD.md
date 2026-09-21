@@ -7,7 +7,6 @@ pipeline_tag: audio-to-audio
 language:
   - en
 library_name: contextspan
-# TODO(jaeho): thumbnail: <absolute URL of assets/figures/architecture.png once the repo is public>
 tags:
   - full-duplex
   - spoken-dialogue
@@ -29,7 +28,6 @@ tags:
 > [mindlogic-ai/ContextSpanning](https://github.com/mindlogic-ai/ContextSpanning); the weights load only
 > through that package.
 
-<!-- TODO(seonghyeon): replace XXXX.XXXXX with the arXiv id -->
 [![arXiv](https://img.shields.io/badge/arXiv-XXXX.XXXXX-b31b1b.svg)](https://arxiv.org/abs/XXXX.XXXXX) [![Code](https://img.shields.io/badge/GitHub-ContextSpanning-181717?logo=github)](https://github.com/mindlogic-ai/ContextSpanning) [![Base Model](https://img.shields.io/badge/base-PersonaPlex--7B-76b900)](https://huggingface.co/nvidia/personaplex-7b-v1) [![Weights License](https://img.shields.io/badge/weights-NVIDIA%20Open%20Model%20License-76b900)](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/) [![Code License](https://img.shields.io/badge/code-MIT-blue.svg)](https://github.com/mindlogic-ai/ContextSpanning/blob/main/LICENSE)
 
 A full-duplex speech model that keeps listening and talking while it calls an external backend. When the
@@ -73,7 +71,7 @@ vendored in the code repository (`contextspan/moshi/`).
 - Parameters: 7B
 - Audio codec: Mimi, 12.5 Hz, 8 codebooks per channel (user and agent)
 - Frame clock: 80 ms per step
-- Sequence convention: `<ret>` = 4, span open = 12, span close = 13 (`CS_SPAN_CLOSE_ID`; checkpoints trained before 2026-09-08 used 12 on both sides), text pad = 3
+- Sequence convention: `<ret>` = 4, span open = 12, span close = 13, text pad = 3
 - Training data: `manifest_v6h` — 823,659 dialogues, ~10,009 h indexed; every dialogue passed a frame-level audio QA and a full-text QA
 - Training objective: masked cross-entropy on the text row and on the audio codebooks as in PersonaPlex, with the span and prefix columns masked out
 - Optimisation: 8-bit AdamW, context 3,000 frames, lr 2e-6 (temporal transformer) / 4e-6 (depth transformer), 32 dialogues per update, 4× NVIDIA RTX Pro 6000
@@ -86,7 +84,6 @@ vendored in the code repository (`contextspan/moshi/`).
 Numbers as reported in the paper (Tables 1 and 2). Rows marked † are reprinted from the original benchmark papers
 (Full-Duplex-Bench) or from MoshiRAG (spoken QA and math). Arrows give the direction of better.
 
-<!-- TODO(seonghyeon): confirm these are the camera-ready numbers -->
 
 <div style="max-width:960px;margin:0 auto">
 <table style="width:100%;border-collapse:collapse;font-size:13px">
@@ -197,11 +194,8 @@ the ASR. Servers, GPU layout, vLLM flags and environment variables:
   project (volunteers who released their voice under CC0; no attribution or consent condition attaches).
 - **Code:** [mindlogic-ai/ContextSpanning](https://github.com/mindlogic-ai/ContextSpanning) is MIT; the
   vendored `contextspan/moshi/` carries Kyutai's own license files.
-<!-- TODO(seonghyeon): decide gated: true / extra_gated_prompt before the repo goes public -->
 
 ## Citation
-
-<!-- TODO(seonghyeon): fill in the arXiv id / venue once known -->
 
 ```bibtex
 @article{go2026contextspanning,

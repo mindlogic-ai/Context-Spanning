@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * ours_adapter.js (Role A/B) — DuetaSpan/moshicp examinee adapter for FDB-v2.
+ * ours_adapter.js (Role A/B) — Context Spanning examinee adapter for FDB-v2.
  *
  * Bridges orchestrator (WebRTC 48 kHz PCM16, 10 ms sink events) <->
- * moshicp live_server WS (raw Float32 mono 24 kHz, engine consumes 1920-sample
+ * `python main.py serve` WS (raw Float32 mono 24 kHz, engine consumes 1920-sample
  * frames = 80 ms @ 24 kHz).
  *
  * Mirrors adapters/moshi_adapter.js structure. Differences:
- *  - No Opus/Ogg: live_server speaks raw f32 PCM over WS (binary), JSON control (text).
+ *  - No Opus/Ogg: the server speaks raw f32 PCM over WS (binary), JSON control (text).
  *  - Handshake: send {"type":"start","persona":...}; wait for {"type":"ready"}.
  *  - Uplink pacer ships one 80 ms frame per tick, silence when the buffer is
  *    empty — the frame clock NEVER stops (server steps the engine only on
@@ -64,7 +64,7 @@ function us24kTo48k(f) {
   return out;
 }
 
-// ── OursClient: WS leg to moshicp live_server ───────────────────────────────
+// ── OursClient: WS leg to `python main.py serve` ────────────────────────────
 // Usable standalone (smoke tests) or from the adapter CLI below.
 class OursClient {
   /**

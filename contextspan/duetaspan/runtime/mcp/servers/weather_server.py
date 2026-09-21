@@ -121,10 +121,10 @@ def _open_meteo(
         if temp is None:
             return f"I could not get the current weather for {place}."
         cond = _condition(code)
-        # Surface-form parity (2026-08-03): the canonical weather form in the training spans is
+        # Surface-form parity: the canonical weather form in the training spans is
         #   "(tool result) Busan: 26.1°C, humidity 68%, wind 3.8 km/h, clear skies."  (13,856 cases)
-        # The earlier "It's N degrees Celsius and COND in CITY right now." appeared 0 times in
-        # training — we were feeding the model a sentence it had never seen. The principle is
+        # A sentence such as "It's N degrees Celsius and COND in CITY right now." appears 0 times
+        # in training — the model would be fed a sentence it has never seen. The principle is
         # training surface form == inference surface form.
         hum = cur.get("relative_humidity_2m")
         wind = cur.get("wind_speed_10m")
@@ -136,7 +136,7 @@ def _open_meteo(
         parts.append(cond)
         return "(tool result) " + ", ".join(parts) + "."
     except Exception:  # pragma: no cover - network failure path
-        return ""   # a transport failure is not something to say aloud: no span (ContextSpanning #10)
+        return ""   # a transport failure is not something to say aloud: no span
 
 
 @mcp.tool()
@@ -170,7 +170,7 @@ def get_weather(
                     r = ""
                 if r:
                     return r
-        return ""   # a transport failure is not something to say aloud: no span (ContextSpanning #10)
+        return ""   # a transport failure is not something to say aloud: no span
     finally:
         ex.shutdown(wait=False)
 

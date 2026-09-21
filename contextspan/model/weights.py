@@ -53,9 +53,8 @@ def load_voice(name_or_path="f0"):
 
     The voices are looked up on the Hub weights repo, never under CS_WEIGHTS_DIR: that
     variable points at a *checkpoint*, and a checkpoint snapshot may carry the voice files
-    that were current when it was uploaded (the VCTK f0-f2 for every checkpoint before
-    2026-09-14), so honouring it here made "f0" a different voice depending on which
-    checkpoint was loaded, with no error and no log line. CS_VOICES_DIR points at a local
+    that were current when it was uploaded, so honouring it here would make "f0" a different
+    voice depending on which checkpoint is loaded, with no error and no log line. CS_VOICES_DIR points at a local
     voices/ directory when one is wanted."""
     if os.path.exists(name_or_path):
         path = name_or_path

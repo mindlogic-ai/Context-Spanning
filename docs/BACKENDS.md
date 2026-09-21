@@ -1,29 +1,29 @@
 # Backends
 
 The backend is the DuetaSpan runtime in `contextspan/duetaspan/`: the tool router, the tool bank with its
-SQLite world and MCP tool servers, the LLM-RAG fallback for knowledge questions, the Context DB (user
-profile + conversation log the router sees) and the ASR client. On `<ret>` the router LLM picks ONE tool
-or answers directly; a tool runs for real and its result is the span; a request that needs no external
-knowledge injects nothing.
+SQLite world and MCP tool servers, the Context DB (user profile + conversation log the router sees) and
+the ASR client. On `<ret>` the router LLM is the single decider: it picks ONE tool, answers directly, or
+abstains. A tool runs for real and its result is the span; a request that needs no external knowledge
+injects nothing.
 
 ## Servers
 
 | server | default | port | GPU | started by |
 |---|---|---|---|---|
-| router LLM (also RAG fallback and eval judge) | `google/gemma-4-26B-A4B-it` on vLLM | 8004 | `ROUTER_GPUS` (1) | `scripts/backends.sh start` |
+| router LLM | `google/gemma-4-26B-A4B-it` on vLLM | 8004 | `ROUTER_GPUS` (1) | `scripts/backends.sh start` |
 | ASR | Qwen3-ASR-1.7B: `qwen-asr-serve` on vLLM (`ASR_BACKEND=vllm`, default) or `python -m contextspan.duetaspan.runtime.asr_server` (`ASR_BACKEND=transformers`) | 8990 | `ASR_GPU` (0) | `scripts/backends.sh start` |
-| RAG / judge (optional second server) | `RAG_MODEL` when set | `RAG_PORT` (8005) | `RAG_GPUS` | `scripts/backends.sh start` |
+| rewrite LLM (optional second server) | `RAG_MODEL` when set | `RAG_PORT` (8005) | `RAG_GPUS` | `scripts/backends.sh start` |
 
 ```bash
 pip install -e '.[asr-server]' vllm
 bash scripts/backends.sh start|status|stop
-source scripts/env.sh          # MCP_ROUTER_* / MOSHICP_RAG_LLM_* / MOSHICP_ASR_URL / JUDGE_LLM_*
+source scripts/env.sh          # MCP_ROUTER_LLM_* / MOSHICP_RAG_LLM_* / MOSHICP_ASR_URL / JUDGE_LLM_*
 ```
 
 Any OpenAI-compatible server replaces the router (`ROUTER_MODEL`, or the `MCP_ROUTER_LLM_*` variables
 directly; a hosted API takes `MCP_ROUTER_LLM_KEY` / `MOSHICP_RAG_LLM_KEY`). The ASR is any OpenAI audio
 API (`MOSHICP_ASR_URL` ending in `/v1/audio/transcriptions`, `MOSHICP_ASR_MODEL` = served name) or any
-`POST /transcribe -> {"text"}` endpoint. The transformers server accepts `language` as a name or a code (#27).
+`POST /transcribe -> {"text"}` endpoint. The transformers server accepts `language` as a name or a code.
 
 The two ASR servers run the same weights; they differ in speed under the runtime's load. The runtime sends a
 partial transcript every 1.6 s while the user speaks and the final one when the utterance ends, and the
@@ -34,14 +34,15 @@ on transformers). `ASR_MEM=0.12` is enough for the 1.7B model at `--max-model-le
 
 Footprint on one 96 GB GPU with everything on it: the router needs its own GPU (~82 GB at `ROUTER_MEM`
 0.85 — the A4B weights alone are 48.5 GiB and the 8192-token KV cache needs the rest; 0.58 fails to start);
-the ASR (~5 GB) and the speech model (~20 GB) share another. The router server also answers the RAG
-fallback and judges evaluations; set `RAG_MODEL` (and `RAG_GPUS`) to put those two on a separate server so
-a smaller model can take the tool pick. The acceptance test for a smaller router is FDB v3 tool-selection
-and argument accuracy (`benchmark/`), which is exactly the job it would do (#13).
+the ASR (~5 GB) and the speech model (~20 GB) share another. The same server also rewrites agent-addressed
+questions ("your latest song" -> "the latest song by <persona>") before they are routed, through the
+`MOSHICP_RAG_LLM_*` variables; set `RAG_MODEL` (and `RAG_GPUS`) to put that call on a separate server so a
+smaller model can take the tool pick. The acceptance test for a smaller router is FDB v3 tool-selection and
+argument accuracy (`benchmark/`), which is exactly the job it would do.
 
 ## Why these vLLM flags
 
-Measured on RTX PRO 6000 Blackwell, 2026-09:
+Measured on an RTX PRO 6000 Blackwell:
 
 - `--max-model-len 8192` — the router prompt carries the tool catalogue (~2.9k tokens at the first stage,
   ~3.5k for the largest tool group) plus the conversation; 4k truncates.
@@ -60,10 +61,10 @@ Measured on RTX PRO 6000 Blackwell, 2026-09:
 | `MCP_ROUTER_JSON_MODE` | 1 | the router asks the server for a JSON object; dropped automatically if the server rejects it |
 | `MCP_ROUTER_MAX_TOKENS` | 120 | router decode budget |
 | `MCP_ROUTER_TIMEOUT_S` | 8 | router call budget |
-| MCP server HTTP calls (weather, finance, web search) | 4 s | a transport failure yields no span, never a sentence about the failure (#10) |
+| MCP server HTTP calls (weather, finance, web search) | 4 s | a transport failure yields no span, never a sentence about the failure |
 | `MCP_MAPS_BUDGET_S` | unset | when set, the map adapters make one attempt with this timeout instead of their 10-20 s retries |
 | `CS_RET_DEADLINE_S` | 2.5 | a span that would land later than this after `<ret>` is dropped (`late` event): the corpus's ret-to-span delays have p99 2.3 s, and a span that arrives after the model has answered is worse than none |
-| `CS_RET_UTT_WAIT_S` | 1.0 | on `<ret>` mid-sentence, how long the question waits for the utterance to end before the fixed window is transcribed (#7) |
+| `CS_RET_UTT_WAIT_S` | 1.0 | on `<ret>` mid-sentence, how long the question waits for the utterance to end before the fixed window is transcribed |
 | `CS_USER_TARGET_LUFS` | -24.0 | loudness the user channel is levelled to (the training median); `--raw-user-audio` bypasses it |
 
 A `get_time` / `get_weather` without an explicit place takes the timezone / city from the user profile

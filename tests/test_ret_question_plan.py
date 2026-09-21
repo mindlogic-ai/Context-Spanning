@@ -1,4 +1,4 @@
-"""The question a <ret> uses: never a partial transcript (#43)."""
+"""The question a <ret> uses: never a partial transcript."""
 from contextspan.runtime.frame_stream import ret_question_plan
 
 

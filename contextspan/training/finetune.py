@@ -29,7 +29,7 @@ def sample_sequence(path, spm, rng):
         spans.append({"inject_frame": s["ret_frame"] + max(1, sample_rag_delay(d_lead, rng)),
                       "reference": s["reference"]})
     codes, tmask, amask = assemble_training_sequence(codes, torch.ones(codes.shape[1], dtype=torch.bool),
-                                                     spans, spm, rng)
+                                                     spans, spm)
     voice = load_voice(str(z["voice"])) if str(z["voice"]) else None
     prefix = persona_prefix(str(z["system_prompt"]), voice, spm)
     P = prefix.shape[1]

@@ -11,22 +11,36 @@ python -m benchmark.live.build_clips benchmark/live/cases.json <clips_dir>     #
 python -m benchmark.live.run http://localhost:8080 <clips_dir> runs/live  # one browser session per case
 ```
 
-Needs `pip install playwright && playwright install chromium`, and a `python main.py serve` to talk
-to. Sessions are sequential because the engine holds one conversation at a time.
+Needs `pip install -e '.[benchmark]' && playwright install chromium`, and a `python main.py serve` to
+talk to. Sessions are sequential because the engine holds one conversation at a time.
 
 ## What it scores
 
-| verdict | meaning |
-| --- | --- |
-| `span` | a span arrived and was injected — retrieval worked at all |
-| `late` | it arrived after `RET_DEADLINE_S` and was dropped |
-| `answer_ok` | the agent's words carry the expected fact |
-| `grounded` | both: a span arrived **and** the answer is right |
-| `invented_or_empty` | no span arrived and the answer is wrong or says nothing |
-| `span_utilisation` | of the turns where a span did arrive, how many the answer used |
+Per case (`results.json`):
 
-`span_utilisation` is the one specific to this system. Every other metric can be met by a model
-answering from its own weights; this one asks whether the Context Span reached the words.
+| field | meaning |
+| --- | --- |
+| `span` | a span arrived and was injected: retrieval worked at all |
+| `late` | it arrived after `CS_RET_DEADLINE_S` and was dropped |
+| `answer_ok` | the agent's words carry the expected fact |
+| `contradicted` | a span arrived and the agent said one of the case's `not_expect` values |
+| `retrieval_s` | seconds from `<ret>` to the span |
+
+Over the set (`summary.json`):
+
+| key | meaning |
+| --- | --- |
+| `span_rate`, `late_rate` | share of cases with a span, and with a span dropped as late |
+| `answer_accuracy` | share of cases answered correctly |
+| `grounded` | a span arrived **and** the answer is right |
+| `invented` | no span arrived, the agent spoke anyway, and the answer is wrong |
+| `contradicted_span` | the answer contradicts the span that was injected |
+| `retrieval_s_p50`, `retrieval_s_p90` | retrieval latency |
+| `by_kind` | `span_rate` and `answer_accuracy` per case kind |
+
+`grounded` and `invented` are the two specific to this system. Accuracy alone can be met by a model
+answering from its own weights; these ask whether the Context Span reached the words, and what the model
+does when no span came.
 
 The agent **speaks** its answer and the gold is **written**, so matching is on normalised words with
 spoken numerals folded to digits, then again with spaces removed — that is what makes "six fifty-one

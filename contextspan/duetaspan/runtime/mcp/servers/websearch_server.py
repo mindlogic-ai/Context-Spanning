@@ -15,8 +15,8 @@ _WIKI_SEARCH = "https://en.wikipedia.org/w/api.php"
 _NO_INFO = "(no information found)"
 _TIMEOUT_S = 2   # per request: the span deadline is 2.5 s, so a slower answer is dropped anyway (as get_weather)
 
-# Every call opened a fresh TLS connection to DuckDuckGo, and the handshake alone was
-# ~1.3 s of a 1.5 s search. One reused session answers the same query in ~130 ms.
+# A fresh TLS connection to DuckDuckGo per call makes the handshake alone ~1.3 s of a
+# 1.5 s search. One reused session answers the same query in ~130 ms.
 _http = requests.Session()
 _http.headers.update(_UA)
 
@@ -43,9 +43,9 @@ def warm_connections() -> None:
 def _ddg_answer(query: str) -> str | None:
     """DuckDuckGo's instant answer, ~120 ms. None when it has none, or is rate-limiting.
 
-    A burst of queries earns HTTP 202 with a non-JSON body, and the old bare `except`
-    read that as "no answer" — so the tool silently degraded to a slower source and never
-    said why. Narrow the catch: a network failure or a malformed body, nothing else.
+    A burst of queries earns HTTP 202 with a non-JSON body. The catch is kept narrow — a
+    network failure or a malformed body, nothing else — so no other error is silently read
+    as "no answer".
     """
     try:
         data = _http.get(
@@ -71,7 +71,7 @@ def _wiki_summary(query: str) -> str | None:
     """The lead sentence of the best-matching article, in one request.
 
     `generator=search` feeds the search hit straight into `prop=extracts`, so the title
-    never makes a round trip back to this process. Two calls were 572 ms; this is 492 ms.
+    never makes a round trip back to this process. Two calls take 572 ms; this takes 492 ms.
     """
     try:
         page = _http.get(
@@ -124,12 +124,12 @@ def web_search(query: str) -> str:
     """
     if not query:
         return _NO_INFO
-    # Ask both at once and return as soon as either has an answer. Waiting for both meant a
-    # provider that cannot be reached (DuckDuckGo's TCP connect hangs from some hosts, #39)
-    # held back the answer the other one already had until its own timeout: measured 4.06 s
-    # for a Wikipedia sentence that was in hand at 0.62 s, i.e. past the span deadline, so the
-    # turn ended as "(no information found)". DuckDuckGo's instant answer is still preferred
-    # when both arrive together.
+    # Ask both at once and return as soon as either has an answer. Waiting for both means a
+    # provider that cannot be reached (DuckDuckGo's TCP connect hangs from some hosts) holds
+    # back the answer the other one already has until its own timeout: measured 4.06 s for a
+    # Wikipedia sentence that was in hand at 0.62 s, i.e. past the span deadline, so the turn
+    # ends as "(no information found)". DuckDuckGo's instant answer is preferred when both
+    # arrive together.
     pool = ThreadPoolExecutor(max_workers=2)
     futs = {pool.submit(_ddg_answer, query): 0, pool.submit(_wiki_summary, query): 1}
     try:
@@ -144,9 +144,8 @@ def web_search(query: str) -> str:
                 except Exception:
                     answer = None
                 if answer:
-                    # DuckDuckGo's instant answer is cut to its first sentence as before; the Wikipedia
-                    # lead is returned whole, as it was on the serial path (a span is the source text,
-                    # never a summary of it).
+                    # DuckDuckGo's instant answer is cut to its first sentence here; the Wikipedia
+                    # lead was already cut to its first sentence by _wiki_summary.
                     return _one_sentence(answer) if futs[fut] == 0 else answer
         return _NO_INFO
     finally:

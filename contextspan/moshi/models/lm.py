@@ -39,7 +39,6 @@ import sys
 from typing import Optional, Union, List, Tuple, Callable, Iterator
 import sphn
 import torch
-from tqdm.auto import tqdm
 
 from ..utils.sampling import sample_token
 from ..utils.compile import CUDAGraphed
@@ -445,7 +444,6 @@ class LMModel(StreamingContainer):
         return self.forward_embeddings(self.embed_codes(sequence))
     
     def forward_embeddings(self, input: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        # print("EMBED:", input[0, 0, :10].float().cpu().tolist()) # DEBUG
         transformer_out = self.transformer(input)
         if self.out_norm:
             transformer_out = self.out_norm(transformer_out)
@@ -716,7 +714,6 @@ class LMGen(StreamingModule[_LMGenState]):
         )
 
         disable = lm_model.device.type != 'cuda'
-        # disable = True # DEBUG
         graphed_main = CUDAGraphed(lm_model.forward_codes, disable=disable)
         graphed_embeddings = CUDAGraphed(lm_model.forward_embeddings, disable=disable)
         graphed_depth = CUDAGraphed(self.depformer_step, disable=disable)
@@ -736,7 +733,6 @@ class LMGen(StreamingModule[_LMGenState]):
             )
         lm_model = self.lm_model
 
-        # audio_tokens_per_stream = lm_model.dep_q//2
         needed_tokens = lm_model.num_codebooks - AUDIO_TOKENS_PER_STREAM - 1
         CT = state.cache.shape[2]
 
@@ -820,8 +816,6 @@ class LMGen(StreamingModule[_LMGenState]):
         prepared_inputs = self.prepare_step_input(
             input_tokens, moshi_tokens, text_token,
         )
-        # print("INPUT:", None if input_tokens is None else input_tokens.squeeze().cpu().tolist()) # DEBUG
-        # print("MOSHI:", None if moshi_tokens is None else moshi_tokens.squeeze().cpu().tolist()) # DEBUG
         if prepared_inputs is None:
             return (None, None) if self.report_loss or self.return_logits else None
         input_, provided_, target_, model_input_position, target_position = prepared_inputs
@@ -888,37 +882,6 @@ class LMGen(StreamingModule[_LMGenState]):
         assert sampled_text_token.shape[2] == 1
         assert sampled_text_token.shape[1] == 1, "Only one text stream supported."
         sampled_text_token = sampled_text_token[:, 0, 0]  # shape is [B]
-
-        # ── <ret> 우선 발행 (MoshiCP, 2026-08-03) ──────────────────────────────────
-        # 검색 여부는 '취향'이 아니라 판단이다. 온도 샘플링에 맡기면 같은 입력에도 런마다
-        # <ret> 개수가 1~3개로 흔들리고(실측), 안 나온 질문은 근거 없이 답해버린다.
-        # p(<ret>) 가 임계 이상이면 온도와 무관하게 <ret> 를 낸다. ret_force_p=0 이면
-        # 종전과 완전히 동일(기본 OFF) — engine 이 설정할 때만 켜진다.
-        # 매 프레임(80ms) 도는 경로 — softmax(32k 어휘 전체 지수화) 대신 max 리덕션 1회로
-        # 판정한다. logit(<ret>) 가 최대 로짓과 margin(nats) 이내면 발행.
-        _rid = getattr(self, "ret_force_id", None)
-        _rp = float(getattr(self, "ret_force_p", 0.0) or 0.0)
-        if _rid is not None and _rp > 0.0:
-            # ── 확률 기반 강제 발행 (2026-08-03 재설계, v3 실측 2회 반복) ─────────────
-            # 1차(margin 2.5, 상시): 청취 프레임에선 margin 조건이 매 프레임 참 →
-            #   <ret> 12.5/s 연사, 캐시가 학습에 없는 <ret> 연쇄로 오염(무호출 37/100).
-            # 2차(margin+상승엣지+불응기): 무음에서 hit 이 계속 참이면 실제 질문 도착
-            #   때 엣지가 다시 안 뜬다 → r5 가 콜하던 샘플을 무호출로 만드는 언더파이어.
-            # 최종: 샘플링이 '내려던' 판단을 온도와 무관하게 결정론으로 복제한다 —
-            #   P_temp(<ret>) >= τ 면 발행. 무음에선 PAD 가 지배해 P(<ret>) 가 낮고,
-            #   판단 지점에선 확률이 치솟는다. 연속 프레임 재발행은 불응기가 흡수.
-            # 자연 샘플링으로 나온 <ret> 는 이 게이트와 무관하게 그대로 통과한다.
-            _cool = int(getattr(self, "ret_force_cooldown_frames", 25))
-            _since = int(getattr(self, "_ret_force_since", 1 << 30))
-            if _since >= _cool:
-                _tl = text_logits[:, 0, 0]                    # [B, card]
-                _pr = torch.softmax(_tl / max(self.temp_text, 1e-6), dim=-1)[:, int(_rid)]
-                _hit = _pr >= _rp
-                sampled_text_token = torch.where(
-                    _hit, torch.full_like(sampled_text_token, int(_rid)), sampled_text_token)
-                self._ret_force_since = 0 if bool(_hit.any().item()) else min(_since + 1, 1 << 30)
-            else:
-                self._ret_force_since = _since + 1
 
         next_text_token = torch.where(provided_[:, 0, 0], target_[:, 0, 0], sampled_text_token)
 

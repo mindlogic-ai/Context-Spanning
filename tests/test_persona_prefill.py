@@ -1,4 +1,4 @@
-"""The batched persona prefix leaves the stream exactly where stepping it would (#38).
+"""The batched persona prefix leaves the stream exactly where stepping it would.
 
 Needs the weights, so it is skipped unless CS_TEST_CHECKPOINT points at a Context Spanning .pt.
 Runs on CPU in float32 by default (CS_TEST_DEVICE=cuda when a GPU is free): both paths from a fresh

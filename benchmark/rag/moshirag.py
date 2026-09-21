@@ -31,7 +31,7 @@ class MoshiRagBackend(RealtimeBackend):
     per conversation, as MoshiRAG's RAGManager owns it per channel)."""
 
     def __init__(self):
-        super().__init__(cache=False)
+        super().__init__()
         self.url = os.environ.get("MOSHIRAG_LLM_URL", "http://localhost:8004").rstrip("/")
         self.model = os.environ.get("MOSHIRAG_LLM_MODEL", REFERENCE_MODEL)   # the server's model id; reported runs: A4B
         self.rag_timeout = RAG_TIMEOUT_S
@@ -83,7 +83,7 @@ class MoshiRagBackend(RealtimeBackend):
                 j += 1
         return out + "Reference:", len(turns)
 
-    def retrieve(self, query, kind="auto", ctx=None, aux_context=None, history=None, convo=None):
+    def retrieve(self, query, ctx=None, aux_context=None, history=None, convo=None):
         self.last_source, self.last_args, self.last_trace = None, None, []
         context, n_turns = self._context(convo, aux_context)
         if n_turns == 0:                # the Context DB may lag the utterance that fired <ret>

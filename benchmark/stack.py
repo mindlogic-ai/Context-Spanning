@@ -1,6 +1,6 @@
-"""The release stack for the evaluation harness: Engine + DuetaSpan backend + ASR, warmed, with a
+"""The release stack for the benchmark: Engine + DuetaSpan backend + ASR, warmed, with a
 deterministic voice per sample. Evaluation is separate from the runtime package: nothing in
-`contextspan/` imports this folder. Run the runners from the repository root (`python -m eval...`)."""
+`contextspan/` imports this folder. Run the runners from the repository root (`python -m benchmark...`)."""
 import hashlib
 
 import numpy as np
@@ -34,7 +34,7 @@ class Stack:
 
     def __init__(self, checkpoint=None, temp=0.8, temp_text=0.7, backend=None, voice=None):
         self.eng = Engine(checkpoint, temp=temp, temp_text=temp_text)
-        self.backend = backend if backend is not None else RealtimeBackend(cache=False)
+        self.backend = backend if backend is not None else RealtimeBackend()
         self.asr = ASR()
         self.sr, self.fs = int(self.eng.mimi.sample_rate), self.eng.frame_size
         self._voices = {v: load_voice(v) for v in ((voice,) if voice else VOICES)}

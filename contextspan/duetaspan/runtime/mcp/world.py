@@ -1,11 +1,9 @@
 """A real, stateful world behind the tools that have no real backend.
 
-38 of the 125 tools in ``mcp_tool_bank.json`` come from Google SGD and 6 from the
-PayPal MCP server. Neither has a service we can actually call: there is no live
-``Restaurants_2`` API, and ``create_order`` needs merchant credentials. The old
-path answered them with an LLM-invented ``tool_result``, so a READ after an
-ACTION never saw the ACTION's effect and ``mcp_chained`` dialogues were only
-pretending to depend on each other.
+38 of the 60 tools in ``mcp_tool_bank.json`` come from Google SGD. They have no
+service that can actually be called: there is no live ``Restaurants_2`` API. Answering
+them with an LLM-invented ``tool_result`` means a READ after an ACTION never sees the
+ACTION's effect, and chained dialogues only pretend to depend on each other.
 
 This module gives those tools a real backend instead: a SQLite world seeded with
 the *actual* entity records SGD's own dialogues returned (real addresses, phone
@@ -96,7 +94,7 @@ class WorldError(Exception):
 
 
 class World:
-    """SQLite-backed execution of the SGD + pay tools."""
+    """SQLite-backed execution of the SGD tools."""
 
     def __init__(self, db_path: str = DEFAULT_DB) -> None:
         if not os.path.exists(db_path):
@@ -117,9 +115,6 @@ class World:
     def functions(self) -> list[str]:
         return sorted(self._meta)
 
-    def kind(self, function: str) -> Optional[str]:
-        entry = self._meta.get(function)
-        return entry["kind"] if entry else None
 
     def required(self, function: str) -> list[str]:
         """The slots this world actually enforces — SGD's own ``required_slots``."""
@@ -147,22 +142,6 @@ class World:
             return self._read(entry["service"], args)
         return self._act(function, entry, args)
 
-    def match_all(self, function: str, args: dict) -> list[dict]:
-        """Every catalog entity consistent with ``args``, best match first.
-
-        Exposed because an under-determined query ("attractions in Toronto") has
-        many right answers, and a caller — a test, a ranker — may need the set
-        rather than the one row ``call`` settles on.
-        """
-        entry = self._meta.get(function)
-        if entry is None or entry["kind"] != "read":
-            return []
-        scored = self._scored(entry["service"], args)
-        if not scored:                              # same time-slot relaxation as _read
-            scored = self._scored(
-                entry["service"], {k: v for k, v in args.items() if not _is_time_slot(k)}
-            )
-        return [doc for _, _, doc in scored]
 
     def _scored(self, service: str, args: dict) -> list[tuple]:
         rows = self._conn.execute(
@@ -222,9 +201,6 @@ class World:
             "INSERT OR REPLACE INTO entity(service, ekey, doc) VALUES (?, ?, ?)",
             (service, _ekey(doc), json.dumps(doc, ensure_ascii=False)),
         )
-
-    def close(self) -> None:
-        self._conn.close()
 
 
 def _abbrev(service: str) -> str:
