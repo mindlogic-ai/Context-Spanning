@@ -9,14 +9,17 @@ and what the model said with it.
 
 `clips_dir` holds `<id>.wav` (the spoken question, already padded with lead-in and tail silence) and
 `cases.json` (`[{id, question, kind, expect: [...], not_expect: [...]}]`). Per case it records the
-rendered turns, the transcript events, the retrieval timings, and three verdicts:
+rendered turns, the transcript events, the retrieval timings, and these verdicts:
 
-  span     a span arrived and was injected                (retrieval worked at all)
-  ontime   it arrived inside the deadline                  (it was usable)
-  answer   the agent's words contain the expected fact     (it was used)
+  span          a span arrived and was injected                     (retrieval worked at all)
+  late          a span arrived after the deadline and was dropped
+  answer_ok     the agent's words contain an expected fact and no `not_expect` one   (it was used)
+  contradicted  the agent's words contain a `not_expect` fact
 
-`grounded` is the join that matters: a span arrived on time AND the answer is right. `invented` is
-the failure that matters: no span arrived and the agent answered anyway with something specific.
+summary.json holds `span_rate`, `late_rate`, `answer_accuracy`, `grounded`, `invented`,
+`contradicted_span`, `retrieval_s_p50` / `retrieval_s_p90` and `by_kind`. `grounded` is the join that
+matters: a span was injected AND the answer is right. `invented` is the failure that matters: no span
+was injected and the agent answered anyway, without the expected fact.
 """
 from __future__ import annotations
 

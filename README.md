@@ -1,9 +1,5 @@
 <div align="center">
 
-  <!-- TODO(seonghyeon): Dueta logo goes here once it exists — 2026-08-20 AI-SLM meeting: derive it from the
-       BAZE app colour scheme (violet), reviewers 선영·상현·경수; 8/27: 경수님께 2시간 한도로 요청.
-       <img width="240" alt="Dueta" src="assets/figures/logo.png"> -->
-
   <h1>Context Spanning</h1>
   <h3>A Communication Framework for Full-Duplex Speech Models and External LLM Backends</h3>
 
@@ -23,9 +19,7 @@
 
   <br>
 
-  <!-- TODO(seonghyeon): replace XXXX.XXXXX with the arXiv id once the preprint is up -->
   [![arXiv](https://img.shields.io/badge/arXiv-XXXX.XXXXX-b31b1b.svg)](https://arxiv.org/abs/XXXX.XXXXX) [![Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-context--spanning--7b-yellow)](https://huggingface.co/mindlogicinc/context-spanning-7b) [![Base Model](https://img.shields.io/badge/base-PersonaPlex--7B-76b900)](https://huggingface.co/nvidia/personaplex-7b-v1) [![Code License](https://img.shields.io/badge/code-MIT-blue.svg)](LICENSE) [![Weights License](https://img.shields.io/badge/weights-NVIDIA%20Open%20Model%20License-76b900)](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/)
-  <!-- TODO(seonghyeon): add a Demo / Project Page badge here if one goes live -->
 
 </div>
 
@@ -75,7 +69,6 @@ fine-tuned from [`nvidia/personaplex-7b-v1`](https://huggingface.co/nvidia/perso
 Tables 1 and 2 of the paper. Underlined models in the paper are reprinted from the original benchmark
 papers (Full-Duplex-Bench) and from MoshiRAG (spoken QA and math); their rows are marked † below.
 
-<!-- TODO(seonghyeon): confirm these are the camera-ready numbers before the repo goes public -->
 
 **Table 1. Full-Duplex-Bench v1 and v3.** Arrows give the direction of better.
 
@@ -163,8 +156,6 @@ MoshiRAG-sampled delays and fine-tunes with the masked cross-entropy. Data forma
 
 
 ## Citation
-
-<!-- TODO(seonghyeon): fill in the arXiv id / venue once known -->
 
 ```bibtex
 @article{go2026contextspanning,

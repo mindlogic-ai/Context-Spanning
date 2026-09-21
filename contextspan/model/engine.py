@@ -33,15 +33,14 @@ class Engine:
         self._sil = torch.tensor(SILENCE_TOKENS, device=device)[None, :, None]
         self._sine = torch.tensor(SINE_TOKENS, device=device)[None, :, None]
         self._pending_exit_cb0 = None
-        self.frames = 0
         self.last_prefill_ms = 0.0
         self.reset()
         with torch.no_grad():
             for _ in range(4):
                 self.lm_gen.step(input_tokens=self._sine)
             # The block forward is a multi-position path the single-step loop never exercises; its
-            # first call in a process costs ~0.7 s (measured 741 ms vs 58 ms for the second call,
-            # 2026-09-09). Pay it here, not on the first span of a conversation.
+            # first call in a process costs ~0.7 s (measured 741 ms vs 58 ms for the second call).
+            # Pay it here, not on the first span of a conversation.
             block.prefill(self.lm_gen, [SPAN_OPEN_ID] + [TEXT_PAD] * 6 + [SPAN_CLOSE_ID], self._sil, self._sine)
         self.reset()
 
@@ -53,7 +52,7 @@ class Engine:
             except Exception:
                 pass
             m.streaming_forever(1)
-        self._pending_exit_cb0, self.frames = None, 0
+        self._pending_exit_cb0 = None
 
     def _prefix_steps(self, system_prompt, voice_codes=None):
         """The prefix as forced step triples: voice codes -> silence -> persona text -> silence."""
@@ -73,7 +72,7 @@ class Engine:
     @torch.no_grad()
     def set_persona(self, system_prompt, voice_codes=None):
         """Prefix: voice codes -> silence -> persona text -> silence, all forced, read in one backbone
-        forward (~0.1 s instead of ~5.5 s of single steps, #38). Same state as `set_persona_stepwise`."""
+        forward (~0.1 s instead of ~5.5 s of single steps). Same state as `set_persona_stepwise`."""
         prefix.prefill_forced_steps(self.lm_gen, self._prefix_steps(system_prompt, voice_codes))
 
     @torch.no_grad()
@@ -98,7 +97,6 @@ class Engine:
                 ac = ac.clone()
                 ac[:, 0, 0] = self._pending_exit_cb0
             self._pending_exit_cb0 = None
-        self.frames += 1
         return {"agent_pcm": self.mimi.decode(ac)[0, 0].cpu().numpy(), "text_token": t,
                 "is_ret": t == RET_TOKEN_ID}
 
@@ -106,7 +104,7 @@ class Engine:
     def inject_context_span(self, reference: str) -> int:
         """Read the reference into the stream as a masked Context Span block in one batched forward.
         Returns the number of frames the block consumed; `last_prefill_ms` holds its wall-clock cost.
-        Measured 2026-09-09 (RTX PRO 6000 Blackwell): 27 ms up to 250 tokens, 32/38/41 ms at 300/350/400,
+        Measured on an RTX PRO 6000 Blackwell: 27 ms up to 250 tokens, 32/38/41 ms at 300/350/400,
         so prefill + the next 32 ms step stays inside the 80 ms frame up to 400 tokens."""
         ids = block.span_ids(reference, self.spm)
         self._pending_exit_cb0 = block.pending_exit_cb0(self.lm_gen)

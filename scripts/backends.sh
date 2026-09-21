@@ -7,15 +7,17 @@
 # Router model: Gemma-4-26B-A4B (26B MoE, 4B active) — the router's decision is a classification plus a
 # few argument strings and its cost is decode, so the 4B-active model answers in roughly a third of the
 # time of a dense 27B at the same quality on the tool-selection probes; one 80-96 GB GPU at TP=1.
-# The same server also answers the RAG fallback (knowledge questions the tools cannot) and serves as the eval
-# judge unless RAG_MODEL points those at a second server. Footprint on one 96 GB GPU with everything on it:
+# The same server also answers the backend's question-rewrite calls (MOSHICP_RAG_LLM_*) and serves as the
+# benchmark judge unless RAG_MODEL points those at a second server. Footprint on 96 GB GPUs:
 # the router needs its own GPU (~82 GB at ROUTER_MEM 0.85); ASR (~5 GB) and the speech model (~20 GB) share another.
 # GPUs: ROUTER_GPUS (default 1), ASR_GPU (default 0, ~4 GB). ROUTER_MODEL / ROUTER_TP override.
 #
-# Why these vLLM flags (measured on RTX PRO 6000 Blackwell, 2026-09):
+# Why these vLLM flags (measured on RTX PRO 6000 Blackwell):
 #   --max-model-len 8192           the router prompt carries the tool catalogue (~2.9k tokens at the first
 #                                  stage, ~3.5k for the largest tool group) plus the conversation; 4k truncates.
-#   --gpu-memory-utilization ROUTER_MEM (0.85, ~82 GB): the A4B weights are 48.5 GiB and the 8192-token KV cache needs the rest; 0.58 fails to start.
+#   --gpu-memory-utilization ROUTER_MEM (0.85, ~82 GB of a 96 GB card): the A4B weights alone are 48.5 GiB and
+#                                  the 8192-token KV cache needs the rest; at 0.58 the KV budget comes out
+#                                  negative and the engine refuses to start.
 #   --speculative-config ngram     the router's replies repeat the prompt (tool names, argument values,
 #                                  the sentence it copies from the Context DB): prompt-lookup speculation
 #                                  cut the router round trip by ~40% at temperature 0 with no output change.
@@ -23,14 +25,14 @@
 set -euo pipefail
 CMD="${1:-status}"
 ROUTER_PORT="${ROUTER_PORT:-8004}"; ASR_PORT="${ASR_PORT:-8990}"
-# ASR server: "vllm" = qwen-asr-serve (vLLM, batched; the final transcript of a question no longer waits behind
-# the partial one: 0.45 s -> 0.13 s median per request on the bench box) or "transformers" = the plain HTTP
+# ASR server: "vllm" = qwen-asr-serve (vLLM, batched; the final transcript of a question does not wait behind
+# the partial one: 0.13 s median per request instead of 0.45 s) or "transformers" = the plain HTTP
 # server in contextspan.duetaspan.runtime.asr_server (~5 GB, no vLLM needed). Both serve Qwen3-ASR-1.7B.
 ASR_BACKEND="${ASR_BACKEND:-vllm}"; ASR_MODEL="${ASR_MODEL:-${QWEN_ASR_DIR:-Qwen/Qwen3-ASR-1.7B}}"; ASR_MEM="${ASR_MEM:-0.12}"
 ROUTER_MODEL="${ROUTER_MODEL:-google/gemma-4-26B-A4B-it}"
 ROUTER_GPUS="${ROUTER_GPUS:-1}"; ROUTER_TP="${ROUTER_TP:-1}"; ASR_GPU="${ASR_GPU:-0}"
-ROUTER_MEM="${ROUTER_MEM:-0.85}"          # fraction of the GPU. Measured: Gemma-4-26B-A4B weights alone take 48.5 GiB; at 0.58 on a 96 GB card the KV cache came out NEGATIVE and the engine refused to start
-# Optional second server for the knowledge jobs (RAG fallback answers, eval judge) so the router model can be
+ROUTER_MEM="${ROUTER_MEM:-0.85}"          # fraction of the GPU (why 0.85: see the flag notes above)
+# Optional second server for the knowledge jobs (question rewriting, benchmark judge) so the router model can be
 # small: set RAG_MODEL (and RAG_GPUS / RAG_PORT). Unset = the router server does all of it (default).
 RAG_MODEL="${RAG_MODEL:-}"; RAG_PORT="${RAG_PORT:-8005}"; RAG_GPUS="${RAG_GPUS:-$ROUTER_GPUS}"; RAG_TP="${RAG_TP:-1}"; RAG_MEM="${RAG_MEM:-0.30}"
 LOG="${BACKEND_LOG_DIR:-/tmp/contextspan_backends}"; mkdir -p "$LOG"

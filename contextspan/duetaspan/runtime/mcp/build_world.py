@@ -12,8 +12,8 @@ Two fields are taken from SGD's own schema rather than trusted from the bank:
   ``is_transactional``: they hail a car and buy tickets. Here they are actions.
 * ``required`` — SGD's ``required_slots`` is what the service itself enforces.
 
-The 6 PayPal tools have no corpus, so they get no catalog: they are pure actions
-whose effect is the transaction row they write.
+Bank tools in the ``pay`` domain (the shipped bank has none) have no corpus, so they
+get no catalog: they are pure actions whose effect is the transaction row they write.
 
 Usage::
 
@@ -139,7 +139,7 @@ def main() -> None:
     sgd_tools = [t for t in bank if t["source"] == "BFCL-v3/Google-SGD"]
     pay_tools = [t for t in bank if t["domain"] == "pay"]
     if not sgd_tools:
-        raise SystemExit("tool bank has no SGD tools — run build_mcp_taxonomy.py first")
+        raise SystemExit("tool bank has no SGD tools")
 
     sgd_dir = _ensure_sgd(args.sgd_dir)
     intents = _sgd_intents(sgd_dir)

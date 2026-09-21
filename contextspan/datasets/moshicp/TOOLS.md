@@ -40,6 +40,4 @@ universe, so the router sees 64 tools (63 on a machine without a `map_road_traff
 - Messaging (1): `Messaging_1_ShareLocation`
 - finance (1): `get_stock_price_global_market`
 
-`contextspan/datasets/moshicp/mcp_tool_bank.json` is this curated bank; the full 125-tool bank is DuetaSpan's
-`datasets/moshicp/mcp_tool_bank.json`. The vendored runtime code is unchanged (the browser and filesystem
-adapters are still present in `contextspan/duetaspan/runtime/mcp/`); no bank entry routes to them.
+`contextspan/datasets/moshicp/mcp_tool_bank.json` is this curated bank.

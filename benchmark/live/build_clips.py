@@ -4,7 +4,7 @@
 
 Each clip is lead-in silence, the question, then a long tail of silence so the session has room to
 answer while the fake device keeps playing. macOS `say` is the default because it is deterministic
-and needs nothing installed; `CS_TTS` overrides the command (it receives TEXT and OUT_AIFF).
+and needs nothing installed; `CS_TTS_VOICE` picks the voice (default Samantha).
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ def build(cases_path: str, out_dir: str) -> int:
     cases = json.load(open(cases_path))
     os.makedirs(out_dir, exist_ok=True)
     if not shutil.which("say") or not shutil.which("afconvert"):
-        sys.exit("needs macOS `say` + `afconvert`; set CS_TTS to use another engine")
+        sys.exit("needs macOS `say` + `afconvert`")
     for c in cases:
         aiff, raw, out = (os.path.join(out_dir, c["id"] + s) for s in (".aiff", ".raw.wav", ".wav"))
         subprocess.run(["say", "-v", os.environ.get("CS_TTS_VOICE", "Samantha"),

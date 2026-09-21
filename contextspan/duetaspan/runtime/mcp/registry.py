@@ -1,33 +1,28 @@
-"""One dispatch table for all 125 tools in the bank.
+"""One dispatch table for every tool in the bank.
 
 Each bank name resolves to exactly one of:
 
-  world   — SGD + PayPal tools, executed against the stateful SQLite world
-  maps    — geocoding, routing, elevation, over keyless open services
-  fs      — the official filesystem tools, sandboxed
-  live    — the pre-existing servers (finance, websearch)
+  world   — SGD tools, executed against the stateful SQLite world
+  maps    — places, routing, weather, over keyless open services
+  live    — the servers in this package (finance, websearch) and the search adapter
   UNSUPPORTED — no backend exists and none can be faked honestly
 
-``Unsupported`` is not a failure to hide. A browser tool with no browser
-installed, or a Tavily search with no API key, must say so; the alternative is a
-tool that returns a plausible sentence it never obtained, which is exactly the
-behaviour this package replaces.
+``Unsupported`` is not a failure to hide. A tool with no honest source must say so; the
+alternative is a tool that returns a plausible sentence it never obtained.
 """
 from __future__ import annotations
 
 import json
-import importlib.util
 import os
 from typing import Any, Callable
 
-from contextspan.duetaspan.runtime.mcp import adapters_fs, adapters_maps, cache
+from contextspan.duetaspan.runtime.mcp import adapters_maps, cache
 from contextspan.duetaspan.runtime.mcp.world import World, WorldError, clause
 from contextspan.duetaspan.common import paths
 
 DATA = str(paths.DATA)
 TOOL_BANK = os.path.join(DATA, "moshicp", "mcp_tool_bank.json")
 
-_NEEDS_BROWSER = "no browser installed (playwright/puppeteer MCP server not provisioned)"
 # The one thing left with no keyless source. Congestion is measured by cameras and
 # loop detectors owned by agencies that gate the feed; there is no OpenStreetMap of
 # live traffic. A free key from Seoul Open Data Plaza or TMAP closes it — free, not paid.
@@ -85,7 +80,7 @@ _END = {"type": "string", "description": "Last date of a range, YYYY-MM-DD."}
 
 # SGD's payment slots describe `amount` as "specified in dollars", so "3만원 보내줘"
 # becomes 30000 dollars and confirms. The executor already echoes every argument into
-# the confirmation record, so naming the currency is all that was ever missing.
+# the confirmation record, so naming the currency is all that is needed.
 _CURRENCY = {"type": "string", "description": "ISO 4217 currency of `amount`.",
              "enum": ["KRW", "USD", "EUR", "JPY", "GBP", "CNY"]}
 _EXTRA_PARAMS = {
@@ -100,59 +95,34 @@ def _unreserve(name: str) -> str:
     return _RESERVED.get(name, name)
 
 
-def _browser_available() -> bool:
-    """A Chromium that cannot launch is worse than an honest `unsupported`.
-
-    The 32 browser tools stay unsupported on a machine without playwright and its
-    bundled browser, rather than failing one call at a time deep inside a dialogue.
-    """
-    # find_spec on a dotted name imports the parent package first and raises when it is
-    # missing, so check the package before the module (#37: a README install has no playwright).
-    if importlib.util.find_spec("playwright") is None:
-        return False
-    try:
-        return importlib.util.find_spec("playwright.sync_api") is not None
-    except ModuleNotFoundError:
-        return False
-
-
 def _world_override() -> dict[str, Callable]:
     """SGD read tools a keyless live source answers better than the seeded catalog.
 
     The catalog knows US cities on 2019 dates and a US music library, so a Korean asking
     any of these could only ever be told about a restaurant that does not exist. Every
-    tool below now reads a real source: OpenStreetMap, open-meteo, iTunes.
+    tool below reads a real source: OpenStreetMap, open-meteo, iTunes.
 
     What stays in the world, and why:
       * Actions — reserving, booking, paying. Executing those for real would take a real
         seat and move real money. A stateful simulation is the honest answer; a mock is not.
 
     Reads with no keyless structured source — KTX timetables, cinema showtimes, bus/rental/
-    event listings — used to return a seeded (fake-but-Korean) row. There is no free API for
-    most of them (Korail gives no public seat feed; cinema times are per-chain), so instead of
-    a made-up row they now fall back to **web search** (DuckDuckGo instant answer), per the
-    user's request. It is the real answer when the web has one and `(no information found)`
+    event listings — have no free API (Korail gives no public seat feed; cinema times are
+    per-chain), so instead of a made-up row they go to **web search** (DuckDuckGo instant
+    answer). It is the real answer when the web has one and `(no information found)`
     when it does not — never a fake row, and never a loosely-matched encyclopedia page. Web
     search is worldwide, so "파리 기차" works as well as "서울 부산"; the intent word is English
     so a foreign place term does not fight a Korean one.
     Only the *reads* move; buying still records into the world. `_web_read` joins the args into
     a query — robust to BFCL's slot renaming (`from` -> `_from`), no per-slot template to drift.
     """
-    # The generation env (gsh) has no mcp/fastmcp package, so importing the server module
-    # dies. In that case degrade to world (the SQLite seed) with no override — for
-    # data-generation dispatch that is actually the better fit: deterministic and
-    # network-independent (user 2026-07-21: build it using backend/mcp as the reference).
-    try:
-        from contextspan.duetaspan.runtime.mcp.adapters_media import lookup_music
-        from contextspan.duetaspan.runtime.mcp.servers.websearch_server import instant_answer
-    except ImportError:
-        return {}
+    from contextspan.duetaspan.runtime.mcp.adapters_media import lookup_music
+    from contextspan.duetaspan.runtime.mcp.servers.websearch_server import instant_answer
 
     # DuckDuckGo's instant answer only (not full web_search): a clear factual answer or
     # "(no information found)" — never a loosely-matched Wikipedia page passed off as the
-    # answer, which is the "no-info when the information is ambiguous" the user asked for. One
-    # request, no Wikipedia round trip, so it stays well under a second (~120-450 ms warm).
-    # Memoised.
+    # answer. One request, no Wikipedia round trip, so it stays well under a second
+    # (~120-450 ms warm). Memoised.
     web = _memo("webread", cache.HOUR, instant_answer)
 
     def _web_read(intent: str) -> Callable:
@@ -199,11 +169,8 @@ def _memo(name: str, ttl: float, produce: Callable[[str], str]) -> Callable[[str
 
 def _live_tools() -> dict[str, Callable]:
     """Reuse the servers already in this package rather than reimplement them."""
-    try:
-        from contextspan.duetaspan.runtime.mcp.servers.finance_server import get_stock_price
-        from contextspan.duetaspan.runtime.mcp.servers.websearch_server import web_search
-    except ImportError:                      # env without mcp/fastmcp installed: world only, no live
-        return {}
+    from contextspan.duetaspan.runtime.mcp.servers.finance_server import get_stock_price
+    from contextspan.duetaspan.runtime.mcp.servers.websearch_server import web_search
 
     quote = _memo("stock", cache.MINUTE, get_stock_price)
     lookup = _memo("websearch", cache.HOUR, web_search)
@@ -224,27 +191,17 @@ class Registry:
         override = _world_override()
         self._world_fns = set(self.world.functions()) - set(override)
         self._impl: dict[str, Callable] = {}
-        self._impl.update(adapters_fs.TOOLS)
         self._impl.update(adapters_maps.TOOLS)
         self._impl.update(_live_tools())
         self._impl.update(override)
         from contextspan.duetaspan.runtime.mcp import adapters_search
+        from contextspan.duetaspan.runtime.mcp.servers import websearch_server
         self._impl.update(adapters_search.TOOLS)
-        if _browser_available():
-            from contextspan.duetaspan.runtime.mcp import adapters_browser
-            self._impl.update(adapters_browser.TOOLS)
-            self._browser_fns = set(adapters_browser.TOOLS)
-        else:
-            self._browser_fns = set()
         # Handshakes to the European map hosts cost ~800 ms each. Start them now, in the
         # background, so the user's first question does not wait for them.
         adapters_maps.warm_connections()
         adapters_search.warm_connections()
-        try:
-            from contextspan.duetaspan.runtime.mcp.servers import websearch_server
-            websearch_server.warm_connections()
-        except ImportError:
-            pass                             # generation env without the mcp package: world-only mode
+        websearch_server.warm_connections()
 
     # ----- classification -----------------------------------------------------
     def backend_of(self, function: str) -> str:
@@ -254,22 +211,14 @@ class Registry:
             return "unsupported"
         if function in self._world_fns:
             return "world"
-        if function in adapters_fs.TOOLS:
-            return "fs"
         if function in adapters_maps.TOOLS:
             return "maps"
-        if function in self._browser_fns:
-            return "browser"
         if function in self._impl:
             return "live"
         return "unsupported"
 
     def unsupported_reason(self, function: str) -> str:
-        if function in _UNSUPPORTED:
-            return _UNSUPPORTED[function]
-        if self.bank.get(function, {}).get("domain") == "browser":
-            return _NEEDS_BROWSER
-        return "no backend"
+        return _UNSUPPORTED.get(function, "no backend")
 
     def supported(self) -> list[str]:
         return [f for f in self.bank if self.backend_of(f) != "unsupported"]
@@ -318,9 +267,6 @@ class Registry:
             result = self.world.call(function, args)
             return clause(result) if result else "(no information found)"
         return str(self._impl[function](**args))
-
-    def close(self) -> None:
-        self.world.close()
 
 
 _REGISTRY: Registry | None = None

@@ -33,4 +33,3 @@ preferred-citation:
       given-names: Jaeho
   year: 2026
   journal: "arXiv preprint"
-  # TODO(seonghyeon): add  identifiers: [{type: other, value: "arXiv:XXXX.XXXXX"}]  and the venue once known

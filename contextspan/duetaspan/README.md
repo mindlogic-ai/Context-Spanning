@@ -5,25 +5,21 @@ package name because its module paths are part of the deployment contract (`scri
 the `DUETASPAN_*` / `MOSHICP_*` environment variables, external tooling).
 
 ```
-align/asr.py               ASR client: HTTP endpoint first (vLLM qwen-asr-serve or /transcribe), local whisper fallbacks
-common/paths.py            every on-disk location, resolved from DUETASPAN_* variables
+align/asr.py               ASR client: posts audio to the Qwen3-ASR endpoint (vLLM qwen-asr-serve or /transcribe)
+common/paths.py            the on-disk locations, resolved from DUETASPAN_* variables
 runtime/asr_server.py      Qwen3-ASR plain HTTP server (transformers; scripts/backends.sh ASR_BACKEND=transformers)
 runtime/backend/
-  realtime.py              RealtimeBackend: the retrieve() the engine calls; router first, LLM-RAG second
-  retrieve.py              the reference-string contract and the MCP-intent words
+  realtime.py              RealtimeBackend: the retrieve() the engine calls; the tool router is the single decider
   context_db.py            ContextProfile (name, city, timezone, notes) + append-only conversation log
 runtime/mcp/
   client.py                MCP client + LLM tool router: two-stage pick, argument fill, one tool per <ret>
-  registry.py              one dispatch table for the 125 bank tools (world / maps / fs / live / unsupported)
+  registry.py              one dispatch table for the bank's tools (world / maps / live / unsupported)
   world.py, build_world.py SQLite world seeded from Google SGD service results; transactions are real rows
   geo_index.py             local gazetteer + POI index (GeoNames KR, Seoul OSM)
   adapters_*.py            keyless real backends: maps (Nominatim/OSRM/open-meteo), search (DuckDuckGo),
-                           media (iTunes), fs (sandboxed), browser (Playwright)
-  api_backend.py, gemini_backend.py   single-model routers over hosted APIs (optional)
+                           media (iTunes)
   cache.py                 disk cache for the free HTTP sources
-  coverage.py              call every bank tool once and report
-  servers/                 the MCP servers: bank, time, weather, finance, websearch
-eval/mcp_toolbank.py       250 real tool calls scored against the world
+  servers/                 the MCP servers: time, weather, finance, websearch
 ```
 
 Configuration and the rationale for the defaults: [`docs/BACKENDS.md`](../../docs/BACKENDS.md). Data

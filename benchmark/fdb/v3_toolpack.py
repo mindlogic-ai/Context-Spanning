@@ -46,7 +46,7 @@ def _schema(props, required):
 
 # Stage-0 domain group descriptions (the stage-0 catalog of client.py's two-stage routing) —
 # split into 4 domains: a single "fdb_v3" group makes stage 0 meaningless (one group), and the
-# diagnosed domain gap (housing 7.7%, ecommerce 13.8%) is why each group now spells out the
+# measured domain gap (housing 7.7%, ecommerce 13.8%) is why each group spells out the
 # situations typical of it.
 DOMAINS = {
     "travel_identity": ("Travel & identity: search/book flights, update passport or "
@@ -60,8 +60,8 @@ DOMAINS = {
 }
 
 # Parameters (json schema) follow the official @function_tool signatures exactly (the argument
-# scoring contract is unchanged). Descriptions were rewritten from the FDB-v3 baseline failure
-# taxonomy (2026-07-27, dominated by never-attempted chains and sibling-tool substitution):
+# scoring contract is unchanged). Descriptions address the FDB-v3 baseline failure
+# taxonomy (dominated by never-attempted chains and sibling-tool substitution):
 # parameter hints + one typical query example + the chain relations (search→book/add, result
 # address→commute, one call per id) spelled out. ≤300 chars (client.py's merge cap).
 TOOLS = {

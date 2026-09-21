@@ -68,7 +68,6 @@ class UserLeveller:
         self.gain = 1.0
         self.a_up = float(np.exp(-frame_s / up_s))      # slow: a hot start must not jump
         self.a_down = float(np.exp(-frame_s / down_s))  # fast: coming down protects the peak
-        self.lufs = None
 
     def process(self, frame: np.ndarray) -> np.ndarray:
         x = np.asarray(frame, dtype=np.float32).reshape(-1)
@@ -81,7 +80,6 @@ class UserLeveller:
                 warnings.simplefilter("ignore")
                 lufs = self.meter.integrated_loudness(self.window)
             if np.isfinite(lufs) and lufs > -70.0:                # -inf / very low = silence: hold
-                self.lufs = float(lufs)
                 want = float(np.clip(10.0 ** ((self.target - lufs) / 20.0),
                                      10.0 ** (MIN_GAIN_DB / 20.0), 10.0 ** (MAX_GAIN_DB / 20.0)))
                 a = self.a_up if want > self.gain else self.a_down
@@ -91,9 +89,6 @@ class UserLeveller:
             self.gain = 0.95 / peak
         return np.clip(x * self.gain, -0.99, 0.99).astype(np.float32)
 
-    def report(self) -> dict:
-        return {"lufs": None if self.lufs is None else round(self.lufs, 1),
-                "gain_db": round(20.0 * np.log10(self.gain + 1e-12), 1), "target_lufs": self.target}
 
 
 def measure_lufs(pcm: np.ndarray, sample_rate: int) -> float:

@@ -54,7 +54,7 @@ The deployed tool router (`contextspan/duetaspan/runtime/mcp`) is not part of th
 | Full-Duplex-Bench v1 | 727 clips, 5 tasks | `v1_v1.5/dataset/data/v1.0` | the benchmark's |
 | Full-Duplex-Bench v3 | 100 scenarios | `fdb_v3_data_released` | the benchmark's |
 
-Items are taken in dataset order. `--limit N` is the first N items (`semi` = 120, labelled as such);
+Items are taken in dataset order. `--limit N` is the first N items;
 `--shard K/N` is every N-th item from K, for two lanes sharing one set.
 
 The math set is built from its public sources on any machine with one GPU (`pip install moshi` for the Kyutai
@@ -143,4 +143,4 @@ Stated so the comparison is read correctly. Everything not listed here is the sa
 `live/` drives the shipped page through Playwright with synthetic TTS clips of twelve hand-written
 questions (`live/cases.json`) and matches the answer on the page's text stream. It checks a deployment
 end to end; paper numbers come from the suites above. `pip install -e '.[benchmark]' && playwright install chromium`.
-Run it on the box or over `ssh -L`, never through a Cloudflare quick tunnel (#31).
+Run it on the box or over `ssh -L`, never through a Cloudflare quick tunnel.

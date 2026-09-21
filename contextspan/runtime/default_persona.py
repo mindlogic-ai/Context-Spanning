@@ -2,7 +2,7 @@
 
 A generic "helpful voice assistant" is the one prefix the fine-tune has not seen: the training
 personas are a named role with a warm manner and a subject it knows, closed by a framing sentence.
-Off that distribution the model does not fall back to neutral, it opens an arbitrary scene (#18).
+Off that distribution the model does not fall back to neutral, it opens an arbitrary scene.
 The default below is the most domain-free corner of the shape the corpus uses; any replacement
 should be sampled from the training shards rather than written freehand.
 """

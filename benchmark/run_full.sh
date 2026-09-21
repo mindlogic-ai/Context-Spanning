@@ -2,7 +2,7 @@
 # The full benchmark protocol of benchmark/README.md, end to end: servers, the five RAG sets on two lanes,
 # scoring with the moshi-rag judges, then Full-Duplex-Bench v1 (all clips, official scorers) and v3.
 #
-#   CHECKPOINT=/path/keep_step8000.pt DATA=/data OUT=runs/full bash benchmark/run_full.sh
+#   CHECKPOINT=/path/context_spanning_7b.pt DATA=/data OUT=runs/full bash benchmark/run_full.sh
 #
 # DATA holds halueval_audio/, math_audio/ (built by benchmark/math/, README.md section 3), openaudiobench/eval_datas/,
 # full_duplex_bench/ (the benchmark clone with v1_v1.5/ and v3/, plus v3_data/fdb_v3_data_released). The models are the protocol's and are not
@@ -36,7 +36,7 @@ for p in 8004 8006 8007; do curl -s -m 60 "localhost:$p/v1/chat/completions" -H 
   -d "{\"model\":\"$( [ $p = 8007 ] && echo $JUDGE_MODEL || echo $ROUTER_MODEL)\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"max_tokens\":4}" > /dev/null; done
 log "servers up and warm"
 export MOSHIRAG_GEMMA_JUDGE_URL=http://localhost:8007
-export MCP_ROUTER_LLM_API=openai MCP_ROUTER_LLM_MODEL="$ROUTER_MODEL" MOSHICP_MCP=1 MOSHICP_ASR_MODEL=qwen3-asr
+export MCP_ROUTER_LLM_MODEL="$ROUTER_MODEL" MOSHICP_ASR_MODEL=qwen3-asr
 R="$OUT/rag"; mkdir -p "$R"
 run_set(){ # $1 set  $2 data root  $3 gpu  $4 shard-or-empty
   local sh=""; [ -n "$4" ] && sh="--shard $4"

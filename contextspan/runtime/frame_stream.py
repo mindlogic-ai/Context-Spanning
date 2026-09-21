@@ -16,9 +16,9 @@ import numpy as np
 
 from ..duetaspan.runtime.backend.context_db import ContextDB, ContextProfile
 
-# Wall-clock budget from <ret> to injection. The training corpus's ret->span delays (live harness
-# 2026-09-04) have p50 0.72 s, p99 2.3 s, max 2.4 s: a span later than that is outside what the model
-# was trained to wait for, and by then it has usually answered without it (#12).
+# Wall-clock budget from <ret> to injection. The training corpus's ret->span delays have
+# p50 0.72 s, p99 2.3 s, max 2.4 s: a span later than that is outside what the model
+# was trained to wait for, and by then it has usually answered without it.
 RET_DEADLINE_S = float(os.environ.get("CS_RET_DEADLINE_S", "2.5"))
 
 # The user's speech is transcribed continuously, by utterance: a frame is voiced above RMS_SPEECH, an
@@ -35,8 +35,8 @@ UTT_CACHE_S = 3.0
 RET_UTT_WAIT_S = float(os.environ.get("CS_RET_UTT_WAIT_S", "1.0"))
 # Once the model has emitted <ret> and is waiting for the running utterance to end, the utterance ends after
 # RET_CUT_S of silence instead of the full UTT_END_F (0.72 s): the <ret> is the model's own signal that the
-# question is over, so the final transcript starts up to 0.32 s earlier. 0.4 s is the debounce that kept the
-# question whole (2026-09-02 debounce study); 0 disables the cut. Measured on the probe box: the <ret> lands
+# question is over, so the final transcript starts up to 0.32 s earlier. 0.4 s is the debounce that keeps the
+# question whole; 0 disables the cut. Measured: the <ret> lands
 # within +-0.1 s of the 0.72 s end-of-utterance mark, and the 0.9 s <ret> -> span median is 0.45 s final ASR
 # + 0.27 s router.
 RET_CUT_S = float(os.environ.get("CS_RET_CUT_S", "0.4"))
@@ -44,7 +44,7 @@ RET_CUT_F = int(round(RET_CUT_S / 0.08))
 
 
 def ret_question_plan(cache, t_now, speaking):
-    """What a `<ret>` at time `t_now` uses as its question (#43).
+    """What a `<ret>` at time `t_now` uses as its question.
 
     "cache"  - the last utterance ended, its FINAL transcript is in the cache and fresh: that is the question.
     "wait"   - the user is still speaking, or the utterance ended but only a PARTIAL transcript is cached

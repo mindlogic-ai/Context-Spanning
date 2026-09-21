@@ -74,7 +74,7 @@ def main(argv=None):
             continue
         m = json.load(open(f"{d}/meta.json")); ev = json.load(open(f"{d}/run_events.json"))
         qe = float(m["question_end_s"]); on = voiced_onset(f"{d}/output.wav", qe)
-        kt = keyword_time(f"{d}/output.wav", keyword(m.get("question", ""), ev.get("hyp_whisper") or ev.get("transcript", ""), m.get("answer", "")))
+        kt = keyword_time(f"{d}/output.wav", keyword(m.get("question", ""), ev.get("transcript", ""), m.get("answer", "")))
         rows.append({"id": os.path.basename(d), "q_end": qe,
                      "ttfat": round(on - qe, 2) if on is not None else None,
                      "kd": round(kt - on, 2) if (kt is not None and on is not None and kt >= on) else None,

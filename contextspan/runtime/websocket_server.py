@@ -56,7 +56,7 @@ async def ws_handler(request):
             UserLeveller(sample_rate=int(eng.mimi.sample_rate), enhancer=enh() if enh else None)
         raw_tail, raw_told = [], False
         db, events = ContextDB(ContextProfile(persona=persona)), []
-        # continuous utterance ASR (DuetaSpan live server): `heard` is indexed by absolute frame via `base`
+        # continuous utterance ASR: `heard` is indexed by absolute frame via `base`
         utts, base, cache, ret_wait, t_ret = Utterances(), 0, {"text": None, "t": -1e9, "final": False}, None, 0.0
         slot = None                      # the span read whose following frame is still to be timed
         sr = int(eng.mimi.sample_rate)
@@ -73,7 +73,7 @@ async def ws_handler(request):
                                            dict(user), db, shown, list(events), notify, question)
             # Read the span the moment the backend returns, not at the next frame head. The loop thread is
             # idle for ~48 ms of every 80 ms frame (a step is ~32 ms), and a block read costs 27-41 ms
-            # (2026-09-09, up to 400 tokens), so the read usually lands in that gap and the next frame
+            # (up to 400 tokens), so the read usually lands in that gap and the next frame
             # pays nothing. The KV sequence is the same either way: the block sits between the last
             # stepped frame and the next one.
             pending.add_done_callback(lambda fut: asyncio.ensure_future(on_retrieved(fut)))
@@ -171,7 +171,7 @@ async def ws_handler(request):
             # The model is conditioned on this audio and the fine-tune's user channel sits in
             # a narrow band, so a quiet microphone is off-distribution input rather than a
             # merely faint one. The ASR hides that: it keeps transcribing while the model
-            # stops reacting (#18). Level it here, before both consumers.
+            # stops reacting. Level it here, before both consumers.
             raw_peak = float(np.sqrt(np.mean(frame * frame))) if frame.size else 0.0
             if leveller is not None:
                 raw_tail.append(frame)

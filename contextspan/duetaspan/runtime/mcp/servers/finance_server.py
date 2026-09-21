@@ -136,24 +136,24 @@ def get_stock_price(company: str) -> str:
         if prev:
             try:
                 pct = (price - prev) / prev * 100.0
-                # Surface-form parity (2026-08-03): the canonical change-rate form in the
-                # training spans is ", up 1.2% from the previous close" (up/down, 70 cases).
-                # The parenthesized "(-8.8% today)" form appeared 0 times in training.
+                # Surface-form parity: the canonical change-rate form in the training spans is
+                # ", up 1.2% from the previous close" (up/down, 70 cases). A parenthesized
+                # "(-8.8% today)" form appears 0 times in training.
                 change_txt = f", {'up' if pct >= 0 else 'down'} {abs(pct):.1f}% from the previous close"
             except Exception:
                 change_txt = ""
         price_txt = f"{price:,.2f}".rstrip("0").rstrip(".") if isinstance(price, float) else str(price)
         # No "(tool result)" prefix here: the span-prefix is applied uniformly by the consuming
-        # layer (realtime._as_tool_result), so baking it into this one server made its output
-        # inconsistent with every other adapter (plain record) and double-prefixed downstream.
-        # A trailing "right now" also appeared 0 times in the training stock spans — the
-        # canonical form ends the sentence with a period: "... KRW."
+        # layer (realtime._as_tool_result), so baking it into this one server would make its
+        # output inconsistent with every other adapter (plain record) and double-prefixed
+        # downstream. A trailing "right now" also appears 0 times in the training stock spans —
+        # the canonical form ends the sentence with a period: "... KRW."
         return (
             f"{name} ({sym}) is trading at "
             f"{price_txt} {currency}{change_txt}."
         ).replace("  ", " ")
     except Exception:  # pragma: no cover - network failure path
-        return ""   # a transport failure is not something to say aloud: no span (ContextSpanning #10)
+        return ""   # a transport failure is not something to say aloud: no span
 
 
 if __name__ == "__main__":

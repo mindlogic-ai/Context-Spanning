@@ -1,12 +1,12 @@
 """A local gazetteer and POI index, so the common questions never leave this machine.
 
 The remote free sources cannot answer in a second, and no amount of caching fixes the
-*first* call. Measured from this box: Nominatim 300-550 ms plus a mandatory 1.05 s gap
+*first* call. Measured: Nominatim 300-550 ms plus a mandatory 1.05 s gap
 between requests, Overpass 2-12 s for a radius query, Photon 1.1 s. Most of that is the
 round trip to Europe. `directions` pays the Nominatim gap twice, once per endpoint.
 
-So bring the data here. Two sources, chosen because both download in seconds where
-Geofabrik's Korea extract crawled at 17 kB/s:
+So bring the data here. Two sources, chosen because both download in seconds (Geofabrik's
+whole-country extract is far slower to fetch; `_extract` prefers it when it is on disk):
 
   GeoNames KR.txt   144k Korean places, nationwide — 선릉역, 강남구, 성수동, 경주, 부산.
                     Its `name` column is romanised; the Korean is in `alternatenames`.
@@ -294,8 +294,8 @@ if __name__ == "__main__":
     assert parks, "성수동 has parks within 2 km; ways must be indexed, not just nodes"
     print(f"parks near 성수동  {len(parks)} found, nearest {parks[0][1]}")
 
-    # 경주 is the whole point of the country-wide extract: on the Seoul-only file this
-    # box excluded it and `attractions` fell through to a 3.1 s Overpass call.
+    # 경주 is the whole point of the country-wide extract: on the Seoul-only file the
+    # box excludes it and `attractions` falls through to a 3.1 s Overpass call.
     gyeongju = place("경주")
     lat, lon = float(gyeongju["lat"]), float(gyeongju["lon"])
     if covers(lat, lon):

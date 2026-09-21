@@ -31,7 +31,7 @@ PROMPT = "You are a wise and friendly teacher. Answer questions or provide advic
 class GoldReferenceBackend(RealtimeBackend):
     """The set's gold passage IS the reference (HaluEvalAudio; MoshiRAG Table 8)."""
     def __init__(self, ref):
-        super().__init__(cache=False); self._ref = ref
+        super().__init__(); self._ref = ref
     def retrieve(self, query, **kw):
         self.last_source = "gold_passage"; return self._ref
 
@@ -60,7 +60,7 @@ def main(argv=None):
     ap.add_argument("mode", choices=["halueval", "math", "llama_questions", "web_questions", "trivia_qa"])
     ap.add_argument("data_root"); ap.add_argument("out_root")
     ap.add_argument("--checkpoint", required=True)
-    ap.add_argument("--limit", type=int, default=0, help="first N items in dataset order (semi = 120)")
+    ap.add_argument("--limit", type=int, default=0, help="first N items in dataset order")
     ap.add_argument("--shard", default=None, help="K/N: items K, K+N, K+2N... (lanes sharing one set)")
     a = ap.parse_args(argv)
     items = list(load_items(a.mode, a.data_root))

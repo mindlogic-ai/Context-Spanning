@@ -5,7 +5,7 @@ through the real stack at the 1.0x frame clock; the tool calls the router made (
 in order) and the agent's transcript are written as result_<provider>.json in the sample directory,
 with exactly the keys the official evaluators (evaluate_tool_calls.py / evaluate_pass_rate.py) read:
     example_id, actual_tool_calls [{function, args, timestamp_start}], transcript
-The tool universe is the benchmark's own 12 tools (fdb_v3_toolpack.py) and nothing else.
+The tool universe is the benchmark's own 12 tools (v3_toolpack.py) and nothing else.
 
     export FDB_V3_DIR=<Full-Duplex-Bench clone>/v3
     python -m benchmark.fdb.v3_run <data_root> [--checkpoint ckpt.pt] [--limit N] [--provider ours]
@@ -51,7 +51,6 @@ def main(argv=None):
     # the router's tool universe is exactly the benchmark's 12 tools
     os.environ["MOSHICP_EXTRA_TOOLPACK"] = os.path.join(os.path.dirname(os.path.abspath(__file__)), "v3_toolpack.py")
     os.environ["MOSHICP_TOOLPACK_ONLY"] = "1"
-    os.environ.setdefault("MOSHICP_MCP", "1")
 
     samples = sorted(os.path.dirname(p) for p in glob.glob(f"{a.data_root}/**/input.wav", recursive=True)
                      if "MACOSX" not in p)
