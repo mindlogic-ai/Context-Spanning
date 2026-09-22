@@ -92,7 +92,6 @@ def contains(hay: str, needle: str) -> bool:
 
 async def one(page, url: str, wav: str, case: dict, seconds: float) -> dict:
     await page.goto(url, wait_until="domcontentloaded", timeout=60000)
-    await page.fill("#name", "Seonghyeon")
     await page.fill("#loc", "Seoul")
     errs: list[str] = []
     page.on("pageerror", lambda e: errs.append(str(e)[:120]))
