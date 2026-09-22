@@ -168,6 +168,7 @@ function recEvent(kind, extra) { if (rec) rec.events.push(Object.assign({ t: +no
 // the server's default (contextspan/runtime/default_persona.py): the page does not send one.
 // The place comes from the browser's geolocation: the server names the coordinates (district, city,
 // in English, as the model's prefix reads "The user is in {city}.") and sends the name back.
+const FIELDS = ["loc"];
 const stored = (f) => { try { return localStorage.getItem("cs." + f); } catch (e) { return null; } };
 for (const f of FIELDS) { const v = stored(f); if (v !== null) $(f).value = v; }
 function context() {
