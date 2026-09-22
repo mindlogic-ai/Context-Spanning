@@ -193,8 +193,10 @@ class MoshiRagJudge:
         if not text or not text.strip() or not question:
             return None
         prompt = self.template.format(question=question, answer=text, valid_answers=str(answer_variants(gold)))
-        body = {"model": self.model, "max_tokens": 512, "temperature": self.temperature, "top_p": 1.0, "top_k": 1,   # moshi-rag judge client: top_k=1 -> greedy
+        body = {"model": self.model, "max_tokens": 512, "temperature": self.temperature, "top_p": 1.0,
                 "messages": [{"role": "user", "content": prompt}]}
+        if self.kind == "gemma":
+            body["top_k"] = 1            # moshi-rag judge client: top_k=1 -> greedy (vLLM only; the OpenAI API rejects top_k)
         for _ in range(3):
             try:
                 r = self.sess.post(self.url, json=body, headers=self.headers, timeout=120)
