@@ -129,8 +129,8 @@ body.talking .bar .status { margin-left: auto; }
   <div class="field">
     <label for="loc">Where you are:</label>
     <div class="row">
-      <select id="loc" title="The city the agent is told you are in"><option value="">not set</option></select>
-      <button id="geo" type="button" title="Asks the browser once and picks the nearest city above; nothing is sent anywhere but this server">Use my location</button>
+      <input id="loc" placeholder="Press Use my location, or type a place" autocomplete="off">
+      <button id="geo" type="button" title="Asks the browser once; the server names the place. Nothing is sent anywhere but this server and the geocoder">Use my location</button>
     </div>
   </div>
 </div>
@@ -166,22 +166,8 @@ function recEvent(kind, extra) { if (rec) rec.events.push(Object.assign({ t: +no
 
 // Where you are. Remembered in this browser only; sent to this server only. The persona is
 // the server's default (contextspan/runtime/default_persona.py): the page does not send one.
-// The city is one of a list, in English, because the model's prefix reads "The user is in {city}."
-// in the training corpus's phrasing and the whole pipeline is English-only.
-const FIELDS = ["loc"];
-const CITIES = [["Seoul", 37.57, 126.98], ["Busan", 35.18, 129.08], ["Tokyo", 35.68, 139.69], ["Osaka", 34.69, 135.50],
-  ["Beijing", 39.90, 116.40], ["Shanghai", 31.23, 121.47], ["Hong Kong", 22.32, 114.17], ["Taipei", 25.03, 121.57],
-  ["Singapore", 1.35, 103.82], ["Bangkok", 13.76, 100.50], ["Mumbai", 19.08, 72.88], ["Dubai", 25.20, 55.27],
-  ["Moscow", 55.76, 37.62], ["Istanbul", 41.01, 28.98], ["Berlin", 52.52, 13.41], ["Paris", 48.86, 2.35],
-  ["London", 51.51, -0.13], ["Madrid", 40.42, -3.70], ["Rome", 41.90, 12.50], ["Sydney", -33.87, 151.21],
-  ["New York", 40.71, -74.01], ["Chicago", 41.88, -87.63], ["Los Angeles", 34.05, -118.24], ["San Francisco", 37.77, -122.42],
-  ["Toronto", 43.65, -79.38], ["Mexico City", 19.43, -99.13], ["Sao Paulo", -23.55, -46.63]];
-for (const [c] of CITIES) { const o = document.createElement("option"); o.value = o.textContent = c; $("loc").append(o); }
-function nearestCity(lat, lon) {
-  const d = (a, b, c, e) => { const r = Math.PI / 180, x = Math.sin((c - a) * r / 2), y = Math.sin((e - b) * r / 2);
-    return x * x + Math.cos(a * r) * Math.cos(c * r) * y * y; };
-  return CITIES.reduce((best, c) => d(lat, lon, c[1], c[2]) < d(lat, lon, best[1], best[2]) ? c : best)[0];
-}
+// The place comes from the browser's geolocation: the server names the coordinates (district, city,
+// in English, as the model's prefix reads "The user is in {city}.") and sends the name back.
 const stored = (f) => { try { return localStorage.getItem("cs." + f); } catch (e) { return null; } };
 for (const f of FIELDS) { const v = stored(f); if (v !== null) $(f).value = v; }
 function context() {
@@ -200,13 +186,13 @@ $("geo").onclick = () => {
   $("geo").disabled = true; $("geo").textContent = "Locating";
   navigator.geolocation.getCurrentPosition((p) => {
     geo = { lat: p.coords.latitude, lon: p.coords.longitude };
-    $("loc").value = nearestCity(geo.lat, geo.lon);      // the closest of the listed cities
+    $("loc").value = "";                                 // the server names the coordinates
     $("geo").textContent = `${geo.lat.toFixed(2)}, ${geo.lon.toFixed(2)}`; $("geo").disabled = false;
     sendContext();
   }, (err) => {
     // Refused or unavailable: fine, the typed location (if any) still counts.
     geo = null; $("geo").textContent = "Use my location"; $("geo").disabled = false;
-    notice("Location not shared (" + err.message + "). Pick a city instead, or leave it not set.");
+    notice("Location not shared (" + err.message + "). Type a place instead, or leave it empty.");
   }, { enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 });
 };
 let cloning = false, clip = [];
@@ -285,6 +271,7 @@ function connect() {
       else if (mode === "voice") { applyVoice(); }
       else { sendContext(); openMic(fmt.sampleRate, fmt.frameSize); }
     }
+    else if (m.type === "context") { $("loc").value = m.location || ""; try { localStorage.setItem("cs.loc", $("loc").value); } catch (e) {} }
     else if (m.type === "busy") {
       notice("Another conversation is already running on this server.");
       status("busy", "busy"); $("go").disabled = false;

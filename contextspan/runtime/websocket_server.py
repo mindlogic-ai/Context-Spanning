@@ -22,6 +22,7 @@ from aiohttp import WSMsgType, web
 
 from ..duetaspan.runtime.backend.context_db import ContextDB, ContextProfile
 from ..model import load_voice
+from ..duetaspan.runtime.mcp.adapters_maps import reverse_geocode
 from ..model.sequence_convention import persona_text
 from .frame_stream import RET_CUT_F, RET_DEADLINE_S, RET_UTT_WAIT_S, Utterances, ret_question_plan, retrieve_for_ret
 from .user_leveller import TARGET_LUFS, UserLeveller, load_enhancer, measure_lufs
@@ -147,6 +148,17 @@ async def ws_handler(request):
                     # resets the engine exactly like a persona change.
                     keys = {"name": "name", "location": "city", "lat": "lat", "lon": "lon", "tz": "timezone"}
                     user = {keys[k]: m[k] for k in keys if m.get(k) not in (None, "")}
+                    if "city" not in user and "lat" in user and "lon" in user:
+                        # The browser's coordinates, named: the model's prefix wants a place, not numbers.
+                        try:
+                            user["city"] = await asyncio.get_running_loop().run_in_executor(
+                                None, reverse_geocode, float(user["lat"]), float(user["lon"]))
+                        except Exception as e:
+                            log.warning("reverse geocode: %s", e); user["city"] = ""
+                        if user["city"]:
+                            await ws.send_json({"type": "context", "location": user["city"]})
+                        else:
+                            del user["city"]
                     db = ContextDB(ContextProfile(persona=m.get("persona") or persona, **user))
                     want = persona_text(m["persona"] if "persona" in m else persona, user)
                     if want != prefix:
