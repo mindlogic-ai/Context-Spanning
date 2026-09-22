@@ -55,18 +55,6 @@ def load_items(mode, root):
             yield f"{mode}_{i}", wav, r[qk], gold, None
 
 
-def seed_all(seed):
-    """moshi-rag inference_utils/utils.py seed_all: the speech model samples at its temperatures, but from a fixed seed."""
-    import random
-    import numpy as np
-    import torch
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed(seed); torch.cuda.manual_seed_all(seed)
-    random.seed(seed); np.random.seed(seed)
-    torch.backends.cudnn.deterministic = False; torch.backends.cudnn.benchmark = False
-
-
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("mode", choices=["halueval", "math", "llama_questions", "web_questions", "trivia_qa"])
@@ -74,7 +62,6 @@ def main(argv=None):
     ap.add_argument("--checkpoint", required=True)
     ap.add_argument("--shard", default=None, help="K/N: items K, K+N, K+2N... (lanes sharing one set)")
     a = ap.parse_args(argv)
-    seed_all(42424242)                  # moshi-rag run_inference.py: one fixed seed per process
     items = list(load_items(a.mode, a.data_root))
     if a.shard:
         k, n_sh = (int(x) for x in a.shard.split("/"))

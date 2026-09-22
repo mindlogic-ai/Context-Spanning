@@ -8,6 +8,7 @@ import numpy as np
 from contextspan.duetaspan.align.asr import ASR, _resample
 from contextspan.duetaspan.runtime.backend.realtime import RealtimeBackend
 from contextspan.model import Engine, load_voice
+from contextspan.model.engine import seed_all
 from contextspan.model.sequence_convention import transcript
 from contextspan.runtime.frame_stream import run_stream
 
@@ -32,7 +33,9 @@ class Stack:
     voice block is outside the training distribution, and the paper runs drew the voice from the
     training voice pool by a hash of the sample key; here the pool is the released f0/f1/f2."""
 
-    def __init__(self, checkpoint=None, temp=0.8, temp_text=0.7, backend=None, voice=None):
+    def __init__(self, checkpoint=None, temp=0.8, temp_text=0.7, backend=None, voice=None, seed=42424242):
+        if seed is not None:                       # moshi-rag run_inference.py: one fixed seed per process
+            seed_all(seed)
         self.eng = Engine(checkpoint, temp=temp, temp_text=temp_text)
         self.backend = backend if backend is not None else RealtimeBackend()
         self.asr = ASR()

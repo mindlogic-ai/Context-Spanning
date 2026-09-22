@@ -58,8 +58,11 @@ def _ctx(a):
 
 def infer(a):
     from contextspan.model import Engine, load_voice
+    from contextspan.model.engine import seed_all
     from contextspan.model.sequence_convention import persona_text, transcript
     from contextspan.runtime.frame_stream import run_stream
+    if a.seed is not None:
+        seed_all(a.seed)
     eng = Engine(a.checkpoint, temp=a.temp, temp_text=a.temp_text, cpu_offload=a.cpu_offload)
     eng.set_persona(persona_text(a.text_prompt, _ctx(a)), load_voice(a.voice))   # name/city as in training
     pcm, sr = sf.read(a.input_wav, dtype="float32")
@@ -83,7 +86,10 @@ def infer(a):
 
 def serve(a):
     from contextspan.model import Engine, load_voice
+    from contextspan.model.engine import seed_all
     from contextspan.runtime.websocket_server import serve as serve_ws
+    if a.seed is not None:
+        seed_all(a.seed)
     eng = Engine(a.checkpoint, temp=a.temp, temp_text=a.temp_text)
     backend, asr = _backend_and_asr()
     serve_ws(eng, backend, asr, a.text_prompt, load_voice(a.voice),
@@ -120,6 +126,7 @@ def main(argv=None):
     p.add_argument("--user-tz", default="", help="IANA timezone, e.g. Asia/Seoul")
     p.add_argument("--temp", type=float, default=0.8)
     p.add_argument("--temp-text", type=float, default=0.7)
+    p.add_argument("--seed", type=int, default=None, help="seed every sampler once (reproducible runs); default unseeded")
     p.add_argument("--cpu-offload", action="store_true")
     p.set_defaults(fn=infer)
 
@@ -137,6 +144,7 @@ def main(argv=None):
     p.add_argument("--listen-s", type=float, default=12.0)
     p.add_argument("--temp", type=float, default=0.8)
     p.add_argument("--temp-text", type=float, default=0.7)
+    p.add_argument("--seed", type=int, default=None, help="seed every sampler once (reproducible runs); default unseeded")
     p.set_defaults(fn=serve)
 
     p = sub.add_parser("prepare", help="encode dialogues (json + stereo wav) into training tensors")

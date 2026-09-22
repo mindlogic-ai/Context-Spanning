@@ -17,6 +17,18 @@ from .sequence_convention import (N_AUDIO_CB, RET_TOKEN_ID, SILENCE_TOKENS, SINE
 from .weights import load_mimi, load_model
 
 
+def seed_all(seed):
+    """One seed for every sampler in the process (torch, CUDA, numpy, random), as moshi-rag's seed_all does:
+    the model still samples at its temperatures, but a run over the same inputs is reproducible up to GPU
+    nondeterminism. The benchmark stack seeds itself with moshi-rag's 42424242; `serve`/`infer` seed only on request."""
+    import random
+    random.seed(seed); np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = False; torch.backends.cudnn.benchmark = False
+
+
 class Engine:
     """One user frame in, one agent frame out; `<ret>` triggers the backend; spans are injected
     as masked blocks exactly as in training."""
