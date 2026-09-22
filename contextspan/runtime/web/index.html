@@ -24,7 +24,7 @@
 body {
   margin: 0; background: var(--bg); color: var(--fg); min-height: 100vh;
   font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  display: flex; flex-direction: column; align-items: center; padding: 56px 22px 90px;
+  display: flex; flex-direction: column; align-items: center; padding: 40px 22px 90px;
 }
 header { width: min(880px, 100%); display: flex; flex-direction: column; gap: 10px; margin-bottom: 26px; }
 h1 { font-size: clamp(22px, 2.6vw, 30px); font-weight: 650; margin: 0; letter-spacing: -0.02em; line-height: 1.15; }
@@ -81,7 +81,7 @@ canvas { width: 100%; height: 28px; display: block; }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 /* Setup finishes before the conversation starts: the fields and the voice are
    decided first, Start talking swaps them for the conversation. */
-body.talking .who, body.talking #clone { display: none; }
+body.talking .setup { display: none; }
 body:not(.talking) #thread, body:not(.talking) .meters { display: none; }
 .notice {
   width: min(880px, 100%); margin-top: 12px; border-left: 3px solid var(--coral);
@@ -89,36 +89,68 @@ body:not(.talking) #thread, body:not(.talking) .meters { display: none; }
   color: var(--dim); font-size: 13px; display: none;
 }
 .notice.show { display: block; }
-.who {
-  width: min(880px, 100%); margin-top: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); order: -1;
-  padding: 12px 16px; display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;
+/* Setup, laid out like the PersonaPlex page: title and one line under it, the
+   text prompt with example pills above it, the voice, who you are, Connect. */
+header { align-items: center; text-align: center; gap: 6px; order: -2; }
+header p { margin: 0; color: var(--dim); font-size: 14px; }
+.setup { width: min(680px, 100%); display: flex; flex-direction: column; gap: 22px; order: -1; }
+.field { display: flex; flex-direction: column; gap: 8px; }
+.field > label { font-size: 15px; font-weight: 600; text-align: left; }
+.examples { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; }
+.examples small { display: block; color: var(--dim); font-size: 11.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 8px; }
+.pills { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.pill { padding: 4px 12px; font-size: 12.5px; font-weight: 500; }
+textarea, select, .field input {
+  font: inherit; font-size: 14.5px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--panel); color: var(--fg); width: 100%;
 }
-.who label { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: var(--dim);
-             text-transform: uppercase; letter-spacing: .1em; font-weight: 600; }
-.who input {
-  font: inherit; font-size: 14px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px;
-  background: transparent; color: var(--fg); text-transform: none; letter-spacing: 0; font-weight: 400;
-}
-.who input:focus { outline: none; border-color: var(--fg); }
-.who .persona { grid-column: 1 / -1; }
-.who .lead { border: 1px solid var(--mint); border-radius: var(--r); padding: 11px 13px; background: var(--mint-soft); }
-.who .lead > input { margin-top: 6px; }
-.who .lead small { font-size: 11.5px; font-weight: 400; letter-spacing: 0; text-transform: none;
-                   color: var(--dim); margin-top: 6px; }
-.who .hint { grid-column: 1 / -1; color: var(--dim); font-size: 12px; margin: -2px 0 0; }
-@media (max-width: 780px) { .who { grid-template-columns: 1fr; } }
+textarea { min-height: 110px; max-height: 260px; resize: vertical; line-height: 1.55; }
+textarea:focus, select:focus, .field input:focus { outline: none; border-color: var(--mint); box-shadow: 0 0 0 2px var(--mint-soft); }
+.count { text-align: right; font-size: 12px; color: var(--dim); }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.row > select, .row > input { flex: 1 1 180px; width: auto; }
+.bar { width: min(680px, 100%); justify-content: center; background: none; border: 0; padding: 0; margin-top: 18px; order: 0; }
+.bar .status { margin-left: 0; }
+body.talking .bar { width: min(880px, 100%); justify-content: flex-start; background: var(--panel); border: 1px solid var(--line); padding: 14px 16px; margin-top: 0; }
+body.talking .bar .status { margin-left: auto; }
+.notice { width: min(680px, 100%); }
 </style>
 
 <header>
-  <h1>Set the agent up, then talk to it.</h1>
+  <h1>Context Spanning</h1>
+  <p>Full duplex conversational AI with text and voice control.</p>
 </header>
 
+<div class="setup">
+  <div class="field">
+    <label for="persona">Text Prompt:</label>
+    <div class="examples"><small>Examples</small><div class="pills" id="presets"></div></div>
+    <textarea id="persona" maxlength="1000" placeholder="Who the agent is; read once, when the conversation begins."></textarea>
+    <div class="count" id="count">0/1000</div>
+  </div>
+
+  <div class="field">
+    <label for="voicesel">Voice:</label>
+    <div class="row">
+      <select id="voicesel" title="One of the released voices"><option value="">default (f0)</option><option value="f1">f1</option><option value="f2">f2</option><option value="f3">f3</option><option value="m0">m0</option><option value="m1">m1</option><option value="m2">m2</option><option value="m3">m3</option><option value="seonghyeon">seonghyeon</option></select>
+      <button id="clone" type="button">Clone my voice</button>
+      <button id="voicefile-btn" type="button" title="A recording of the voice to speak with (any audio file, a few seconds or more)">Use a voice file</button>
+      <input type="file" id="voicefile" accept="audio/*" hidden>
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="name">You:</label>
+    <div class="row">
+      <input id="name" placeholder="Your name (optional)" autocomplete="off">
+      <input id="loc" placeholder="Where you are" autocomplete="off">
+      <button id="geo" type="button" title="Asks the browser once; nothing is sent anywhere but this server">Use my location</button>
+    </div>
+  </div>
+</div>
+
 <div class="bar">
-  <button id="go" class="primary">Start talking</button>
-  <button id="clone">Clone my voice</button>
-  <select id="voicesel" title="One of the released voices"><option value="">Voice: default (f0)</option><option value="f1">Voice: f1</option><option value="f2">Voice: f2</option><option value="f3">Voice: f3</option><option value="m0">Voice: m0</option><option value="m1">Voice: m1</option><option value="m2">Voice: m2</option><option value="m3">Voice: m3</option><option value="seonghyeon">Voice: seonghyeon</option></select>
-  <button id="voicefile-btn" type="button" title="A recording of the voice to speak with (any audio file, a few seconds or more)">Use a voice file</button>
-  <input type="file" id="voicefile" accept="audio/*" hidden>
+  <button id="go" class="primary">Connect</button>
   <span class="status"><span class="dot" id="dot"></span><span id="state">idle</span></span>
 </div>
 
@@ -126,17 +158,6 @@ body:not(.talking) #thread, body:not(.talking) .meters { display: none; }
 <div class="bar" id="rec" hidden>
   <a id="recwav" download>Download recording (wav: left = you, right = agent)</a>
   <a id="recjson" download>Download transcript (json: spans, text, timing)</a>
-</div>
-
-<div class="who">
-  <label class="persona lead">Agent persona &mdash; set before you start
-    <input id="persona" placeholder="who the agent is; read once, when the conversation begins">
-    <small>This is the setting the conversation runs under. It is read when you press Start talking and cannot be changed mid-conversation.</small>
-  </label>
-  <label>Your name <input id="name" placeholder="optional" autocomplete="off"></label>
-  <label>Where you are <input id="loc" placeholder="city, or use the button" autocomplete="off"></label>
-  <button id="geo" type="button" title="Asks the browser once; nothing is sent anywhere but this server">Use my location</button>
-  <label class="persona">Knowledge (optional) <input id="db" placeholder="a passage the agent may draw on; it goes to the retrieval router, not the model" autocomplete="off"></label>
 </div>
 
 <div class="meters">
@@ -158,7 +179,7 @@ const now = () => (rec ? (performance.now() - rec.t0) / 1000 : 0);
 function recEvent(kind, extra) { if (rec) rec.events.push(Object.assign({ t: +now().toFixed(3), type: kind }, extra || {})); }
 
 // Who is talking. Remembered in this browser only; sent to this server only.
-const FIELDS = ["name", "loc", "persona", "db"];
+const FIELDS = ["name", "loc", "persona"];
 const stored = (f) => { try { return localStorage.getItem("cs." + f); } catch (e) { return null; } };
 for (const f of FIELDS) { const v = stored(f); if (v !== null) $(f).value = v; }
 let serverPersona = "";                  // the default this server starts from, sent with `ready`
@@ -166,8 +187,7 @@ function context() {
   let tz = "";
   try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) {}
   return { type: "context", name: $("name").value.trim(), location: $("loc").value.trim(),
-           lat: geo ? geo.lat : null, lon: geo ? geo.lon : null, tz, persona: $("persona").value.trim(),
-           db: $("db").value.trim() };
+           lat: geo ? geo.lat : null, lon: geo ? geo.lon : null, tz, persona: $("persona").value.trim() };
 }
 function sendContext() {
   for (const f of FIELDS) {
@@ -180,6 +200,20 @@ function sendContext() {
   if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(context()));
 }
 for (const f of FIELDS) $(f).addEventListener("change", sendContext);
+// Example prompts, as pills above the text prompt. "Assistant (default)" is whatever this server starts from.
+const PRESETS = [
+  ["Assistant (default)", null],
+  ["Medical office (service)", "You work for Dr. Jones's medical office, and you are receiving calls to record information for new patients. Record full name, date of birth, any medication allergies and any prior medical conditions. Assure the patient that this information is confidential, if they ask."],
+  ["Bank (service)", "You work for First Neuron Bank and your name is Alexis Kim. The customer's transaction for $1,200 at Home Depot was declined because it was attempted in Miami while the customer normally transacts in Seattle. Verify the customer's identity, then explain."],
+  ["Astronaut (fun)", "You are an astronaut on the International Space Station, talking to a class of schoolchildren over the radio. Be vivid and enthusiastic."],
+];
+for (const [label, text] of PRESETS) {
+  const b = document.createElement("button"); b.type = "button"; b.className = "pill"; b.textContent = label;
+  b.onclick = () => { $("persona").value = text === null ? serverPersona : text; counter(); sendContext(); };
+  $("presets").append(b);
+}
+function counter() { $("count").textContent = `${$("persona").value.length}/1000`; }
+$("persona").addEventListener("input", counter); counter();
 $("geo").onclick = () => {
   if (!navigator.geolocation) { notice("This browser has no geolocation."); return; }
   $("geo").disabled = true; $("geo").textContent = "Locating";
@@ -266,7 +300,7 @@ function connect() {
     // server's default persona is shown rather than assumed, so emptying the field is a choice.
     if (m.type === "ready") {
       serverPersona = m.persona || "";
-      if (stored("persona") === null) $("persona").value = serverPersona;
+      if (stored("persona") === null) { $("persona").value = serverPersona; counter(); }
       fmt = { sampleRate: m.sample_rate, frameSize: m.frame_size };
       if (mode === "clone") { openMic(fmt.sampleRate, fmt.frameSize, true); }
       else if (mode === "voice") { applyVoice(); }
@@ -301,7 +335,7 @@ function connect() {
       $("voicefile-btn").disabled = false; $("go").disabled = false;
     }
     else if (m.type === "voice") {
-      status(`voice ${m.name || "f0"} ready — press Start talking`, null);
+      status(`voice ${m.name || "f0"} ready — press Connect`, null);
       $("go").disabled = false; $("clone").disabled = false; $("voicefile-btn").disabled = false;
     }
   };
@@ -494,7 +528,7 @@ function stop(msg) {
   fmt = null;
   lvl.u.fill(0); lvl.a.fill(0);
   status(msg, null);
-  $("go").textContent = "Start talking"; $("go").disabled = false;
+  $("go").textContent = "Connect"; $("go").disabled = false;
   $("go").onclick = start;
   $("clone").textContent = "Clone my voice"; $("clone").disabled = false; $("voicefile-btn").disabled = false;
 }
