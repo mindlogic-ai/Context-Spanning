@@ -8,7 +8,7 @@ with exactly the keys the official evaluators (evaluate_tool_calls.py / evaluate
 The tool universe is the benchmark's own 12 tools (v3_toolpack.py) and nothing else.
 
     export FDB_V3_DIR=<Full-Duplex-Bench clone>/v3
-    python -m benchmark.fdb.v3_run <data_root> [--checkpoint ckpt.pt] [--limit N] [--provider ours]
+    python -m benchmark.fdb.v3_run <data_root> [--checkpoint ckpt.pt] [--provider ours]
 """
 import argparse
 import glob
@@ -18,6 +18,7 @@ import re
 import sys
 
 import numpy as np
+import soundfile as sf
 
 from benchmark.stack import Stack, load_mono, transcript
 
@@ -40,7 +41,6 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("data_root")
     ap.add_argument("--checkpoint", default=None)
-    ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--provider", default="ours")
     ap.add_argument("--tail-s", type=float, default=6.0, help="silence appended after the user stops")
     ap.add_argument("--temp", type=float, default=0.8)
@@ -54,8 +54,6 @@ def main(argv=None):
 
     samples = sorted(os.path.dirname(p) for p in glob.glob(f"{a.data_root}/**/input.wav", recursive=True)
                      if "MACOSX" not in p)
-    if a.limit:
-        samples = samples[: a.limit]
     print(f"[fdbv3] {len(samples)} samples under {a.data_root}", flush=True)
     st = Stack(a.checkpoint, a.temp, a.temp_text)
     done = 0
@@ -84,6 +82,9 @@ def main(argv=None):
                   "input_duration_s": round(n * st.fs / st.sr - a.tail_s, 2),
                   "retrieval_events": [{k: e.get(k) for k in ("t_ret", "t_inj", "question", "src", "args", "reference", "inject")}
                                        for e in res["events"]]}
+        # agent audio for the turn-taking metrics (take-turn, latency, interruption, filler): the paper's analysis runs
+        # ASR with word timestamps on this file (benchmark/fdb/v3_turn_taking.py)
+        sf.write(f"{sdir}/output_{a.provider}.wav", res["agent"], st.sr)
         with open(result_path, "w") as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
         done += 1

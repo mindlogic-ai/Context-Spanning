@@ -19,7 +19,8 @@ PROMPT_FILE = f"{_HERE}/reference_prompt_template.txt"
 REFERENCE_MODEL = "google/gemma-4-26B-A4B-it"
 RAG_TIMEOUT_S = 10.0          # run_inference.py --rag-timeout default (the offline evaluation), not the live server's 1.5
 MAX_REFERENCE_TOKENS = 64     # run_inference.py --max-reference-tokens default
-STT_WAIT_S = 0.5              # run_inference.py --stt-wait-time default: wait after <ret>, then send the transcript so far
+STT_WAIT_S = 0.5              # run_inference.py --stt-wait-time default; paper 3.3.2: "Once <ret> is predicted, we first wait
+                              # 0.5 seconds for the ASR model to produce a complete transcript of the user's utterance."
 
 
 def _norm(t):

@@ -90,21 +90,16 @@ def fetch(url, timeout=120):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("out", help="benchmark directory; questions go to <out>/questions/")
-    ap.add_argument("--sets", default=",".join(SOURCES), help="comma-separated subset (default: all five)")
     ap.add_argument("--raw", default=None, help="directory holding the raw files (AddSub.json, MultiArith.json, "
                                                 "SingleEq.json, SVAMP.json, gsm8k_test.jsonl) to parse instead of downloading")
     ap.add_argument("--force", action="store_true", help="download again even if <out>/questions/raw/ has the file")
     a = ap.parse_args(argv)
-    sets = [s.strip() for s in a.sets.split(",") if s.strip()]
-    unknown = [s for s in sets if s not in SOURCES]
-    if unknown:
-        ap.error(f"unknown set(s): {', '.join(unknown)}; choose from {', '.join(SOURCES)}")
     qdir = os.path.join(a.out, "questions")
     raw_dir = os.path.join(qdir, "raw")
     os.makedirs(raw_dir, exist_ok=True)
 
     failed, total = [], 0
-    for name in sets:
+    for name in SOURCES:
         url, raw_name, parse, expected = SOURCES[name]
         cached = os.path.join(a.raw or raw_dir, raw_name)
         try:

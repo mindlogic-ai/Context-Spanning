@@ -26,17 +26,17 @@ it end to end; a number is comparable with another only if both come from the sa
 
 ## 2. Reference
 
-The reference that answers a `<ret>` is decided by the set, not by an option:
+The reference that answers a `<ret>` is the same for every set, HaluEvalAudio included (the protocol of the MoshiRAG
+main table, where the reference is generated from the question and the gold passage is never shown):
 
-- **HaluEvalAudio**: the set's gold passage is the reference (MoshiRAG Table 8, GT reference).
-- **every other set**: the moshi-rag reference generator (`rag/moshirag.py`) on our router model
+- **every set**: the moshi-rag reference generator (`rag/moshirag.py`) on our router model
   `google/gemma-4-26B-A4B-it` (vLLM, `--gpu-memory-utilization 0.70`, `--max-model-len 8192`,
   `--enable-prefix-caching`; `MOSHIRAG_LLM_URL` and `MOSHIRAG_LLM_MODEL` name the server, and a run
   with another reference LLM is reported as such): kyutai-labs/moshi-rag `reference_prompt_template.txt` copied verbatim
   (`rag/reference_prompt_template.txt`), system prompt `You are a helpful assistant.`, the conversation so
   far as `Human:` / `moshi:` lines with earlier references interleaved, temperature 1.0, 64 tokens, stop at
   the first newline, 10 s timeout (the defaults of moshi-rag `run_inference.py`, its offline evaluation
-  driver; a timeout injects nothing). No tools, no abstain clause (MoshiRAG Table 9, LLM reference).
+  driver; a timeout injects nothing). No tools, no abstain clause.
 
 A reference is injected whenever it arrives within the timeout: the runtime's late-span drop
 (`CS_RET_DEADLINE_S`) is set to the same 10 s for the benchmark, as `run_inference.py` applies the
@@ -54,8 +54,9 @@ The deployed tool router (`contextspan/duetaspan/runtime/mcp`) is not part of th
 | Full-Duplex-Bench v1 | 727 clips, 5 tasks | `v1_v1.5/dataset/data/v1.0` | the benchmark's |
 | Full-Duplex-Bench v3 | 100 scenarios | `fdb_v3_data_released` | the benchmark's |
 
-Items are taken in dataset order. `--limit N` is the first N items;
-`--shard K/N` is every N-th item from K, for two lanes sharing one set.
+Every set is run whole, in dataset order. There is no subset, sample or smoke setting anywhere in this
+folder: a number is a full-set number or it is not reported. `--shard K/N` is every N-th item from K, so
+that two lanes with their own routers can render one set together.
 
 The math set is built from its public sources on any machine with one GPU (`pip install moshi` for the Kyutai
 TTS; the questions come from GitHub, the model and the voices from the Hugging Face Hub):
@@ -65,8 +66,7 @@ python benchmark/math/prepare_questions.py /data/math_audio   # -> questions/<se
 python benchmark/math/build_audio.py /data/math_audio         # -> meta.json + audios/<id>.wav
 ```
 
-`build_audio.py --limit 100` builds only the first 100 items, a quick subset laid out and noised exactly as
-those items are in the full build; `--dry-run` prints the item counts and voice assignment without a GPU, and
+The build is always the whole set: `--dry-run` prints the item counts and voice assignment without a GPU, and
 an interrupted build resumes. Each question is spoken with a voice from the raw `voice-donations/` recordings of
 `kyutai/tts-voices`, chosen by a hash of the item id, and written as 24 kHz stereo with 0.35 s of lead silence,
 the speech on the left channel and low-level noise on the right (the HaluEvalAudio layout); the docstring of
@@ -96,19 +96,24 @@ benchmark's `evaluate_tool_calls.py` and `evaluate_pass_rate.py` with `--use-llm
 
 ## 5. Machine layout and run conditions
 
-Two lanes, one router per lane, the ASR of a lane next to its engine, the judge on its own GPU, nothing
-else on those GPUs, every server warmed with one request before the first scored item. `run_full.sh`
-encodes the layout used for the paper (4 x 96 GB):
+Two lanes. A router server serves exactly one lane, never two (a router that batches two lanes changes the
+span latency of both), and a GPU that holds a Gemma holds nothing else: no engine, no ASR, no second
+model. One engine per render GPU with its ASR beside it, so the 1.0x frame clock is met (three engines on
+one 96 GB GPU render at about 0.75x and every span then lands early in frames; `rag/run.py` records
+`render_speed_x` per item and warns below 0.98x). Every server is warmed with one request before the
+first scored item. `run_full.sh` encodes the layout used for the paper (4 x 96 GB):
 
 | GPU | processes |
 | --- | --- |
-| 0 | router B (`:8006`) |
-| 1 | router A (`:8004`), lane A engine |
-| 2 | gemma-3-27b-it judge (`:8007`, 0.70), ASR A (`:8990`, 0.10) |
+| 0 | lane A engine, ASR A (`:8990`, 0.10) |
+| 1 | router A (`:8004`) |
+| 2 | router B (`:8006`) during rendering; gemma-3-27b-it judge (`:8007`, 0.70) after it |
 | 3 | lane B engine, ASR B (`:8991`, 0.10) |
 
-Lane A: WebQuestions, math, HaluEval shard 0/2. Lane B: TriviaQA, LlamaQuestions, HaluEval shard 1/2.
-FDB v1 and v3 follow on lane B with the same servers.
+Both lanes run all five sets: lane A shard 0/2 with router A, lane B shard 1/2 with router B, so the lanes
+finish together whatever the per-item time of a set. When rendering is done router B is replaced by the
+judge and scoring starts, while FDB v1 and then v3 render on lane A with router A and the FDB v1 scorers
+run on GPU 3.
 
 Running it elsewhere: the environment names only servers and keys.
 

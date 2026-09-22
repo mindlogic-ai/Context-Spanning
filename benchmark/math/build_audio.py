@@ -2,7 +2,6 @@
 
     python benchmark/math/prepare_questions.py <out>
     python benchmark/math/build_audio.py <out>                  # all 3,822 items (one GPU)
-    python benchmark/math/build_audio.py <out> --limit 100      # the first 100 items only, a quick build
     python benchmark/math/build_audio.py <out> --dry-run        # meta + voice assignment, no GPU, nothing written
 
 The result is what `python -m benchmark.rag.run math <out> ...` reads.
@@ -22,8 +21,7 @@ speech       Kyutai TTS (`pip install moshi`; model kyutai/tts-1.6b-en_fr, n_q 3
 audios       24 kHz stereo PCM_16: left = 0.35 s of zeros then the speech (mono), right = Gaussian noise of
              std 7/32768 over the whole length, drawn from numpy default_rng(20260916) item after item in
              meta.json order (the HaluEvalAudio layout). The noise of an item depends on the lengths of the
-             items before it, so `--sets` builds its own noise sequence, while `--limit N` is a prefix of the
-             full build.
+             items before it, which is why the build is always the whole set.
 
 The build resumes: items whose audios/<id>.wav exists are not synthesised again, and the speech of an
 interrupted run is kept in <out>/speech/ (safe to delete once audios/ is complete).
@@ -52,12 +50,10 @@ CFG_COEF = 2.0
 DECODE_PRIME = 8                                    # warm-up decodes of the first frame, output discarded
 
 
-def load_meta(out, sets=SETS, limit=0):
+def load_meta(out):
     """meta.json rows from <out>/questions/<set>.jsonl, in benchmark order."""
     rows = []
     for name in SETS:
-        if name not in sets:
-            continue
         path = os.path.join(out, "questions", f"{name}.jsonl")
         if not os.path.exists(path):
             sys.exit(f"missing {path}: run benchmark/math/prepare_questions.py {out} first")
@@ -66,7 +62,7 @@ def load_meta(out, sets=SETS, limit=0):
                 q = json.loads(line)
                 rows.append({"id": q["id"], "dataset": q["dataset"], "text": q["question"],
                              "answer": str(q["answer"]), "knowledge": None})
-    return rows[:limit] if limit else rows
+    return rows
 
 
 def normalize(text):
@@ -178,20 +174,14 @@ def assemble(meta, out):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("out", help="benchmark directory holding questions/ (from prepare_questions.py)")
-    ap.add_argument("--sets", default=",".join(SETS), help="comma-separated subset of the five sets")
-    ap.add_argument("--limit", type=int, default=0, help="first N items in meta order (0 = all)")
     ap.add_argument("--batch-size", type=int, default=64, help="TTS batch size (lower it on small GPUs)")
     ap.add_argument("--voices-dir", default=None, help=f"local copy of {VOICE_REPO} (default: the HF Hub)")
     ap.add_argument("--dry-run", action="store_true", help="print meta counts and voice assignment; no GPU, no writes")
     ap.add_argument("--show", type=int, default=5, help="items printed by --dry-run")
     a = ap.parse_args(argv)
-    sets = [s.strip() for s in a.sets.split(",") if s.strip()]
-    if any(s not in SETS for s in sets):
-        ap.error(f"--sets must be among {', '.join(SETS)}")
-
-    meta = load_meta(a.out, sets, a.limit)
+    meta = load_meta(a.out)
     pool = voice_pool(a.voices_dir)
-    counts = {s: sum(r["dataset"] == s for r in meta) for s in SETS if s in sets}
+    counts = {s: sum(r["dataset"] == s for r in meta) for s in SETS}
     print(f"{len(meta)} items {counts}; voice pool {len(pool)}")
     if a.dry_run:
         for r in meta[:a.show]:

@@ -5,7 +5,7 @@ the **browser page** with a fake microphone, one question per session, and score
 actually rendered — so it measures the thing that ships: ASR, the router, the deadline, the span,
 and what the model said with it.
 
-    python -m benchmark.live.run <url> <clips_dir> <out_dir> [--limit N]
+    python -m benchmark.live.run <url> <clips_dir> <out_dir>
 
 `clips_dir` holds `<id>.wav` (the spoken question, already padded with lead-in and tail silence) and
 `cases.json` (`[{id, question, kind, expect: [...], not_expect: [...]}]`). Per case it records the
@@ -138,12 +138,9 @@ async def one(page, url: str, wav: str, case: dict, seconds: float) -> dict:
 async def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("url"); ap.add_argument("clips"); ap.add_argument("out")
-    ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--seconds", type=float, default=30.0)
     a = ap.parse_args()
     cases = json.load(open(os.path.join(a.clips, "cases.json")))
-    if a.limit:
-        cases = cases[:a.limit]
     os.makedirs(a.out, exist_ok=True)
     rows = []
     async with async_playwright() as p:

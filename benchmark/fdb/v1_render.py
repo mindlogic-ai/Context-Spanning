@@ -2,7 +2,7 @@
 1.0x frame clock and the agent audio is written in the official layout ({task}/{id}/output.wav, plus
 clean_output.wav for v1.5 overlap tasks), ready for the benchmark's own scorers.
 
-    python -m benchmark.fdb.v1_render <data_root> <out_root> [--checkpoint ckpt.pt] [--limit N] [--tasks a,b]
+    python -m benchmark.fdb.v1_render <data_root> <out_root> [--checkpoint ckpt.pt]
 
 Prompts are the ones the benchmark specifies for PersonaPlex: the teacher prompt for interruption
 tasks, "You enjoy having a good conversation." otherwise.
@@ -25,22 +25,18 @@ P_CONV = "You enjoy having a good conversation."
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("data_root"); ap.add_argument("out_root")
-    ap.add_argument("--checkpoint", default=None); ap.add_argument("--limit", type=int, default=0)
-    ap.add_argument("--tasks", default="", help="comma-separated task dirs to run (default all)")
+    ap.add_argument("--checkpoint", default=None)
     ap.add_argument("--voice", default=None)
     a = ap.parse_args(argv)
     samples = sorted(os.path.dirname(p) for p in glob.glob(f"{a.data_root}/**/input.wav", recursive=True))
-    only = {t for t in a.tasks.split(",") if t}
     bytask = {}
     for s in samples:
-        task = os.path.relpath(s, a.data_root).split(os.sep)[0]
-        if not only or task in only:
-            bytask.setdefault(task, []).append(s)
+        bytask.setdefault(os.path.relpath(s, a.data_root).split(os.sep)[0], []).append(s)
     print(f"[fdb] {len(samples)} samples / {len(bytask)} tasks: { {k: len(v) for k, v in bytask.items()} }", flush=True)
     st = Stack(a.checkpoint, voice=a.voice)
     done = 0
     for task, dirs in bytask.items():
-        for si, sdir in enumerate(dirs[: a.limit] if a.limit else dirs):
+        for si, sdir in enumerate(dirs):
             rel = os.path.relpath(sdir, a.data_root); odir = f"{a.out_root}/{rel}"
             if os.path.exists(f"{odir}/output.wav"):
                 continue
