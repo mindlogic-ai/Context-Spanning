@@ -68,6 +68,9 @@ fine-tuned from [`nvidia/personaplex-7b-v1`](https://huggingface.co/nvidia/perso
 A checkpoint trained with LoRA adapters loads with the same `--checkpoint` flag. The adapters stay
 unmerged (`<name>.base.weight`, `<name>.lora_A`, `<name>.lora_B` and `"lora": {"r", "alpha"}` in the
 file); `contextspan/model/lora.py` rebuilds those layers at load and runs them as they were trained.
+Unmerged adapters cost engine time: with r = 128 on 327 layers a step takes 88.8 ms against the 80 ms
+frame (42.5 ms for a merged checkpoint), so a LoRA checkpoint is for `infer` and the benchmarks, not for
+a live conversation.
 
 ```bash
 huggingface-cli download seonghyeonko/context-spanning-7b-v11c-lora-step1000 context_spanning_7b.pt --local-dir ckpt
