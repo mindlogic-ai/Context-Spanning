@@ -9,6 +9,7 @@ import sentencepiece
 import torch
 from huggingface_hub import hf_hub_download
 
+from . import lora
 from ..moshi.models import loaders
 
 BASE_REPO = "nvidia/personaplex-7b-v1"
@@ -40,9 +41,14 @@ def load_model(checkpoint=None, device="cuda", cpu_offload=False):
     spm = load_tokenizer()
     lm = loaders.get_moshi_lm(hf_path(BASE_REPO, loaders.MOSHI_NAME), device=device, cpu_offload=cpu_offload)
     ck = checkpoint or hf_path(WEIGHTS_REPO, WEIGHTS_FILE)
-    sd = torch.load(ck, map_location="cpu", weights_only=False)
-    sd = sd.get("model", sd)
-    lm.load_state_dict({k.replace("._orig_mod.", "."): v for k, v in sd.items()})
+    ckpt = torch.load(ck, map_location="cpu", weights_only=False)
+    sd = {k.replace("._orig_mod.", "."): v for k, v in ckpt.get("model", ckpt).items()}
+    if lora.adapted_layers(sd):
+        meta = ckpt.get("lora") if isinstance(ckpt, dict) else None
+        if not meta:
+            raise ValueError(f"{ck} carries LoRA adapters but no 'lora': {{'r', 'alpha'}} entry")
+        lora.wrap(lm, sd, int(meta["r"]), float(meta["alpha"]))
+    lm.load_state_dict(sd)
     lm.eval()
     return lm, mimi, spm
 

@@ -9,6 +9,7 @@ contextspan/
     weights.py                  base and checkpoint: Hub or CS_BASE_DIR / CS_WEIGHTS_DIR; voices: Hub or CS_VOICES_DIR
     engine.py                   Engine: persona prefix, step, <ret>, inject_context_span, clone_voice
     context_span_block.py       the Context Span block, read into the KV stream in one forward
+    lora.py                     LoRA checkpoints loaded unmerged (adapted Linears rebuilt as trained)
     prefix_prefill.py           the per-connection prefix (voice codes, persona text), read in one forward
     sequence_convention.py      token ids, placeholders, prefix, training-sequence assembly, transcript
   runtime/                      the live loop around the engine
