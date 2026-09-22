@@ -235,6 +235,21 @@ def _place(address: str) -> dict:
     return _places(address, limit=1)[0]
 
 
+def reverse_geocode(lat: float, lon: float) -> str:
+    """The place at a coordinate as the model's prefix wants it: "district, city" in English
+    (`The user is in {city}.`), the browser's geolocation being the only source of it."""
+    hit = _get(_NOMINATIM + "/reverse", {"lat": lat, "lon": lon, "format": "jsonv2", "zoom": 14,
+                                         "accept-language": "en"}, throttle=True)
+    a = hit.get("address", {}) if isinstance(hit, dict) else {}
+    city = a.get("city") or a.get("town") or a.get("village") or a.get("county") or a.get("state") or ""
+    part = a.get("suburb") or a.get("quarter") or a.get("city_district") or a.get("borough") or a.get("neighbourhood") or ""
+    part = re.sub(r"\s*\d+\([a-z]+\)-", "-", part)          # "Yeoksam 1(il)-dong" -> "Yeoksam-dong"
+    parts = [part] if part and part != city else []
+    if city:
+        parts.append(city)
+    return ", ".join(parts) or a.get("country", "")
+
+
 def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Great-circle metres. Good enough to rank POIs inside one neighbourhood."""
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
