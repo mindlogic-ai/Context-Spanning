@@ -91,7 +91,7 @@ class MoshiRagBackend(RealtimeBackend):
             if not (query or "").strip():
                 self.last_status = "empty"; return None
             context, n_turns = f"Human: {query.strip()}\nReference:", 1
-        body = {"model": self.model, "max_tokens": self.max_tokens, "temperature": 1.0, "stop": ["\n"],
+        body = {"model": self.model, "max_tokens": self.max_tokens, "temperature": 1.0, "top_p": 1.0, "top_k": 1, "stop": ["\n"],   # moshi-rag llm/client.py: top_k=1 -> greedy
                 "messages": [{"role": "system", "content": "You are a helpful assistant."},
                              {"role": "user", "content": self.prompt + context}]}
         t0 = time.time()
@@ -193,7 +193,7 @@ class MoshiRagJudge:
         if not text or not text.strip() or not question:
             return None
         prompt = self.template.format(question=question, answer=text, valid_answers=str(answer_variants(gold)))
-        body = {"model": self.model, "max_tokens": 512, "temperature": self.temperature, "top_p": 1.0,
+        body = {"model": self.model, "max_tokens": 512, "temperature": self.temperature, "top_p": 1.0, "top_k": 1,   # moshi-rag judge client: top_k=1 -> greedy
                 "messages": [{"role": "user", "content": prompt}]}
         for _ in range(3):
             try:
