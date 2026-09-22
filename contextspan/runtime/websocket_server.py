@@ -141,12 +141,11 @@ async def ws_handler(request):
                         except Exception as e:
                             await ws.send_json({"type": "error", "stage": "voice", "message": str(e)})
                 elif m.get("type") == "context":
-                    # page fields -> Context DB profile (duetaspan ContextProfile): the "Knowledge" text
-                    # is the profile's notes, so the router sees it in the working text. The name and
+                    # page fields -> Context DB profile (duetaspan ContextProfile). The name and
                     # location also go into the model's prefix, phrased as in the training corpus
                     # (`The user's name is {name}. The user is in {city}.`), so a change to either
                     # resets the engine exactly like a persona change.
-                    keys = {"name": "name", "location": "city", "lat": "lat", "lon": "lon", "tz": "timezone", "db": "notes"}
+                    keys = {"name": "name", "location": "city", "lat": "lat", "lon": "lon", "tz": "timezone"}
                     user = {keys[k]: m[k] for k in keys if m.get(k) not in (None, "")}
                     db = ContextDB(ContextProfile(persona=m.get("persona") or persona, **user))
                     want = persona_text(m["persona"] if "persona" in m else persona, user)
