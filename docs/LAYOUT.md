@@ -20,7 +20,7 @@ contextspan/
     default_persona.py          the persona the demo starts from
   training/
     prepare.py                  dialogues (JSON + stereo wav) -> .npz
-    finetune.py                 span splicing, masked cross-entropy, training loop
+    finetune.py                 span splicing, training loop
   duetaspan/                    backend runtime (see its README)
   datasets/moshicp/             tool bank, SQLite world, geo index, TOOLS.md
   moshi/                        vendored PersonaPlex fork of Kyutai's moshi (third-party)

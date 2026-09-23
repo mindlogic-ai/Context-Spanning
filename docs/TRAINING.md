@@ -35,9 +35,8 @@ Every step draws `--accum` dialogues (`contextspan/training/finetune.py`):
    once around it (`assemble_training_sequence`);
 2. the masked PersonaPlex prefix (voice codes, `<system> persona <system>`) is prepended
    (`persona_prefix`);
-3. a `--context`-frame window is cut and the model is trained with the masked cross-entropy: text CE on the
-   text row (`<ret>` x `--w-ret`, padding x 0.5, prefix and span columns masked) plus audio CE with the
-   semantic codebook at 1.0 and the acoustic codebooks at 0.02.
+3. a `--context`-frame window is cut and the model is fine-tuned on its text row and audio codebooks; the
+   prefix and span columns are masked.
 
 Checkpoints are written every `--ckpt-every` steps as `{"model": state_dict}` and load with
 `python main.py infer --checkpoint`.

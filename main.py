@@ -104,7 +104,7 @@ def prepare(a):
 
 def train(a):
     from contextspan.training.finetune import train as finetune
-    finetune(a.data_dir, a.out_dir, a.checkpoint, a.steps, a.lr, a.accum, a.context, a.ckpt_every, a.w_ret, a.seed)
+    finetune(a.data_dir, a.out_dir, a.checkpoint, a.steps, a.lr, a.accum, a.context, a.ckpt_every, a.seed)
 
 
 def main(argv=None):
@@ -161,7 +161,6 @@ def main(argv=None):
     p.add_argument("--accum", type=int, default=8)
     p.add_argument("--context", type=int, default=3000)
     p.add_argument("--ckpt-every", type=int, default=250)
-    p.add_argument("--w-ret", type=float, default=5.0)
     p.add_argument("--seed", type=int, default=0)
     p.set_defaults(fn=train)
 
