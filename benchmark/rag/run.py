@@ -74,6 +74,13 @@ def main(argv=None):
         if os.path.exists(f"{odir}/output.wav"):
             continue
         os.makedirs(odir, exist_ok=True)
+        claim = f"{odir}/.claim"           # lanes sharing a shard list: first claimant renders; a claim older than 30 min is stale
+        try:
+            if os.path.exists(claim) and time.time() - os.path.getmtime(claim) > 1800:
+                os.remove(claim)
+            fd = os.open(claim, os.O_CREAT | os.O_EXCL | os.O_WRONLY); os.close(fd)
+        except FileExistsError:
+            continue
         pcm = load_mono(wav, st.sr)
         q_end = len(pcm) / st.sr
         pcm = np.concatenate([pcm, np.zeros(int(TAIL_S * st.sr), np.float32)])
