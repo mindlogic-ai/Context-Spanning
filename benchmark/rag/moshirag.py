@@ -21,6 +21,14 @@ RAG_TIMEOUT_S = 10.0          # run_inference.py --rag-timeout default (the offl
 MAX_REFERENCE_TOKENS = 64     # run_inference.py --max-reference-tokens default
 STT_WAIT_S = 0.5              # run_inference.py --stt-wait-time default; paper 3.3.2: "Once <ret> is predicted, we first wait
                               # 0.5 seconds for the ASR model to produce a complete transcript of the user's utterance."
+# The API-backend protocol (benchmark/README.md section 2): the reference LLM is an API model reached through its
+# OpenAI-compatible endpoint; the reference is generated before the stream with the server-side defaults of
+# moshi-rag's RAGManager / LLMReferenceGenerator (512 tokens, stop at the first newline) and a long timeout with
+# retries, since its latency is not streamed but replayed as a fixed number of frames.
+API_REFERENCE_MODEL = "gpt-4.1"
+API_MAX_REFERENCE_TOKENS = 512
+API_TIMEOUT_S = 60.0
+OPENAI_URL = "https://api.openai.com"
 
 
 def _norm(t):
@@ -29,14 +37,19 @@ def _norm(t):
 
 class MoshiRagBackend(RealtimeBackend):
     """One conversation's reference generator. Create one per bench item (the reference history is
-    per conversation, as MoshiRAG's RAGManager owns it per channel)."""
+    per conversation, as MoshiRAG's RAGManager owns it per channel).
+    `api=True`: the API-backend protocol (OpenAI-compatible API model named by MOSHIRAG_LLM_MODEL, default
+    gpt-4.1, at MOSHIRAG_LLM_URL, default the OpenAI API with OPENAI_API_KEY); the OpenAI API rejects
+    `top_k`, so the greedy request carries it only towards a vLLM server."""
 
-    def __init__(self):
+    def __init__(self, api=False):
         super().__init__()
-        self.url = os.environ.get("MOSHIRAG_LLM_URL", "http://localhost:8004").rstrip("/")
-        self.model = os.environ.get("MOSHIRAG_LLM_MODEL", REFERENCE_MODEL)   # the server's model id; reported runs: A4B
-        self.rag_timeout = RAG_TIMEOUT_S
-        self.max_tokens = MAX_REFERENCE_TOKENS
+        self.url = os.environ.get("MOSHIRAG_LLM_URL", OPENAI_URL if api else "http://localhost:8004").rstrip("/")
+        self.model = os.environ.get("MOSHIRAG_LLM_MODEL", API_REFERENCE_MODEL if api else REFERENCE_MODEL)
+        self.rag_timeout = API_TIMEOUT_S if api else RAG_TIMEOUT_S
+        self.max_tokens = API_MAX_REFERENCE_TOKENS if api else MAX_REFERENCE_TOKENS
+        self.openai = "api.openai.com" in self.url
+        self.headers = {"Authorization": "Bearer " + os.environ["OPENAI_API_KEY"]} if self.openai else {}
         self.prompt = open(PROMPT_FILE).read()
         self.history = []            # (num_turns_at_generation, reference_text), as ReferenceHistory
         self.last_elapsed_s = None
@@ -91,12 +104,14 @@ class MoshiRagBackend(RealtimeBackend):
             if not (query or "").strip():
                 self.last_status = "empty"; return None
             context, n_turns = f"Human: {query.strip()}\nReference:", 1
-        body = {"model": self.model, "max_tokens": self.max_tokens, "temperature": 1.0, "top_p": 1.0, "top_k": 1, "stop": ["\n"],   # moshi-rag llm/client.py: top_k=1 -> greedy
+        body = {"model": self.model, "max_tokens": self.max_tokens, "temperature": 1.0, "top_p": 1.0, "stop": ["\n"],
                 "messages": [{"role": "system", "content": "You are a helpful assistant."},
                              {"role": "user", "content": self.prompt + context}]}
+        if not self.openai:
+            body["top_k"] = 1                    # moshi-rag llm/client.py: top_k=1 -> greedy (vLLM; the OpenAI API rejects it)
         t0 = time.time()
         try:
-            r = self.sess.post(f"{self.url}/v1/chat/completions", json=body, timeout=self.rag_timeout)
+            r = self.sess.post(f"{self.url}/v1/chat/completions", json=body, headers=self.headers, timeout=self.rag_timeout)
             text = (r.json()["choices"][0]["message"]["content"] or "").strip()
         except requests.Timeout:
             self.last_elapsed_s = round(time.time() - t0, 3); self.last_status = "timeout"
@@ -193,8 +208,10 @@ class MoshiRagJudge:
         if not text or not text.strip() or not question:
             return None
         prompt = self.template.format(question=question, answer=text, valid_answers=str(answer_variants(gold)))
-        body = {"model": self.model, "max_tokens": 512, "temperature": self.temperature, "top_p": 1.0, "top_k": 1,   # moshi-rag judge client: top_k=1 -> greedy
+        body = {"model": self.model, "max_tokens": 512, "temperature": self.temperature, "top_p": 1.0,
                 "messages": [{"role": "user", "content": prompt}]}
+        if self.kind == "gemma":
+            body["top_k"] = 1            # moshi-rag judge client: top_k=1 -> greedy (vLLM only; the OpenAI API rejects top_k)
         for _ in range(3):
             try:
                 r = self.sess.post(self.url, json=body, headers=self.headers, timeout=120)

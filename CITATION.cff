@@ -17,8 +17,8 @@ authors:
     affiliation: Mindlogic
 repository-code: "https://github.com/mindlogic-ai/ContextSpanning"
 license: MIT
-version: 1.0.0
-date-released: 2026-09-15
+version: 1.1.0
+date-released: 2026-09-23
 preferred-citation:
   type: article
   title: "Context Spanning: A Communication Framework for Full-Duplex Speech Models and External LLM Backends"

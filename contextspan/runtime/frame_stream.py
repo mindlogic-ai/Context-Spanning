@@ -149,12 +149,21 @@ def retrieve_for_ret(backend, asr, clip, sample_rate, ctx, db, said_text, events
 
 
 def run_stream(eng, backend, asr, pcm, ctx=None, asr_window_s=12.0, realtime=True, verbose=True,
-               ret_deadline_s=RET_DEADLINE_S, ret_fixed_wait_s=None):
+               ret_deadline_s=RET_DEADLINE_S, ret_fixed_wait_s=None, inject_at_f=None, no_partials=False,
+               ret_closes_utt=False):
     """Streams `pcm` (float32 mono at Mimi's rate) through the engine, one 80 ms frame per step.
     `ctx` = user profile (name, city, timezone, lat, lon, notes). Returns dict(agent, tokens, events).
+    `ret_deadline_s`: a span arriving later than this after its `<ret>` is dropped; None never drops.
     `ret_fixed_wait_s`: benchmark only (moshi-rag run_inference.py `stt_wait_time`): every `<ret>` waits
     exactly this long, then the audio window so far is transcribed and sent; the utterance plan and the
-    `<ret>` cut are not used. None (serving) keeps the utterance-transcript path."""
+    `<ret>` cut are not used. None (serving) keeps the utterance-transcript path.
+    `inject_at_f`: benchmark only (the API-backend protocol of benchmark/README.md): the span of a `<ret>`
+    is injected exactly this many frames after it, and the stream waits at that frame until the backend
+    has answered. The retrieval delay lives in frames, as in moshi-rag `run_inference.py`, so the run needs
+    no real-time clock (`realtime=False`). None (serving) injects a span as soon as it arrives.
+    `no_partials`: no partial transcripts while an utterance runs (the final one is enough when nothing
+    is live). `ret_closes_utt`: the utterance running at the `<ret>` frame ends there and is transcribed
+    at once, without the silence debounce: the `<ret>` is the model's end-of-question signal."""
     fs, sr = eng.frame_size, int(eng.mimi.sample_rate)
     n = len(pcm) // fs
     ctx = dict(ctx or {})
@@ -163,6 +172,7 @@ def run_stream(eng, backend, asr, pcm, ctx=None, asr_window_s=12.0, realtime=Tru
     utts, cache = Utterances(), {"text": None, "t": -1e9, "final": False}
     ret_wait = [None]                      # frame index of a <ret> waiting for the running utterance to end
     pending = [False]
+    hold_until = [None]                    # frame at which the pending <ret>'s span is injected (inject_at_f)
     transcripts = []                       # (t_end_s, partial|final, text) for the caller's record
 
     def kick(i, question=None, end=None):
@@ -197,21 +207,40 @@ def run_stream(eng, backend, asr, pcm, ctx=None, asr_window_s=12.0, realtime=Tru
         if ret_fixed_wait_s is not None:
             fixed_kick[0], fixed_kick[1] = i + int(round(ret_fixed_wait_s * eng.frame_rate)), i
             return
+        if inject_at_f is not None:
+            hold_until[0] = i + int(inject_at_f)
         plan = ret_question_plan(cache, i / eng.frame_rate, utts.speaking)
         if plan == "cache":
             threading.Thread(target=kick, args=(i, cache["text"]), daemon=True).start()
         elif plan == "wait":
             ret_wait[0] = i                # resolved by the utterance's final transcript or by the cap below
+            if ret_closes_utt and utts.speaking:
+                ev = utts.end_now(i)       # the question is over at the <ret>: transcribe it now
+                if ev is not None:
+                    threading.Thread(target=transcribe_utt, args=ev, daemon=True).start()
         else:
             threading.Thread(target=kick, args=(i,), daemon=True).start()
 
     t_start = time.time()
     for i in range(n):
-        with lock:
-            ready = queue.pop(0) if queue else None
+        ready = None
+        if hold_until[0] is not None:
+            if i >= hold_until[0]:         # the span's frame: wait here until the backend has answered
+                t_w = time.time()
+                while True:
+                    with lock:
+                        ready = queue.pop(0) if queue else None
+                    if ready is not None or time.time() - t_w > 120:
+                        break
+                    time.sleep(0.005)
+                hold_until[0] = None
+        else:
+            with lock:
+                ready = queue.pop(0) if queue else None
         if ready is not None:
             ready["t_inj"] = i / eng.frame_rate
-            ready["late"] = ready["inject"] is not None and (ready["t_inj"] - ready["t_ret"]) > ret_deadline_s
+            ready["late"] = ready["inject"] is not None and ret_deadline_s is not None \
+                and (ready["t_inj"] - ready["t_ret"]) > ret_deadline_s
             if ready["late"]:
                 ready["inject"] = None
             ready["frames"] = eng.inject_context_span(ready["inject"]) if ready["inject"] else 0
@@ -223,6 +252,8 @@ def run_stream(eng, backend, asr, pcm, ctx=None, asr_window_s=12.0, realtime=Tru
                 print(f"[span @{ready['t_inj']:.1f}s] q={ready['question']!r} src={ready['src']} -> {shown}", flush=True)
         frame = pcm[i * fs:(i + 1) * fs]
         for kind, u0, u1 in utts.feed(i, frame):
+            if no_partials and kind == "partial":
+                continue
             threading.Thread(target=transcribe_utt, args=(kind, u0, u1), daemon=True).start()
         if fixed_kick[0] is not None and i >= fixed_kick[0]:
             ret_i, fixed_kick[0] = fixed_kick[1], None

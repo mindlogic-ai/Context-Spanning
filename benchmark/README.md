@@ -1,7 +1,8 @@
 # Benchmark
 
-Everything a reported number depends on is in this folder, and there is one method. `run_full.sh` runs
-it end to end; a number is comparable with another only if both come from the same revision of this folder.
+Everything a reported number depends on is in this folder. `run_full.sh` runs the live protocol end to end;
+`rag/run.py --protocol api` is the API-backend protocol of the spoken-QA table. A number is comparable with
+another only if both come from the same revision of this folder and the same protocol.
 
 | Benchmark | Runner | Scorer |
 | --- | --- | --- |
@@ -15,7 +16,7 @@ it end to end; a number is comparable with another only if both come from the sa
 
 | role | what | pinned in |
 | --- | --- | --- |
-| speech model | DuetaSpan v7 step 8000, fine-tuned from `nvidia/personaplex-7b-v1` | `mindlogicinc/context-spanning-7b`, `--checkpoint` |
+| speech model | Context Spanning-7B (training step 5,938), fine-tuned from `nvidia/personaplex-7b-v1` | `mindlogicinc/context-spanning-7b` `context_spanning_7b.pt`, `--checkpoint` |
 | voices | released voice prompts, one per sample by a hash of the sample id | `voices/` in the Hub repo, `stack.py` |
 | Context DB profile | `Seoul / Asia/Seoul`, no name, no facts | `stack.py` (`CTX`) |
 | persona prompt | `You are a wise and friendly teacher. Answer questions or provide advice in a clear and engaging way.` | `rag/run.py`; FDB uses the PersonaPlex prompts in `fdb/v1_render.py` |
@@ -27,7 +28,11 @@ it end to end; a number is comparable with another only if both come from the sa
 ## 2. Reference
 
 The reference that answers a `<ret>` is the same for every set, HaluEvalAudio included (the protocol of the MoshiRAG
-main table, where the reference is generated from the question and the gold passage is never shown):
+main table, where the reference is generated from the question and the gold passage is never shown). There are
+two protocols; every table row names the one it came from.
+
+**Live protocol** (`rag/run.py`, the default; `run_full.sh`): the reference LLM is a local server and its latency
+is streamed, as moshi-rag `run_inference.py` with a local model.
 
 - **every set**: the moshi-rag reference generator (`rag/moshirag.py`) on our router model
   `google/gemma-4-26B-A4B-it` (vLLM, `--gpu-memory-utilization 0.70`, `--max-model-len 8192`,
@@ -41,6 +46,17 @@ main table, where the reference is generated from the question and the gold pass
 A reference is injected whenever it arrives within the timeout: the runtime's late-span drop
 (`CS_RET_DEADLINE_S`) is set to the same 10 s for the benchmark, as `run_inference.py` applies the
 reference at trigger step + measured retrieval steps with no cut-off.
+
+**API-backend protocol** (`rag/run.py --protocol api --reference-delay-s 0.8`; MoshiRAG arXiv 2604.12928
+footnote 9: an API reference LLM, a uniform retrieval delay and no timeout): before the stream, the question audio
+is transcribed by the same ASR and the reference is generated once per item by the API model (`MOSHIRAG_LLM_MODEL`,
+default `gpt-4.1`, through `MOSHIRAG_LLM_URL`, default the OpenAI API with `OPENAI_API_KEY`) with the moshi-rag
+server defaults (512 tokens, stop at the first newline; 60 s timeout, retried until it answers). During the stream
+the span is injected exactly `--reference-delay-s` after the `<ret>`, replayed as 80 ms frames (0.8 s = 10 frames;
+GPT-4.1 answered in 0.77 s on average, MoshiRAG's table assumed 1.5 s), the stream waits at that frame for the
+reference, nothing is dropped, no partial transcripts are taken and the `<ret>` closes the question utterance. The
+stream is not paced to wall time, so several engines can share one GPU without changing a span's frame. The
+references are written to `references_<K>.json` next to the items.
 
 The deployed tool router (`contextspan/duetaspan/runtime/mcp`) is not part of the benchmark.
 
@@ -126,8 +142,10 @@ Running it elsewhere: the environment names only servers and keys.
 | `MCP_ROUTER_LLM_URL`, `MCP_ROUTER_LLM_MODEL` | the deployed router, used by the FDB runs only |
 
 ```bash
-CHECKPOINT=/path/keep_step8000.pt DATA=/data OUT=runs/full OPENAI_API_KEY=... bash benchmark/run_full.sh
-python -m benchmark.rag.run web_questions <openaudiobench/eval_datas> runs/webq --checkpoint ckpt.pt   # one set
+CHECKPOINT=/path/context_spanning_7b.pt DATA=/data OUT=runs/full OPENAI_API_KEY=... bash benchmark/run_full.sh
+python -m benchmark.rag.run web_questions <openaudiobench/eval_datas> runs/webq --checkpoint ckpt.pt   # one set, live
+python -m benchmark.rag.run web_questions <openaudiobench/eval_datas> runs/webq_api --checkpoint ckpt.pt \
+    --protocol api --reference-delay-s 0.8                                                             # api (GPT-4.1)
 python -m benchmark.rag.score runs/webq                                                                # -> rag_report.json
 ```
 
@@ -140,8 +158,8 @@ Stated so the comparison is read correctly. Everything not listed here is the sa
 | user ASR | Kyutai streaming STT (`LocalSpeechToText`), word level, VAD turn switching | `Qwen/Qwen3-ASR-1.7B`, utterance level; the router sees the whole transcript so far either way |
 | reference conditioning | a separate reference encoder summed into the token embeddings over several steps | the span prefilled as text into the model's own text stream |
 | end of a sample | after the input, until `max_consecutive_silence_frames` of model silence | a fixed 14 s window after the question |
-| clock | the stream pauses during the retrieval call and the measured latency is replayed as frames | the stream runs at 1.0x while the call is in flight |
-| speech model | Moshi (MoshiRAG fine-tune), one voice | DuetaSpan v7 8000 (PersonaPlex fine-tune), released voices |
+| clock | the stream pauses during the retrieval call and the measured latency is replayed as frames | live protocol: the stream runs at 1.0x while the call is in flight; api protocol: the stream waits and the delay is replayed as frames, as moshi-rag |
+| speech model | Moshi (MoshiRAG fine-tune), one voice | Context Spanning-7B (PersonaPlex fine-tune), released voices |
 
 ## 7. Live session
 
@@ -149,3 +167,10 @@ Stated so the comparison is read correctly. Everything not listed here is the sa
 questions (`live/cases.json`) and matches the answer on the page's text stream. It checks a deployment
 end to end; paper numbers come from the suites above. `pip install -e '.[benchmark]' && playwright install chromium`.
 Run it on the box or over `ssh -L`, never through a Cloudflare quick tunnel.
+
+## 8. Results
+
+The released checkpoint's per-set reports are in [`results/`](results/): the summary block of every
+`rag_report.json` (n, ref / resp accuracy, P(resp | ref), `<ret>` and span rates, injection latency) and the
+per-subset math accuracies, for the API-backend protocol at 0.8 s (the paper's GPT-4.1 row) and at 1.04 s (the
+delay ablation). The tables themselves are in the repository README.

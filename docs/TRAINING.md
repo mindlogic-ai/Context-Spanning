@@ -41,11 +41,22 @@ Every step draws `--accum` dialogues (`contextspan/training/finetune.py`):
 Checkpoints are written every `--ckpt-every` steps as `{"model": state_dict}` and load with
 `python main.py infer --checkpoint`.
 
-## The released weights (DuetaSpan v7, step 8000)
+## The released weights (Context Spanning-7B, step 5,938)
 
-Fine-tuned from `nvidia/personaplex-7b-v1` on `manifest_v6h` — 823,659 dialogues, ~10,009 h indexed —
-with this sequence convention. Every dialogue in the manifest passed a frame-level audio QA (alignment,
-levels, silence) and a full-text QA that removed fabricated lookups without `<ret>`. Persona prefixes
-carry the user's name and city in the phrasing `persona_text` produces. The convention, the
-placeholders and the delay sampler in this repository are the ones the corpus was written with, so a
-checkpoint produced by `main.py train` on new data is directly comparable.
+Every parameter of `nvidia/personaplex-7b-v1` fine-tuned with this sequence convention on a 2,100-hour stereo
+corpus of 195,257 synthetic dialogues (38.2 s and 9.9 spoken turns on average): everyday conversation
+(1,453 h / 102k dialogues; SODA, with turn-taking and backchannels placed as in the Candor corpus), knowledge
+retrieval (389 h / 71k; Natural Questions, HotpotQA and TriviaQA through the MoshiRAG pipeline), tool use
+(195 h / 12k; 125 tools, 87 from MCPToolBench++ and 38 from Google SGD, the 65 MCPToolBench++ tasks unsuited to a
+voice assistant excluded) and other scenarios such as abstaining (63 h / 10k). Dialogues with retrieval carry
+1.53 `<ret>` on average. Scripts were written by Gemma 4 31B and every span content by Gemma-4-26B-A4B, the
+backend model; the speech is Fish Audio with 5,164 single-speaker GLOBE prompts kept above a UTMOSv2 score of
+3.2. Numbers are fully verbalised with the NeMo text normalizer before tokenization (Moshi's digit splitting
+misaligns frames on large numbers). Every dialogue passed a frame-level audio QA (alignment, levels, silence)
+and a full-text QA that removed fabricated lookups without `<ret>`. Persona prefixes carry the user's name and
+city in the phrasing `persona_text` produces.
+
+AdamW, context 3,000 frames, learning rate 2e-6 for the temporal transformer and 4e-6 for the depth transformer,
+one epoch on two NVIDIA RTX Pro 6000 (8 hours). The convention, the placeholders and the delay sampler in this
+repository are the ones the corpus was written with, so a checkpoint produced by `main.py train` on new data is
+directly comparable.

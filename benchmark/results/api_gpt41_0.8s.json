@@ -1,0 +1,110 @@
+{
+ "checkpoint": "mindlogicinc/context-spanning-7b context_spanning_7b.pt (training step 5938)",
+ "protocol": "api",
+ "reference_model": "gpt-4.1",
+ "reference_delay_s": 0.8,
+ "reference_delay_frames": 10,
+ "judges": {
+  "halueval": "google/gemma-3-27b-it greedy (vLLM)",
+  "math": "google/gemma-3-27b-it greedy (vLLM)",
+  "llama_questions": "gpt-4o-2024-08-06",
+  "web_questions": "gpt-4o-2024-08-06",
+  "trivia_qa": "gpt-4o-2024-08-06"
+ },
+ "seed": 42424242,
+ "date": "2026-09-23",
+ "sets": {
+  "halueval": {
+   "n": 1000,
+   "ref_acc": 0.6828,
+   "resp_acc": 0.5554,
+   "P(resp|ref)": 0.7899,
+   "n_ref_judged": 990,
+   "n_resp_judged": 992,
+   "n_ref_correct": 676,
+   "ret_rate": 0.995,
+   "span_rate": 0.993,
+   "inj_lat_s": 0.8015,
+   "backend_timeout": 0
+  },
+  "llama_questions": {
+   "n": 300,
+   "ref_acc": 0.899,
+   "resp_acc": 0.8328,
+   "P(resp|ref)": 0.9419,
+   "n_ref_judged": 287,
+   "n_resp_judged": 299,
+   "n_ref_correct": 258,
+   "ret_rate": 0.9967,
+   "span_rate": 0.9567,
+   "inj_lat_s": 0.8,
+   "backend_timeout": 0
+  },
+  "web_questions": {
+   "n": 1000,
+   "ref_acc": 0.7938,
+   "resp_acc": 0.6667,
+   "P(resp|ref)": 0.8221,
+   "n_ref_judged": 970,
+   "n_resp_judged": 978,
+   "n_ref_correct": 770,
+   "ret_rate": 0.977,
+   "span_rate": 0.97,
+   "inj_lat_s": 0.8,
+   "backend_timeout": 0
+  },
+  "trivia_qa": {
+   "n": 1000,
+   "ref_acc": 0.911,
+   "resp_acc": 0.8377,
+   "P(resp|ref)": 0.9671,
+   "n_ref_judged": 933,
+   "n_resp_judged": 986,
+   "n_ref_correct": 850,
+   "ret_rate": 0.986,
+   "span_rate": 0.933,
+   "inj_lat_s": 0.8,
+   "backend_timeout": 0
+  },
+  "math": {
+   "n": 3822,
+   "ref_acc": 0.8436,
+   "resp_acc": 0.7831,
+   "P(resp|ref)": 0.9252,
+   "n_ref_judged": 3805,
+   "n_resp_judged": 3813,
+   "n_ref_correct": 3210,
+   "ret_rate": 0.9976,
+   "span_rate": 0.9956,
+   "inj_lat_s": 0.8,
+   "backend_timeout": 0,
+   "subsets": {
+    "AddSub": {
+     "n": 395,
+     "ref_acc": 0.826,
+     "resp_acc": 0.747
+    },
+    "MultiArith": {
+     "n": 600,
+     "ref_acc": 0.952,
+     "resp_acc": 0.897
+    },
+    "SingleEq": {
+     "n": 508,
+     "ref_acc": 0.859,
+     "resp_acc": 0.822
+    },
+    "SVAMP": {
+     "n": 1000,
+     "ref_acc": 0.892,
+     "resp_acc": 0.854
+    },
+    "GSM8K": {
+     "n": 1319,
+     "ref_acc": 0.757,
+     "resp_acc": 0.674
+    }
+   }
+  }
+ }
+}
