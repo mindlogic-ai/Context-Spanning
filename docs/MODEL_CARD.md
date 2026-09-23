@@ -73,7 +73,6 @@ vendored in the code repository (`contextspan/moshi/`).
 - Frame clock: 80 ms per step
 - Sequence convention: `<ret>` = 4, span open = 12, span close = 13, text pad = 3
 - Training data: `manifest_v6h` — 823,659 dialogues, ~10,009 h indexed; every dialogue passed a frame-level audio QA and a full-text QA
-- Training objective: masked cross-entropy on the text row and on the audio codebooks as in PersonaPlex, with the span and prefix columns masked out
 - Optimisation: 8-bit AdamW, context 3,000 frames, lr 2e-6 (temporal transformer) / 4e-6 (depth transformer), 32 dialogues per update, 4× NVIDIA RTX Pro 6000
 - Released checkpoint: DuetaSpan v7, step 8000 (2026-09-11)
 - Backends the numbers were measured with: router `google/gemma-4-26B-A4B-it` on vLLM, ASR Qwen3-ASR-1.7B

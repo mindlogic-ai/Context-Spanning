@@ -3,7 +3,7 @@
 One 17-row token sequence: text (ch0), 8 agent audio codebooks, 8 user audio codebooks.
 Control tokens on the text row: `<ret>` asks the backend; a Context Span block is the reference
 text between two span delimiters. Span and prefix columns carry placeholder audio (SILENCE on
-the agent rows, SINE on the user rows) and are masked out of the loss. Everything that decides
+the agent rows, SINE on the user rows) and are masked. Everything that decides
 how such a sequence is laid out lives here, so the assembler that writes the training data and
 the engine that reads a span at inference cannot drift apart.
 """
