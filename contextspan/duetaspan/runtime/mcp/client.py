@@ -155,8 +155,8 @@ _SYSTEM_PROMPT = (
     # covers the ones it leaves empty.
     "The conversation context may include the user's PROFILE (home city, timezone). "
     "When a tool needs a location or timezone argument and the user did not name one, fill it "
-    "from the profile yourself (profile says Seoul + 'how's the weather?' -> city='Seoul'; "
-    "'what time is it?' -> timezone='Asia/Seoul'). A place the user explicitly names ALWAYS "
+    "from the profile yourself (profile says Lisbon + 'how's the weather?' -> city='Lisbon'; "
+    "'what time is it?' -> timezone='Europe/Lisbon'). A place the user explicitly names ALWAYS "
     "wins over the profile ('weather in New York' -> city='New York'). "
     "The transcript may contain SEVERAL questions in a row (running speech). "
     "Route for the LAST question that has not been answered yet -- the most recent "
@@ -325,7 +325,7 @@ def _canonical_name(bank: dict, name: str):
 
 def _coerce_types(args: dict[str, Any], schema: dict[str, Any]) -> dict[str, Any]:
     """Deterministically coerce argument values to the schema-declared types (post-processing, the
-    model is never touched). number/integer/boolean the LLM stringified as "1500"/"true" go back to
+    model is never touched). number/integer/boolean the LLM stringified as "1234"/"true" go back to
     their declared type; a type mismatch alone fails an otherwise correct call. The values
     themselves are never changed."""
     props = (schema or {}).get("properties") or {}
@@ -345,7 +345,7 @@ def _coerce_types(args: dict[str, Any], schema: dict[str, Any]) -> dict[str, Any
                 elif t == "boolean" and s.lower() in ("true", "false"):
                     v = s.lower() == "true"
                 elif untyped:
-                    # Any field -> natural JSON type: "1500"→1500, "true"→true, else keep str.
+                    # Any field -> natural JSON type: "1234"→1234, "true"→true, else keep str.
                     if s.lower() in ("true", "false"):
                         v = s.lower() == "true"
                     elif re.fullmatch(r"-?\d+", s):
@@ -792,15 +792,15 @@ class MCPRouter:
                              "is valid — never use a value the user replaced. "
                              # Spoken-value notation rules (ASR speech → API value): same meaning, notation only.
                              "Value formatting rules for spoken input: write dates as "
-                             "'<Month> <number>' with NO ordinal suffix ('November 1', never "
-                             "'November 1st'). When the schema description names canonical "
+                             "'<Month> <number>' with NO ordinal suffix ('May 6', never "
+                             "'May 6th'). When the schema description names canonical "
                              "values (e.g. 'passport', 'id_card'), use exactly that snake_case "
-                             "token ('driver_license', never \"driver's license\"). For id-like "
+                             "token ('id_card', never \"ID card\"). For id-like "
                              "fields (order id, document number, confirmation code), join any "
                              "letters/digits the user spelled out into ONE compact uppercase "
-                             "token ('d l 5 5 5' -> 'DL555'); if the id sounds incomplete or "
+                             "token ('a b 1 2' -> 'AB12'); if the id sounds incomplete or "
                              "garbled, prefer the fullest version heard in the conversation. "
-                             "Numeric fields must be JSON numbers (1500, not \"1500\"); boolean "
+                             "Numeric fields must be JSON numbers (1234, not \"1234\"); boolean "
                              "fields must be true/false literals.\n"
                              f"tool: {name}\nschema: {_json.dumps(sch, ensure_ascii=False)}"
                              + prior)},
@@ -885,7 +885,7 @@ class MCPRouter:
                     t = (props.get(k) or {}).get("type", "string")
                     args[k] = _DEF.get(t, "")
                 logger.warning("required args defaulted for '%s': %s", name, missing)
-            # Schema type coercion (post-processing): "1500"→1500, "true"→true — type only, value unchanged.
+            # Schema type coercion (post-processing): "1234"→1234, "true"→true — type only, value unchanged.
             args = _coerce_types(args, sch)
         # Profile arguments for the live tools without a second LLM call: a `get_time` with no timezone or a
         # `get_weather` with no place takes the user's profile value (an argument round trip costs as
