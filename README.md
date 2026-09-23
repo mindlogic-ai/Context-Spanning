@@ -201,7 +201,7 @@ python main.py train   --data-dir data/prepared --out-dir runs/ft
 ```
 
 `prepare` encodes dialogues (JSON + stereo wav) into tensors; `train` splices Context Span blocks at
-MoshiRAG-sampled delays and fine-tunes on them. Data format and the v7 recipe:
+MoshiRAG-sampled delays and fine-tunes on them. Data format and the recipe:
 [`docs/TRAINING.md`](docs/TRAINING.md).
 
 
