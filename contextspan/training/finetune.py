@@ -12,7 +12,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from ..model.sequence_convention import (RET_TOKEN_ID, TEXT_PAD, assemble_training_sequence, persona_prefix,
+from ..model.sequence_convention import (TEXT_PAD, assemble_training_sequence, persona_prefix,
                                          sample_rag_delay)
 from ..model.weights import load_model, load_voice
 
@@ -37,7 +37,6 @@ def sample_sequence(path, spm, rng):
     return codes, tmask, amask
 
 
-RET_W = 5.0
 PAD_W = 0.5
 ACOUSTIC_W = 0.02
 
@@ -49,7 +48,6 @@ def loss_fn(out, codes, tmask, amask, lm):
     ce = F.cross_entropy(tl.reshape(-1, tl.shape[-1]), tgt.reshape(-1), reduction="none").reshape(tgt.shape)
     w = keep.float()
     w = torch.where(tgt == TEXT_PAD, w * PAD_W, w)
-    w = torch.where(tgt == RET_TOKEN_ID, w * RET_W, w)
     text_loss = (ce * w).sum() / w.sum().clamp_min(1)
     al = torch.nan_to_num(out.logits, nan=0.0)                                # [B,dep_q,T,card]
     ao = lm.audio_offset
