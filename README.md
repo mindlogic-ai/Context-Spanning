@@ -94,7 +94,7 @@ benchmark harness. Unless a row says otherwise the backend is Gemma-4-26B-A4B.
 **Spoken QA and math reasoning (accuracy, %).** `ref.` = the injected reference judged against the gold
 answer; `resp.` = the model's response. Following MoshiRAG's API-backend protocol, the pre-computed reference is
 injected a fixed delay after `<ret>`: GPT-4.1 answered in 0.77 s on average in our runs, so the GPT-4.1 row uses a
-0.8 s delay (MoshiRAG used 1.5 s). The math sets were unseen during training. Every set whole (LlamaQ 300,
+0.8 s delay. The math sets were unseen during training. Every set whole (LlamaQ 300,
 WebQ 1,000, TriviaQA 1,000, HaluEval 1,000, math 3,822); MoshiRAG's judges (gemma-3-27b-it for HaluEval and math,
 gpt-4o for the OpenAudioBench sets). Protocol and per-set reports: [`benchmark/README.md`](benchmark/README.md),
 [`benchmark/results/`](benchmark/results/).

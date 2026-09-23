@@ -53,7 +53,7 @@ is transcribed by the same ASR and the reference is generated once per item by t
 default `gpt-4.1`, through `MOSHIRAG_LLM_URL`, default the OpenAI API with `OPENAI_API_KEY`) with the moshi-rag
 server defaults (512 tokens, stop at the first newline; 60 s timeout, retried until it answers). During the stream
 the span is injected exactly `--reference-delay-s` after the `<ret>`, replayed as 80 ms frames (0.8 s = 10 frames;
-GPT-4.1 answered in 0.77 s on average, MoshiRAG's table assumed 1.5 s), the stream waits at that frame for the
+GPT-4.1 answered in 0.77 s on average), the stream waits at that frame for the
 reference, nothing is dropped, no partial transcripts are taken and the `<ret>` closes the question utterance. The
 stream is not paced to wall time, so several engines can share one GPU without changing a span's frame. The
 references are written to `references_<K>.json` next to the items.
@@ -172,5 +172,5 @@ Run it on the box or over `ssh -L`, never through a Cloudflare quick tunnel.
 
 The released checkpoint's per-set reports are in [`results/`](results/): the summary block of every
 `rag_report.json` (n, ref / resp accuracy, P(resp | ref), `<ret>` and span rates, injection latency) and the
-per-subset math accuracies, for the API-backend protocol at 0.8 s (the paper's GPT-4.1 row) and at 1.04 s (the
-delay ablation). The tables themselves are in the repository README.
+per-subset math accuracies, for the API-backend protocol (the paper's GPT-4.1 row). The tables themselves are in
+the repository README.
