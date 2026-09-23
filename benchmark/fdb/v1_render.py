@@ -12,6 +12,7 @@ import glob
 import json
 import os
 import shutil
+import time
 
 import numpy as np
 import soundfile as sf
@@ -41,6 +42,13 @@ def main(argv=None):
             if os.path.exists(f"{odir}/output.wav"):
                 continue
             os.makedirs(odir, exist_ok=True)
+            claim = f"{odir}/.claim"       # several renderers may share a task: first claimant renders (stale after 30 min)
+            try:
+                if os.path.exists(claim) and time.time() - os.path.getmtime(claim) > 1800:
+                    os.remove(claim)
+                fd = os.open(claim, os.O_CREAT | os.O_EXCL | os.O_WRONLY); os.close(fd)
+            except FileExistsError:
+                continue
             prompt = P_TEACHER if "interrupt" in rel.lower() else P_CONV
 
             def render(src, dst):
