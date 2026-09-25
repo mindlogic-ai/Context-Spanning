@@ -1,0 +1,121 @@
+[
+ {
+  "id": "time_now",
+  "question": "What time is it right now?",
+  "kind": "live",
+  "expect": [
+   "PM",
+   "AM"
+  ],
+  "not_expect": []
+ },
+ {
+  "id": "time_day",
+  "question": "What day of the week is it today?",
+  "kind": "live",
+  "expect": [
+   "Monday"
+  ],
+  "not_expect": []
+ },
+ {
+  "id": "weather_here",
+  "question": "What's the weather like here right now?",
+  "kind": "live",
+  "expect": [
+   "degrees",
+   "celsius"
+  ],
+  "not_expect": []
+ },
+ {
+  "id": "radium",
+  "question": "Who discovered radium?",
+  "kind": "knowledge",
+  "expect": [
+   "Curie"
+  ],
+  "not_expect": []
+ },
+ {
+  "id": "australia",
+  "question": "What is the capital of Australia?",
+  "kind": "knowledge",
+  "expect": [
+   "Canberra"
+  ],
+  "not_expect": [
+   "Sydney",
+   "Melbourne"
+  ]
+ },
+ {
+  "id": "austen",
+  "question": "Who wrote Pride and Prejudice?",
+  "kind": "knowledge",
+  "expect": [
+   "Austen"
+  ],
+  "not_expect": []
+ },
+ {
+  "id": "everest",
+  "question": "How tall is Mount Everest?",
+  "kind": "knowledge",
+  "expect": [
+   "8848",
+   "29029"
+  ],
+  "not_expect": []
+ },
+ {
+  "id": "magazine",
+  "question": "Which magazine was started first, Arthur's Magazine or First for Women?",
+  "kind": "knowledge",
+  "expect": [
+   "Arthur"
+  ],
+  "not_expect": []
+ },
+ {
+  "id": "lightspeed",
+  "question": "What is the speed of light in a vacuum?",
+  "kind": "knowledge",
+  "expect": [
+   "299",
+   "186000",
+   "300000"
+  ],
+  "not_expect": []
+ },
+ {
+  "id": "moon",
+  "question": "Who was the first person to walk on the moon?",
+  "kind": "knowledge",
+  "expect": [
+   "Armstrong"
+  ],
+  "not_expect": []
+ },
+ {
+  "id": "restaurant",
+  "question": "Can you recommend me a restaurant nearby?",
+  "kind": "places",
+  "expect": [
+   "Seoul"
+  ],
+  "not_expect": []
+ },
+ {
+  "id": "chitchat",
+  "question": "I'm feeling a bit tired today.",
+  "kind": "chitchat",
+  "expect": [
+   "tired",
+   "rest",
+   "sorry",
+   "hope"
+  ],
+  "not_expect": []
+ }
+]
