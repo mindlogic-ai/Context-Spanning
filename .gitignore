@@ -1,0 +1,11 @@
+__pycache__/
+*.pt
+*.npz
+*.wav
+!assets/**/*.wav
+runs/
+data/
+.omc/
+contextspan/datasets/moshicp/mcp_http_cache.sqlite
+build/
+*.egg-info/

@@ -1,0 +1,2425 @@
+[
+ {
+  "function": "Weather_1_GetWeather",
+  "description": "Retrieves the weather forecast for a specified city on a particular date.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "city"
+   ],
+   "properties": {
+    "city": {
+     "type": "string",
+     "description": "The name of the city for which weather information is requested."
+    },
+    "date": {
+     "type": "string",
+     "description": "The date for which weather information is requested, in the format of 'YYYY-MM-DD'. If not provided, the current date is used.",
+     "default": "2019-03-01"
+    }
+   }
+  },
+  "domain": "Weather",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Movies_3_FindMovies",
+  "description": "Retrieves a list of movies based on the director, genre, and cast specified by the user.",
+  "parameters": {
+   "type": "dict",
+   "required": [],
+   "properties": {
+    "directed_by": {
+     "type": "string",
+     "description": "Director of the movie. Use 'dontcare' if the director is not a specific search criterion.",
+     "default": "dontcare"
+    },
+    "genre": {
+     "type": "string",
+     "description": "Genre of the movie. Use 'dontcare' to include all genres or genre is not specified by user",
+     "enum": [
+      "Offbeat",
+      "Fantasy",
+      "World",
+      "Mystery",
+      "Thriller",
+      "Comedy",
+      "Comedy-drama",
+      "Horror",
+      "Animation",
+      "Sci-fi",
+      "Cult",
+      "Drama",
+      "Anime",
+      "Family",
+      "Action",
+      "dontcare"
+     ],
+     "default": "dontcare"
+    },
+    "cast": {
+     "type": "string",
+     "description": "Names of leading actors or actresses in the movie. Use 'dontcare' if the cast is not a specific search criterion.",
+     "default": "dontcare"
+    }
+   }
+  },
+  "domain": "Movies",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Flights_4_SearchOnewayFlight",
+  "description": "Search for one-way flights from an origin to a destination on a specified date, with options for seating class, ticket quantity, and preferred airline.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "origin_airport",
+    "destination_airport",
+    "departure_date"
+   ],
+   "properties": {
+    "origin_airport": {
+     "type": "string",
+     "description": "The IATA code or the name of the airport or city to depart from. For example, 'LAX' for Los Angeles International Airport."
+    },
+    "destination_airport": {
+     "type": "string",
+     "description": "The IATA code or the name of the airport or city to arrive at. For example, 'JFK' for John F. Kennedy International Airport."
+    },
+    "departure_date": {
+     "type": "string",
+     "description": "The start date of the trip in the format 'YYYY-MM-DD'."
+    },
+    "seating_class": {
+     "type": "string",
+     "description": "The cabin seat option for the flight.",
+     "enum": [
+      "Economy",
+      "Premium Economy",
+      "Business"
+     ],
+     "default": "Economy"
+    },
+    "number_of_tickets": {
+     "type": "integer",
+     "description": "The number of flight tickets for the trip.",
+     "default": 1
+    },
+    "airlines": {
+     "type": "string",
+     "description": "The preferred airline company for the flight. Use 'dontcare' if there is no preference.",
+     "enum": [
+      "United Airlines",
+      "American Airlines",
+      "Delta Airlines",
+      "Southwest Airlines",
+      "Alaska Airlines",
+      "British Airways",
+      "Air Canada",
+      "Air France",
+      "South African Airways",
+      "LOT Polish Airlines",
+      "LATAM Brasil",
+      "dontcare"
+     ],
+     "default": "dontcare"
+    }
+   }
+  },
+  "domain": "Flights",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Flights_4_SearchRoundtripFlights",
+  "description": "Search for roundtrip flights based on specified criteria including departure and return dates, airports, seating class, and airlines.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "origin_airport",
+    "destination_airport",
+    "departure_date",
+    "return_date"
+   ],
+   "properties": {
+    "origin_airport": {
+     "type": "string",
+     "description": "The IATA airport code or the name of the city for the departure airport. Example: 'JFK' for John F. Kennedy International Airport."
+    },
+    "destination_airport": {
+     "type": "string",
+     "description": "The IATA airport code or the name of the city for the arrival airport. Example: 'LAX' for Los Angeles International Airport."
+    },
+    "departure_date": {
+     "type": "string",
+     "description": "The departure date for the trip, in the format 'YYYY-MM-DD'."
+    },
+    "return_date": {
+     "type": "string",
+     "description": "The return date for the trip, in the format 'YYYY-MM-DD'."
+    },
+    "seating_class": {
+     "type": "string",
+     "description": "The class of the cabin seat.",
+     "enum": [
+      "Economy",
+      "Premium Economy",
+      "Business"
+     ],
+     "default": "Economy"
+    },
+    "number_of_tickets": {
+     "type": "integer",
+     "description": "The number of flight tickets required for the trip.",
+     "default": 1
+    },
+    "airlines": {
+     "type": "string",
+     "description": "Preferred airline for the trip. Use 'dontcare' to include all available airlines.",
+     "enum": [
+      "United Airlines",
+      "American Airlines",
+      "Delta Airlines",
+      "Southwest Airlines",
+      "Alaska Airlines",
+      "British Airways",
+      "Air Canada",
+      "Air France",
+      "South African Airways",
+      "LOT Polish Airlines",
+      "LATAM Brasil",
+      "dontcare"
+     ],
+     "default": "dontcare"
+    }
+   }
+  },
+  "domain": "Flights",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "RentalCars_3_GetCarsAvailable",
+  "description": "Retrieve a list of cars that are available for rent within a specified location and time frame.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "city",
+    "start_date",
+    "pickup_time",
+    "end_date"
+   ],
+   "properties": {
+    "city": {
+     "type": "string",
+     "description": "The city where the rental car will be picked up. For example, 'Los Angeles, CA'."
+    },
+    "start_date": {
+     "type": "string",
+     "description": "The start date for the car rental in the format 'YYYY-MM-DD'."
+    },
+    "pickup_time": {
+     "type": "string",
+     "description": "The pick-up time for the car rental in 24-hour format 'HH:MM'."
+    },
+    "end_date": {
+     "type": "string",
+     "description": "The end date for returning the rental car in the format 'YYYY-MM-DD'."
+    },
+    "car_type": {
+     "type": "string",
+     "description": "The preferred type of car to rent.",
+     "enum": [
+      "Hatchback",
+      "Sedan",
+      "SUV",
+      "dontcare"
+     ],
+     "default": "dontcare"
+    }
+   }
+  },
+  "domain": "RentalCars",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "RentalCars_3_ReserveCar",
+  "description": "This function reserves a car for rental, allowing a user to specify pick-up and drop-off times and locations, as well as the type of car and insurance options.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "pickup_location",
+    "start_date",
+    "pickup_time",
+    "end_date",
+    "car_type",
+    "add_insurance"
+   ],
+   "properties": {
+    "pickup_location": {
+     "type": "string",
+     "description": "The location where the car will be picked up, in the format of 'City, State', such as 'Berkeley, CA' or 'New York, NY'."
+    },
+    "start_date": {
+     "type": "string",
+     "description": "The starting date of the car rental in the format 'YYYY-MM-DD'."
+    },
+    "pickup_time": {
+     "type": "string",
+     "description": "The time of day when the car will be picked up, in 24-hour format 'HH:MM'."
+    },
+    "end_date": {
+     "type": "string",
+     "description": "The end date of the car rental in the format 'YYYY-MM-DD'."
+    },
+    "car_type": {
+     "type": "string",
+     "description": "The category of car to reserve.",
+     "enum": [
+      "Hatchback",
+      "Sedan",
+      "SUV",
+      "dontcare"
+     ]
+    },
+    "add_insurance": {
+     "type": "boolean",
+     "description": "Flag to indicate whether to add insurance to the rental. True for adding insurance, false otherwise."
+    }
+   }
+  },
+  "domain": "RentalCars",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Restaurants_2_ReserveRestaurant",
+  "description": "Make a table reservation at a restaurant specifying the restaurant name, location, reservation date and time, and the number of seats.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "restaurant_name",
+    "location",
+    "date",
+    "time"
+   ],
+   "properties": {
+    "restaurant_name": {
+     "type": "string",
+     "description": "The name of the restaurant where the reservation is to be made."
+    },
+    "location": {
+     "type": "string",
+     "description": "The city and state where the restaurant is located, in the format of 'City, State', such as 'Berkeley, CA' or 'New York, NY'."
+    },
+    "date": {
+     "type": "string",
+     "description": "The tentative date for the reservation in ISO format (YYYY-MM-DD), such as '2023-03-01'."
+    },
+    "time": {
+     "type": "string",
+     "description": "The tentative time for the reservation in 24-hour format, such as '18:00' for 6 PM."
+    },
+    "number_of_seats": {
+     "type": "integer",
+     "description": "The number of seats to reserve at the restaurant. Valid options range from 1 to 6.",
+     "default": 2
+    }
+   }
+  },
+  "domain": "Restaurants",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Restaurants_2_FindRestaurants",
+  "description": "Searches for restaurants based on specified location, category, and other optional preferences.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "category",
+    "location"
+   ],
+   "properties": {
+    "category": {
+     "type": "string",
+     "description": "The type of cuisine or food category offered by the restaurant.",
+     "enum": [
+      "Mexican",
+      "Bistro",
+      "Izakaya",
+      "Brunch",
+      "Thai",
+      "Sandwich",
+      "Seafood",
+      "Barbecue",
+      "European",
+      "Steakhouse",
+      "Vietnamese",
+      "Asian",
+      "Coffeehouse",
+      "American",
+      "Gastropub",
+      "Austrian",
+      "Italian",
+      "Indian",
+      "Spanish",
+      "Vegetarian",
+      "Brasserie",
+      "Chinese",
+      "Breakfast",
+      "Greek",
+      "California",
+      "Tapas",
+      "Take-out",
+      "Japanese"
+     ]
+    },
+    "location": {
+     "type": "string",
+     "description": "The city where the restaurant is located, in the format 'City, State' (e.g., 'New York, NY'). State has to be abbrieviated"
+    },
+    "price_range": {
+     "type": "string",
+     "description": "The desired price range for the restaurant's offerings.",
+     "enum": [
+      "cheap",
+      "moderate",
+      "pricey",
+      "ultra high-end"
+     ],
+     "default": "moderate"
+    },
+    "has_vegetarian_options": {
+     "type": "boolean",
+     "description": "Specifies if the restaurant should offer vegetarian options.",
+     "default": false
+    },
+    "has_seating_outdoors": {
+     "type": "boolean",
+     "description": "Indicates whether the restaurant should have outdoor seating.",
+     "default": false
+    }
+   }
+  },
+  "domain": "Restaurants",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "RideSharing_2_GetRide",
+  "description": "Book a cab to travel to the specified destination with a selected number of seats and ride type.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "destination",
+    "number_of_seats",
+    "ride_type"
+   ],
+   "properties": {
+    "destination": {
+     "type": "string",
+     "description": "The precise address or location where the cab should take the passenger, in the format of 'Street, City, State'."
+    },
+    "number_of_seats": {
+     "type": "integer",
+     "description": "The number of seats to reserve in the cab."
+    },
+    "ride_type": {
+     "type": "string",
+     "description": "The category of cab ride to book.",
+     "enum": [
+      "Pool",
+      "Regular",
+      "Luxury"
+     ]
+    }
+   }
+  },
+  "domain": "RideSharing",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Services_4_BookAppointment",
+  "description": "Books an appointment with a selected therapist for a specified date and time.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "therapist_name",
+    "appointment_time",
+    "appointment_date"
+   ],
+   "properties": {
+    "therapist_name": {
+     "type": "string",
+     "description": "The full name of the therapist with whom the appointment is to be booked."
+    },
+    "appointment_time": {
+     "type": "string",
+     "description": "The desired time for the appointment, in 24-hour format (e.g., '14:00' for 2 PM)."
+    },
+    "appointment_date": {
+     "type": "string",
+     "description": "The desired date for the appointment, in the format of 'YYYY-MM-DD' (e.g., '2023-04-15')."
+    }
+   }
+  },
+  "domain": "Services",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Services_4_FindProvider",
+  "description": "Discover a therapist based on the user's specific needs and location.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "city",
+    "type"
+   ],
+   "properties": {
+    "city": {
+     "type": "string",
+     "description": "The city where the user is looking for a therapist, in the format of 'City, State', such as 'Berkeley, CA' or 'New York, NY'. State has to be abbrieviated."
+    },
+    "type": {
+     "type": "string",
+     "description": "The specialization of the therapist the user is seeking.",
+     "enum": [
+      "Psychologist",
+      "Family Counselor",
+      "Psychiatrist"
+     ]
+    },
+    "insurance_accepted": {
+     "type": "boolean",
+     "description": "Indicates whether the therapist should accept insurance, true for yes and false for no.",
+     "default": true
+    }
+   }
+  },
+  "domain": "Services",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Hotels_2_BookHouse",
+  "description": "Books a selected house for a specified duration and number of adults.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "where_to",
+    "number_of_adults",
+    "check_in_date",
+    "check_out_date"
+   ],
+   "properties": {
+    "where_to": {
+     "type": "string",
+     "description": "The location of the house to book, in the format of 'City, State', such as 'San Francisco, CA'."
+    },
+    "number_of_adults": {
+     "type": "integer",
+     "description": "The number of adults to include in the reservation."
+    },
+    "check_in_date": {
+     "type": "string",
+     "description": "The check-in date for the reservation in the format 'MM/DD/YYYY'."
+    },
+    "check_out_date": {
+     "type": "string",
+     "description": "The check-out date for the reservation in the format 'MM/DD/YYYY'."
+    }
+   }
+  },
+  "domain": "Hotels",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Hotels_2_SearchHouse",
+  "description": "Search for a house accommodation at a specific location, optionally filtering by laundry service availability, number of adults, and review rating.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "where_to"
+   ],
+   "properties": {
+    "where_to": {
+     "type": "string",
+     "description": "The destination where the house is searched for, in the format of 'City, State', such as 'Austin, TX' or 'San Francisco, CA'. State has to be abbrieviated"
+    },
+    "has_laundry_service": {
+     "type": "string",
+     "description": "Indicates if the house should have laundry service available.",
+     "enum": [
+      "True",
+      "False",
+      "dontcare"
+     ],
+     "default": "dontcare"
+    },
+    "number_of_adults": {
+     "type": "integer",
+     "description": "The number of adults for the reservation. Use 0 to indicate 'dontcare'.",
+     "default": 0
+    },
+    "rating": {
+     "type": "float",
+     "description": "The minimum review rating of the house on a scale from 1.0 to 5.0, with 5.0 being the highest. Use 0 to indicate 'dontcare'.",
+     "default": 0.0
+    }
+   }
+  },
+  "domain": "Hotels",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Hotels_4_ReserveHotel",
+  "description": "Reserve a specified number of hotel rooms at a selected location for a given duration and check-in date.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "place_name",
+    "check_in_date",
+    "stay_length",
+    "location"
+   ],
+   "properties": {
+    "place_name": {
+     "type": "string",
+     "description": "The name of the hotel or accommodation to reserve."
+    },
+    "check_in_date": {
+     "type": "string",
+     "description": "The check-in date for the reservation, in the format 'YYYY-MM-DD'."
+    },
+    "stay_length": {
+     "type": "integer",
+     "description": "The length of the stay in number of days."
+    },
+    "location": {
+     "type": "string",
+     "description": "The city or town where the accommodation is located, in the format 'City, State'."
+    },
+    "number_of_rooms": {
+     "type": "string",
+     "description": "The number of rooms to reserve.",
+     "enum": [
+      "1",
+      "2",
+      "3",
+      "dontcare"
+     ],
+     "default": "dontcare"
+    }
+   }
+  },
+  "domain": "Hotels",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Hotels_4_SearchHotel",
+  "description": "Searches for available accommodation in a specified location with optional filters such as star rating, smoking policy, and number of rooms.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "location"
+   ],
+   "properties": {
+    "location": {
+     "type": "string",
+     "description": "The city or town where the accommodation is searched for, in the format of 'City, State' or 'City, Country'. State has to be abbrieviated"
+    },
+    "star_rating": {
+     "type": "string",
+     "description": "The star rating for the accommodation ranging from 1 to 5 stars.",
+     "enum": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "dontcare"
+     ],
+     "default": "dontcare"
+    },
+    "smoking_allowed": {
+     "type": "string",
+     "description": "Indicates if smoking is allowed. Choose 'True' for smoking rooms, 'False' for non-smoking rooms, or 'dontcare' if no preference.",
+     "enum": [
+      "True",
+      "False",
+      "dontcare"
+     ],
+     "default": "dontcare"
+    },
+    "number_of_rooms": {
+     "type": "integer",
+     "description": "The number of rooms required for the reservation.",
+     "default": 1
+    }
+   }
+  },
+  "domain": "Hotels",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Travel_1_FindAttractions",
+  "description": "Browse attractions in a given city, filtering by various criteria such as free entry, category, and suitability for children.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "location"
+   ],
+   "properties": {
+    "location": {
+     "type": "string",
+     "description": "The name of the city or town where the attraction is located, in the format of 'City, State' or 'City, Country', such as 'Paris, France' or 'New York, NY'."
+    },
+    "free_entry": {
+     "type": "boolean",
+     "description": "Flag indicating whether the attraction offers free entry. A value of 'True' filters for attractions with free entry, 'False' for attractions with an entry fee, and 'dontcare' (default) includes all attractions regardless of entry fee.",
+     "enum": [
+      "True",
+      "False",
+      "dontcare"
+     ],
+     "default": "dontcare"
+    },
+    "category": {
+     "type": "string",
+     "description": "Category of the attraction, such as 'Place of Worship', 'Theme Park', etc. Use 'dontcare' (default) to include all categories.",
+     "enum": [
+      "Place of Worship",
+      "Theme Park",
+      "Museum",
+      "Historical Landmark",
+      "Park",
+      "Tourist Attraction",
+      "Sports Venue",
+      "Shopping Area",
+      "Performing Arts Venue",
+      "Nature Preserve",
+      "dontcare"
+     ],
+     "default": "dontcare"
+    },
+    "good_for_kids": {
+     "type": "boolean",
+     "description": "Flag indicating whether the attraction is suitable for children. 'True' filters for kid-friendly attractions, 'False' for attractions that may not be suitable for children, and 'dontcare' (default) includes all attractions.",
+     "enum": [
+      "True",
+      "False",
+      "dontcare"
+     ],
+     "default": "dontcare"
+    }
+   }
+  },
+  "domain": "Travel",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Media_3_FindMovies",
+  "description": "Search for movies that fit a user's preferences such as genre and starring actors.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "genre"
+   ],
+   "properties": {
+    "genre": {
+     "type": "string",
+     "description": "The genre of the movie to search for.",
+     "enum": [
+      "World",
+      "Fantasy",
+      "Offbeat",
+      "Mystery",
+      "Musical",
+      "Thriller",
+      "Comedy",
+      "Horror",
+      "Animation",
+      "Cult",
+      "Sci-fi",
+      "War",
+      "Drama",
+      "Family",
+      "Action"
+     ]
+    },
+    "starring": {
+     "type": "string",
+     "description": "The name of a specific actor or actress the user wants to see in the movie. Use 'All' to include any.",
+     "default": "All"
+    }
+   }
+  },
+  "domain": "Media",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Media_3_PlayMovie",
+  "description": "Streams a selected movie online with the option to choose subtitles in various languages.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "title"
+   ],
+   "properties": {
+    "title": {
+     "type": "string",
+     "description": "The title of the movie to be streamed."
+    },
+    "subtitle_language": {
+     "type": "string",
+     "description": "The preferred language for the movie's subtitles.",
+     "enum": [
+      "English",
+      "Spanish",
+      "Hindi",
+      "French"
+     ],
+     "default": "English"
+    }
+   }
+  },
+  "domain": "Media",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Music_3_PlayMedia",
+  "description": "Plays a specified track on a designated media player device.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "track"
+   ],
+   "properties": {
+    "track": {
+     "type": "string",
+     "description": "The title of the song to be played."
+    },
+    "artist": {
+     "type": "string",
+     "description": "The name of the artist performing the song. If unspecified, any artist is acceptable.",
+     "default": "dontcare"
+    },
+    "device": {
+     "type": "string",
+     "description": "The media player device where the song will be played.",
+     "enum": [
+      "Living room",
+      "Kitchen",
+      "Patio"
+     ],
+     "default": "Living room"
+    },
+    "album": {
+     "type": "string",
+     "description": "The album where the song is featured. If unspecified, any album is acceptable.",
+     "default": "dontcare"
+    }
+   }
+  },
+  "domain": "Music",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Music_3_LookupMusic",
+  "description": "Retrieve a list of songs that align with the user's musical preferences based on artist, album, genre, and release year.",
+  "parameters": {
+   "type": "dict",
+   "properties": {
+    "artist": {
+     "type": "string",
+     "description": "The name of the artist or band. Use 'dontcare' if this is not a filtering criterion.",
+     "default": "dontcare"
+    },
+    "album": {
+     "type": "string",
+     "description": "The title of the album. Use 'dontcare' if this is not a filtering criterion.",
+     "default": "dontcare"
+    },
+    "genre": {
+     "type": "string",
+     "description": "The musical genre of the songs. Select 'dontcare' to include all genres.",
+     "enum": [
+      "Reggae",
+      "Holiday",
+      "Electropop",
+      "Pop",
+      "Asia",
+      "House",
+      "Electronica",
+      "Funk",
+      "Rock",
+      "Metal",
+      "Dubstep",
+      "Country",
+      "dontcare"
+     ],
+     "default": "dontcare"
+    },
+    "year": {
+     "type": "integer",
+     "description": "The release year of the song. Use 'dontcare' to include songs from any year.",
+     "default": "dontcare"
+    }
+   },
+   "required": []
+  },
+  "domain": "Music",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Alarm_1_GetAlarms",
+  "description": "Retrieve a list of all alarms that the user has set in the application.",
+  "parameters": {
+   "type": "dict",
+   "properties": {
+    "user_id": {
+     "type": "string",
+     "description": "The unique identifier for the user whose alarms are being retrieved."
+    },
+    "include_disabled": {
+     "type": "boolean",
+     "description": "A flag indicating whether to include disabled alarms in the result set.",
+     "default": false
+    }
+   },
+   "required": [
+    "user_id"
+   ]
+  },
+  "domain": "Alarm",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Alarm_1_AddAlarm",
+  "description": "Sets a new alarm with specified time and an optional custom name.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "new_alarm_time"
+   ],
+   "properties": {
+    "new_alarm_time": {
+     "type": "string",
+     "description": "The time to set for the new alarm in 24-hour format (e.g., '14:30' for 2:30 PM)."
+    },
+    "new_alarm_name": {
+     "type": "string",
+     "description": "The custom name to assign to the new alarm.",
+     "default": "New Alarm"
+    }
+   }
+  },
+  "domain": "Alarm",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Messaging_1_ShareLocation",
+  "description": "Shares the current geographical location with a specified contact.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "location",
+    "contact_name"
+   ],
+   "properties": {
+    "location": {
+     "type": "string",
+     "description": "The current location to share, expressed in the format 'Latitude, Longitude' (e.g., '34.052235, -118.243683')."
+    },
+    "contact_name": {
+     "type": "string",
+     "description": "The full name of the contact to whom the location will be sent."
+    }
+   }
+  },
+  "domain": "Messaging",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Services_1_BookAppointment",
+  "description": "This function books an appointment with a specified hair stylist or salon on a desired date and time.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "stylist_name",
+    "appointment_date",
+    "appointment_time"
+   ],
+   "properties": {
+    "stylist_name": {
+     "type": "string",
+     "description": "The full name of the hair stylist or the name of the salon."
+    },
+    "appointment_date": {
+     "type": "string",
+     "description": "The date for the appointment in the format of 'YYYY-MM-DD', such as '2023-10-05'."
+    },
+    "appointment_time": {
+     "type": "string",
+     "description": "The time for the appointment in 24-hour format 'HH:MM', such as '14:30'."
+    }
+   }
+  },
+  "domain": "Services",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Services_1_FindProvider",
+  "description": "Search for a hair stylist in a specified city, with options to filter for unisex salons.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "city"
+   ],
+   "properties": {
+    "city": {
+     "type": "string",
+     "description": "The city where the stylist or salon is sought, such as 'New York, NY'. State names must be abbreviated with two letters."
+    },
+    "is_unisex": {
+     "type": "boolean",
+     "description": "Indicates whether the salon caters to all genders. True for yes, False for no.",
+     "default": false
+    }
+   }
+  },
+  "domain": "Services",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Events_3_FindEvents",
+  "description": "Find cultural events, such as concerts and plays, happening in a specified city on a given date.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "event_type",
+    "city"
+   ],
+   "properties": {
+    "event_type": {
+     "type": "string",
+     "description": "The type of cultural event to find. Events include concerts and plays.",
+     "enum": [
+      "Music",
+      "Theater"
+     ]
+    },
+    "city": {
+     "type": "string",
+     "description": "The city where the event is taking place, in the format 'City, State' or 'City, Country' (e.g., 'New York, NY' or 'London, UK'). State names must be abbreviated with two letters."
+    },
+    "date": {
+     "type": "string",
+     "description": "The date of the event. Use the format 'YYYY-MM-DD'. If not specified, the current date is used.",
+     "default": null
+    }
+   }
+  },
+  "domain": "Events",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Events_3_BuyEventTickets",
+  "description": "Purchase tickets for a specific cultural event on a chosen date in a specified city.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "event_name",
+    "number_of_tickets",
+    "date",
+    "city"
+   ],
+   "properties": {
+    "event_name": {
+     "type": "string",
+     "description": "The official title of the event, such as an artist's name or a play title."
+    },
+    "number_of_tickets": {
+     "type": "integer",
+     "description": "The quantity of tickets to be reserved, must be an integer from 1 to 9.",
+     "enum": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+     ]
+    },
+    "date": {
+     "type": "string",
+     "description": "The date of the event, formatted as 'YYYY-MM-DD'."
+    },
+    "city": {
+     "type": "string",
+     "description": "The name of the city where the event will take place, formatted as 'City, State' (e.g., 'New York, NY')."
+    }
+   }
+  },
+  "domain": "Events",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Movies_1_BuyMovieTickets",
+  "description": "Purchase tickets for a specific movie showing, including the number of tickets, show date and time, and location.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "movie_name",
+    "number_of_tickets",
+    "location"
+   ],
+   "properties": {
+    "movie_name": {
+     "type": "string",
+     "description": "The title of the movie for which tickets are being purchased."
+    },
+    "number_of_tickets": {
+     "type": "integer",
+     "description": "The total number of tickets to be bought."
+    },
+    "show_date": {
+     "type": "string",
+     "description": "The date on which the movie is showing, in the format 'YYYY-MM-DD'.",
+     "default": null
+    },
+    "location": {
+     "type": "string",
+     "description": "The city in which the movie theater is located, in the format of 'City, State', such as 'Los Angeles, CA'."
+    },
+    "show_time": {
+     "type": "string",
+     "description": "The start time of the movie showing, in 24-hour format 'HH:MM'.",
+     "default": "20:00"
+    },
+    "show_type": {
+     "type": "string",
+     "description": "The format of the movie showing.",
+     "enum": [
+      "regular",
+      "3d",
+      "imax"
+     ],
+     "default": "regular"
+    }
+   }
+  },
+  "domain": "Movies",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Movies_1_FindMovies",
+  "description": "Search for movies based on location, genre, and show type at specific theaters.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "location"
+   ],
+   "properties": {
+    "location": {
+     "type": "string",
+     "description": "The city where the theatre is located, in the format of 'City, State', such as 'Berkeley, CA' or 'New York, NY'. State names must be abbreviated"
+    },
+    "theater_name": {
+     "type": "string",
+     "description": "The name of the theatre. If unspecified, all theatres are considered.",
+     "default": "dontcare"
+    },
+    "genre": {
+     "type": "string",
+     "description": "The genre of the movie. If unspecified, all genres are considered.",
+     "enum": [
+      "World",
+      "Offbeat",
+      "Mystery",
+      "Supernatural",
+      "Horror",
+      "Animation",
+      "Sci-fi",
+      "Documentary",
+      "Drama",
+      "War",
+      "Family",
+      "Action"
+     ],
+     "default": "dontcare"
+    },
+    "show_type": {
+     "type": "string",
+     "description": "The type of movie show. If unspecified, all show types are considered.",
+     "enum": [
+      "regular",
+      "3d",
+      "imax"
+     ],
+     "default": "dontcare"
+    }
+   }
+  },
+  "domain": "Movies",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Movies_1_GetTimesForMovie",
+  "description": "Retrieves the show times for a specific movie at a particular theater location on a specified date.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "movie_name",
+    "location",
+    "show_date"
+   ],
+   "properties": {
+    "movie_name": {
+     "type": "string",
+     "description": "The title of the movie for which to find show times."
+    },
+    "location": {
+     "type": "string",
+     "description": "The city and state where the theater is located, in the format of 'City, State', such as 'Berkeley, CA' and 'New York, NY'."
+    },
+    "show_date": {
+     "type": "string",
+     "description": "The date of the show in the format 'YYYY-MM-DD', for example, '2023-04-15'."
+    },
+    "theater_name": {
+     "type": "string",
+     "description": "The name of the theater where the movie is showing. If not specified, any theater will be considered.",
+     "default": "Any Theater"
+    },
+    "show_type": {
+     "type": "string",
+     "description": "The format of the movie showing.",
+     "enum": [
+      "regular",
+      "3D",
+      "IMAX"
+     ],
+     "default": "regular"
+    }
+   }
+  },
+  "domain": "Movies",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Buses_3_FindBus",
+  "description": "Search for a bus itinerary between two cities on a specific date.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "from_city",
+    "to_city",
+    "departure_date"
+   ],
+   "properties": {
+    "from_city": {
+     "type": "string",
+     "description": "The city of departure, in the format 'City, State', such as 'New York, NY'."
+    },
+    "to_city": {
+     "type": "string",
+     "description": "The destination city of the trip, in the format 'City, State', such as 'Los Angeles, CA'."
+    },
+    "departure_date": {
+     "type": "string",
+     "description": "The date of departure in the format 'YYYY-MM-DD'."
+    },
+    "num_passengers": {
+     "type": "integer",
+     "description": "The number of passengers for the trip.",
+     "enum": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "default": 1
+    },
+    "category": {
+     "type": "string",
+     "description": "The category of the trip based on the number of stops.",
+     "enum": [
+      "direct",
+      "one-stop"
+     ],
+     "default": "direct"
+    }
+   }
+  },
+  "domain": "Buses",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Buses_3_BuyBusTicket",
+  "description": "This function processes the purchase of bus tickets from a departure city to a destination city on a specified date and time. It also accounts for the number of passengers and additional luggage optio",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "from_city",
+    "to_city",
+    "departure_date",
+    "departure_time",
+    "num_passengers"
+   ],
+   "properties": {
+    "from_city": {
+     "type": "string",
+     "description": "The city where the journey begins, in the format of 'City, State', such as 'New York, NY'."
+    },
+    "to_city": {
+     "type": "string",
+     "description": "The destination city for the trip, in the format of 'City, State', such as 'Los Angeles, CA'."
+    },
+    "departure_date": {
+     "type": "string",
+     "description": "The departure date in 'YYYY-MM-DD' format, for example, '2023-04-21'."
+    },
+    "departure_time": {
+     "type": "string",
+     "description": "The time of departure in 24-hour format 'HH:MM', such as '14:30' for 2:30 PM."
+    },
+    "num_passengers": {
+     "type": "integer",
+     "description": "The number of passengers for whom the tickets are being purchased. Must be a positive integer."
+    },
+    "additional_luggage": {
+     "type": "boolean",
+     "description": "Indicates whether additional luggage will be carried on the bus.",
+     "default": false
+    }
+   }
+  },
+  "domain": "Buses",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Trains_1_GetTrainTickets",
+  "description": "Reserve tickets for a train journey by providing journey details, the number of passengers, and seating class preferences.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "_from",
+    "to",
+    "date_of_journey",
+    "journey_start_time",
+    "number_of_adults",
+    "trip_protection"
+   ],
+   "properties": {
+    "_from": {
+     "type": "string",
+     "description": "The departure city for the train journey, in the format of 'City, State', such as 'Los Angeles, CA'."
+    },
+    "to": {
+     "type": "string",
+     "description": "The arrival city for the train journey, in the format of 'City, State', such as 'New York, NY'."
+    },
+    "date_of_journey": {
+     "type": "string",
+     "description": "The date of the train journey in the format 'YYYY-MM-DD', such as '2023-04-15'."
+    },
+    "journey_start_time": {
+     "type": "string",
+     "description": "The start time of the train journey in 24-hour format 'HH:MM', such as '14:30'."
+    },
+    "number_of_adults": {
+     "type": "integer",
+     "description": "The number of adults to reserve train tickets for. Must be between 1 to 5 adults."
+    },
+    "trip_protection": {
+     "type": "boolean",
+     "description": "Indicates whether to add trip protection to the reservation for an additional fee. Trip protection provides refund options and assistance in case of trip disruptions."
+    },
+    "_class": {
+     "type": "string",
+     "description": "The fare class for the train reservation. Options include 'Value', 'Flexible', and 'Business'.",
+     "enum": [
+      "Value",
+      "Flexible",
+      "Business"
+     ],
+     "default": "Value"
+    }
+   }
+  },
+  "domain": "Trains",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Trains_1_FindTrains",
+  "description": "Finds available train options for a specified route on a given date, allowing users to select a preferred travel class.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "_from",
+    "to",
+    "date_of_journey"
+   ],
+   "properties": {
+    "_from": {
+     "type": "string",
+     "description": "The city where the train journey will start. Eg: 'Berkeley, CA'. State names must be abbreviated."
+    },
+    "to": {
+     "type": "string",
+     "description": "The destination city for the train journey. Eg: 'Berkeley, CA'. State names must be abbreviated."
+    },
+    "date_of_journey": {
+     "type": "string",
+     "description": "The date of the train journey, in the format of 'YYYY-MM-DD'."
+    },
+    "_class": {
+     "type": "string",
+     "description": "The fare class for the train reservation.",
+     "enum": [
+      "Value",
+      "Flexible",
+      "Business"
+     ],
+     "default": "Value"
+    },
+    "number_of_adults": {
+     "type": "integer",
+     "description": "The number of adults to reserve train tickets for.",
+     "default": 1
+    }
+   }
+  },
+  "domain": "Trains",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Payment_1_RequestPayment",
+  "description": "Initiates a payment request to a specified contact or account.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "receiver",
+    "amount"
+   ],
+   "properties": {
+    "receiver": {
+     "type": "string",
+     "description": "The name or identifier of the contact or account to which the payment request will be sent."
+    },
+    "amount": {
+     "type": "float",
+     "description": "The monetary value to be requested, specified in dollars."
+    },
+    "private_visibility": {
+     "type": "boolean",
+     "description": "Indicates whether the payment request should be visible to others or kept private.",
+     "default": false
+    }
+   }
+  },
+  "domain": "Payment",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Payment_1_MakePayment",
+  "description": "Executes a transaction to transfer funds from the user to another account.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "payment_method",
+    "amount",
+    "receiver"
+   ],
+   "properties": {
+    "payment_method": {
+     "type": "string",
+     "description": "The funding source for the payment such as 'app balance', 'debit card', or 'credit card'.",
+     "enum": [
+      "app balance",
+      "debit card",
+      "credit card"
+     ]
+    },
+    "amount": {
+     "type": "float",
+     "description": "The monetary value to be transferred, in USD."
+    },
+    "receiver": {
+     "type": "string",
+     "description": "The identifier for the recipient, such as an account number or username."
+    },
+    "private_visibility": {
+     "type": "boolean",
+     "description": "Indicates if the transaction should be private (true) or public (false).",
+     "default": false
+    }
+   }
+  },
+  "domain": "Payment",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Homes_2_FindHomeByArea",
+  "description": "Search for a property to rent or buy in a specified city, filtering by number of bedrooms, number of bathrooms, garage availability, and in-unit laundry facilities.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "area",
+    "intent",
+    "number_of_beds",
+    "number_of_baths"
+   ],
+   "properties": {
+    "area": {
+     "type": "string",
+     "description": "The city where the property is located, in the format of 'City, State' (e.g., 'San Francisco, CA'). State names must be abbreviated"
+    },
+    "intent": {
+     "type": "string",
+     "description": "The intent of the search, whether the user is looking to rent or buy.",
+     "enum": [
+      "rent",
+      "buy"
+     ]
+    },
+    "number_of_beds": {
+     "type": "integer",
+     "description": "The number of bedrooms required in the property."
+    },
+    "number_of_baths": {
+     "type": "integer",
+     "description": "The number of bathrooms required in the property."
+    },
+    "has_garage": {
+     "type": "boolean",
+     "description": "Indicates if the property must have a garage.",
+     "default": false
+    },
+    "in_unit_laundry": {
+     "type": "boolean",
+     "description": "Indicates if the property must have in-unit laundry facilities.",
+     "default": false
+    }
+   }
+  },
+  "domain": "Homes",
+  "kind": "read",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "Homes_2_ScheduleVisit",
+  "description": "Schedules a property visit for a potential buyer or tenant on a specific date.",
+  "parameters": {
+   "type": "dict",
+   "required": [
+    "property_name",
+    "visit_date"
+   ],
+   "properties": {
+    "property_name": {
+     "type": "string",
+     "description": "The name of the property or apartment complex to be visited."
+    },
+    "visit_date": {
+     "type": "string",
+     "description": "The scheduled date for the visit in the format 'YYYY-MM-DD', such as '2023-04-15'."
+    }
+   }
+  },
+  "domain": "Homes",
+  "kind": "action",
+  "source": "BFCL-v3/Google-SGD"
+ },
+ {
+  "function": "get_stock_price_global_market",
+  "description": "Get Public Available Stock Symbols from Global Marketplace Args: symbol_list (List): List of Symbols, such as Tencent: 700, Kuaishou: 1024, Tesla (TSLA), Microsoft(MSFT), Google (GOOG), London Stock E",
+  "parameters": {
+   "properties": {
+    "symbol_list": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Symbol List",
+     "type": "array"
+    },
+    "market": {
+     "title": "Market",
+     "type": "string"
+    }
+   },
+   "required": [
+    "symbol_list",
+    "market"
+   ],
+   "title": "get_stock_price_global_marketArguments",
+   "type": "object"
+  },
+  "domain": "finance",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_search_places",
+  "description": "Search for places using Google Places API",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "query": {
+     "type": "string",
+     "description": "Search query"
+    },
+    "location": {
+     "type": "object",
+     "properties": {
+      "latitude": {
+       "type": "number"
+      },
+      "longitude": {
+       "type": "number"
+      }
+     },
+     "description": "Optional center point for the search"
+    },
+    "radius": {
+     "type": "number",
+     "description": "Search radius in meters (max 50000)"
+    }
+   },
+   "required": [
+    "query"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_place_details",
+  "description": "Get detailed information about a specific place",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "place_id": {
+     "type": "string",
+     "description": "The place ID to get details for"
+    }
+   },
+   "required": [
+    "place_id"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_distance_matrix",
+  "description": "Calculate travel distance and time for multiple origins and destinations",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "origins": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "Array of origin addresses or coordinates"
+    },
+    "destinations": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "Array of destination addresses or coordinates"
+    },
+    "mode": {
+     "type": "string",
+     "description": "Travel mode (driving, walking, bicycling, transit)",
+     "enum": [
+      "driving",
+      "walking",
+      "bicycling",
+      "transit"
+     ]
+    }
+   },
+   "required": [
+    "origins",
+    "destinations"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_directions",
+  "description": "Get directions between two points",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "origin": {
+     "type": "string",
+     "description": "Starting point address or coordinates"
+    },
+    "destination": {
+     "type": "string",
+     "description": "Ending point address or coordinates"
+    },
+    "mode": {
+     "type": "string",
+     "description": "Travel mode (driving, walking, bicycling, transit)",
+     "enum": [
+      "driving",
+      "walking",
+      "bicycling",
+      "transit"
+     ]
+    }
+   },
+   "required": [
+    "origin",
+    "destination"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "map_search_places",
+  "description": "地点检索服务: 支持检索城市内的地点信息(最小到city级别), 也可支持圆形区域内的周边地点信息检索. 城市内检索: 检索某一城市内（目前最细到城市级别）的地点信息. 周边检索: 设置圆心和半径, 检索圆形区域内的地点信息（常用于周边检索场景）.",
+  "parameters": {
+   "type": "object",
+   "required": [
+    "query"
+   ],
+   "properties": {
+    "query": {
+     "type": "string",
+     "description": "检索关键字, 可直接使用名称或类型, 如'天安门', 且可以至多10个关键字, 用英文逗号隔开"
+    },
+    "tag": {
+     "type": "string",
+     "description": "检索分类, 以中文字符输入, 如'美食', 多个分类用英文逗号隔开, 如'美食,购物'"
+    },
+    "region": {
+     "type": "string",
+     "description": "检索的城市名称, 可为行政区划名或citycode, 格式如'北京市'或'131', 不传默认为'全国'"
+    },
+    "location": {
+     "type": "string",
+     "description": "圆形区域检索的中心点纬经度坐标, 格式为lat,lng"
+    },
+    "radius": {
+     "type": "integer",
+     "description": "圆形区域检索半径, 单位：米"
+    },
+    "language": {
+     "type": "string",
+     "description": "指定输入参数和召回参数的语言类型, 需要传入的是语言名称的英文缩写. \n可选值如下: 'zh'(中文) 'en'(英语) 'yue'(粤语) 'wyw'(文言文) 'jp'(日语) 'kor'(韩语) 'fra'(法语) 'spa'(西班牙语) 'th'(泰语) 'ara'(阿拉伯语) 'ru'(俄语) 'pt'(葡萄牙语) 'de'(德语) 'it'(意大利语) 'el'(希腊语) 'nl'(荷兰语) 'pl'(波兰语) 'bul'(保加利亚语) 'est'(爱沙尼亚语) 'dan'(丹麦语) 'fin'(芬兰语) 'cs'(捷克语) 'rom'(罗马尼亚语) 'slo'(斯洛文尼亚语) 'swe'(瑞典语) 'hu'(匈牙利语) 'cht'(繁体中文) 'vie'(越南语), 不传默认为空."
+    }
+   }
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "map_place_details",
+  "description": "地点详情检索服务: 地点详情检索针对指定POI, 检索其相关的详情信息. 通过地点检索服务获取POI uid.使用地点详情检索功能, 传入uid, 即可检索POI详情信息, 如评分、营业时间等(不同类型POI对应不同类别详情数据).",
+  "parameters": {
+   "type": "object",
+   "required": [
+    "uid"
+   ],
+   "properties": {
+    "uid": {
+     "type": "string",
+     "description": "POI的唯一标识"
+    }
+   }
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "map_directions_matrix",
+  "description": "批量算路服务: 根据起点和终点坐标计算路线规划距离和行驶时间. 批量算路目前支持驾车、骑行、步行. 步行时任意起终点之间的距离不得超过200KM, 超过此限制会返回参数错误. 驾车批量算路一次最多计算100条路线, 起终点个数之积不能超过100.",
+  "parameters": {
+   "type": "object",
+   "required": [
+    "origins",
+    "destinations"
+   ],
+   "properties": {
+    "origins": {
+     "type": "string",
+     "description": "多个起点纬经度坐标, 纬度在前, 经度在后, 多个起点用|分隔"
+    },
+    "destinations": {
+     "type": "string",
+     "description": "多个终点纬经度坐标, 纬度在前, 经度在后, 多个终点用|分隔"
+    },
+    "model": {
+     "type": "string",
+     "description": "批量算路类型(driving, riding, walking)"
+    }
+   }
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "map_directions",
+  "description": "路线规划服务: 根据起终点`位置名称`或`纬经度坐标`规划出行路线. 驾车路线规划: 根据起终点`位置名称`或`纬经度坐标`规划驾车出行路线. 骑行路线规划: 根据起终点`位置名称`或`纬经度坐标`规划骑行出行路线. 步行路线规划: 根据起终点`位置名称`或`纬经度坐标`规划步行出行路线. 公交路线规划: 根据起终点`位置名称`或`纬经度坐标`规划公共交通出行路线.",
+  "parameters": {
+   "type": "object",
+   "required": [
+    "origin",
+    "destination"
+   ],
+   "properties": {
+    "model": {
+     "type": "string",
+     "description": "路线规划类型(driving, riding, walking, transit)"
+    },
+    "origin": {
+     "type": "string",
+     "description": "起点位置名称或纬经度坐标, 纬度在前, 经度在后"
+    },
+    "destination": {
+     "type": "string",
+     "description": "终点位置名称或纬经度坐标, 纬度在前, 经度在后"
+    }
+   }
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "map_weather",
+  "description": "天气查询服务: 通过行政区划或是经纬度坐标查询实时天气信息及未来5天天气预报.",
+  "parameters": {
+   "type": "object",
+   "required": [],
+   "properties": {
+    "location": {
+     "type": "string",
+     "description": "经纬度坐标, 经度在前纬度在后, 逗号分隔"
+    },
+    "district_id": {
+     "type": "string",
+     "description": "行政区划代码, 需保证为6位无符号整数"
+    }
+   }
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "map_road_traffic",
+  "description": "实时路况查询服务: 查询实时交通拥堵情况, 可通过指定道路名和区域形状(矩形, 多边形, 圆形)进行实时路况查询. 道路实时路况查询: 查询具体道路的实时拥堵评价和拥堵路段、拥堵距离、拥堵趋势等信息. 矩形区域实时路况查询: 查询指定矩形地理范围的实时拥堵情况和各拥堵路段信息. 多边形区域实时路况查询: 查询指定多边形地理范围的实时拥堵情况和各拥堵路段信息. 圆形区域(周边)实时路况查询: 查询某",
+  "parameters": {
+   "type": "object",
+   "required": [
+    "model"
+   ],
+   "properties": {
+    "model": {
+     "type": "string",
+     "description": "路况查询类型(road, bound, polygon, around)"
+    },
+    "road_name": {
+     "type": "string",
+     "description": "道路名称和道路方向, model=road时必传 (如:朝阳路南向北)"
+    },
+    "city": {
+     "type": "string",
+     "description": "城市名称或城市adcode, model=road时必传 (如:北京市)"
+    },
+    "bounds": {
+     "type": "string",
+     "description": "区域左下角和右上角的纬经度坐标, 纬度在前, 经度在后, model=bound时必传"
+    },
+    "vertexes": {
+     "type": "string",
+     "description": "多边形区域的顶点纬经度坐标, 纬度在前, 经度在后, model=polygon时必传"
+    },
+    "center": {
+     "type": "string",
+     "description": "圆形区域的中心点纬经度坐标, 纬度在前, 经度在后, model=around时必传"
+    },
+    "radius": {
+     "type": "integer",
+     "description": "圆形区域的半径(米), 取值[1,1000], model=around时必传"
+    }
+   }
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_direction_bicycling",
+  "description": "骑行路径规划用于规划骑行通勤方案，规划时会考虑天桥、单行线、封路等情况。最大支持 500km 的骑行路线规划",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "origin": {
+     "type": "string",
+     "description": "出发点经纬度，坐标格式为：经度，纬度"
+    },
+    "destination": {
+     "type": "string",
+     "description": "目的地经纬度，坐标格式为：经度，纬度"
+    }
+   },
+   "required": [
+    "origin",
+    "destination"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_direction_driving",
+  "description": "驾车路径规划 API 可以根据用户起终点经纬度坐标规划以小客车、轿车通勤出行的方案，并且返回通勤方案的数据。",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "origin": {
+     "type": "string",
+     "description": "出发点经纬度，坐标格式为：经度，纬度"
+    },
+    "destination": {
+     "type": "string",
+     "description": "目的地经纬度，坐标格式为：经度，纬度"
+    }
+   },
+   "required": [
+    "origin",
+    "destination"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_direction_transit_integrated",
+  "description": "根据用户起终点经纬度坐标规划综合各类公共（火车、公交、地铁）交通方式的通勤方案，并且返回通勤方案的数据，跨城场景下必须传起点城市与终点城市",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "origin": {
+     "type": "string",
+     "description": "出发点经纬度，坐标格式为：经度，纬度"
+    },
+    "destination": {
+     "type": "string",
+     "description": "目的地经纬度，坐标格式为：经度，纬度"
+    },
+    "city": {
+     "type": "string",
+     "description": "公共交通规划起点城市"
+    },
+    "cityd": {
+     "type": "string",
+     "description": "公共交通规划终点城市"
+    }
+   },
+   "required": [
+    "origin",
+    "destination",
+    "city",
+    "cityd"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_direction_walking",
+  "description": "根据输入起点终点经纬度坐标规划100km 以内的步行通勤方案，并且返回通勤方案的数据",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "origin": {
+     "type": "string",
+     "description": "出发点经度，纬度，坐标格式为：经度，纬度"
+    },
+    "destination": {
+     "type": "string",
+     "description": "目的地经度，纬度，坐标格式为：经度，纬度"
+    }
+   },
+   "required": [
+    "origin",
+    "destination"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_distance",
+  "description": "测量两个经纬度坐标之间的距离,支持驾车、步行以及球面距离测量",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "origins": {
+     "type": "string",
+     "description": "起点经度，纬度，可以传多个坐标，使用竖线隔离，比如120,30|120,31，坐标格式为：经度，纬度"
+    },
+    "destination": {
+     "type": "string",
+     "description": "终点经度，纬度，坐标格式为：经度，纬度"
+    },
+    "type": {
+     "type": "string",
+     "description": "距离测量类型,1代表驾车距离测量，0代表直线距离测量，3步行距离测量"
+    }
+   },
+   "required": [
+    "origins",
+    "destination"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_around_search",
+  "description": "周边搜，根据用户传入关键词以及坐标location，搜索出radius半径范围的POI",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "keywords": {
+     "type": "string",
+     "description": "搜索关键词"
+    },
+    "location": {
+     "type": "string",
+     "description": "中心点经度纬度"
+    },
+    "radius": {
+     "type": "string",
+     "description": "搜索半径"
+    }
+   },
+   "required": [
+    "keywords",
+    "location"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_search_detail",
+  "description": "查询关键词搜或者周边搜获取到的POI ID的详细信息",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "关键词搜或者周边搜获取到的POI ID"
+    }
+   },
+   "required": [
+    "id"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_text_search",
+  "description": "关键字搜索 API 根据用户输入的关键字进行 POI 搜索，并返回相关的信息",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "keywords": {
+     "type": "string",
+     "description": "查询关键字"
+    },
+    "city": {
+     "type": "string",
+     "description": "查询城市"
+    },
+    "citylimit": {
+     "type": "boolean",
+     "default": false,
+     "description": "是否限制城市范围内搜索，默认不限制"
+    }
+   },
+   "required": [
+    "keywords"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "maps_weather",
+  "description": "根据城市名称或者标准adcode查询指定城市的天气",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "city": {
+     "type": "string",
+     "description": "城市名称或者adcode"
+    }
+   },
+   "required": [
+    "city"
+   ]
+  },
+  "domain": "map",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "tavily-search",
+  "description": "A powerful web search tool that provides comprehensive, real-time results using Tavily's AI search engine. Returns relevant web content with customizable parameters for result count, content type, and",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "query": {
+     "type": "string",
+     "description": "Search query"
+    },
+    "search_depth": {
+     "type": "string",
+     "enum": [
+      "basic",
+      "advanced"
+     ],
+     "description": "The depth of the search. It can be 'basic' or 'advanced'",
+     "default": "basic"
+    },
+    "topic": {
+     "type": "string",
+     "enum": [
+      "general",
+      "news"
+     ],
+     "description": "The category of the search. This will determine which of our agents will be used for the search",
+     "default": "general"
+    },
+    "days": {
+     "type": "number",
+     "description": "The number of days back from the current date to include in the search results. This specifies the time frame of data to be retrieved. Please note that this feature is only available when using the 'news' search topic",
+     "default": 3
+    },
+    "time_range": {
+     "type": "string",
+     "description": "The time range back from the current date to include in the search results. This feature is available for both 'general' and 'news' search topics",
+     "enum": [
+      "day",
+      "week",
+      "month",
+      "year",
+      "d",
+      "w",
+      "m",
+      "y"
+     ]
+    },
+    "max_results": {
+     "type": "number",
+     "description": "The maximum number of search results to return",
+     "default": 10,
+     "minimum": 5,
+     "maximum": 20
+    },
+    "include_images": {
+     "type": "boolean",
+     "description": "Include a list of query-related images in the response",
+     "default": false
+    },
+    "include_image_descriptions": {
+     "type": "boolean",
+     "description": "Include a list of query-related images and their descriptions in the response",
+     "default": false
+    },
+    "include_raw_content": {
+     "type": "boolean",
+     "description": "Include the cleaned and parsed HTML content of each search result",
+     "default": false
+    },
+    "include_domains": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "A list of domains to specifically include in the search results, if the user asks to search on specific sites set this to the domain of the site",
+     "default": []
+    },
+    "exclude_domains": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "List of domains to specifically exclude, if the user asks to exclude a domain set this to the domain of the site",
+     "default": []
+    },
+    "country": {
+     "type": "string",
+     "enum": [
+      "afghanistan",
+      "albania",
+      "algeria",
+      "andorra",
+      "angola",
+      "argentina",
+      "armenia",
+      "australia",
+      "austria",
+      "azerbaijan",
+      "bahamas",
+      "bahrain",
+      "bangladesh",
+      "barbados",
+      "belarus",
+      "belgium",
+      "belize",
+      "benin",
+      "bhutan",
+      "bolivia",
+      "bosnia and herzegovina",
+      "botswana",
+      "brazil",
+      "brunei",
+      "bulgaria",
+      "burkina faso",
+      "burundi",
+      "cambodia",
+      "cameroon",
+      "canada",
+      "cape verde",
+      "central african republic",
+      "chad",
+      "chile",
+      "china",
+      "colombia",
+      "comoros",
+      "congo",
+      "costa rica",
+      "croatia",
+      "cuba",
+      "cyprus",
+      "czech republic",
+      "denmark",
+      "djibouti",
+      "dominican republic",
+      "ecuador",
+      "egypt",
+      "el salvador",
+      "equatorial guinea",
+      "eritrea",
+      "estonia",
+      "ethiopia",
+      "fiji",
+      "finland",
+      "france",
+      "gabon",
+      "gambia",
+      "georgia",
+      "germany",
+      "ghana",
+      "greece",
+      "guatemala",
+      "guinea",
+      "haiti",
+      "honduras",
+      "hungary",
+      "iceland",
+      "india",
+      "indonesia",
+      "iran",
+      "iraq",
+      "ireland",
+      "israel",
+      "italy",
+      "jamaica",
+      "japan",
+      "jordan",
+      "kazakhstan",
+      "kenya",
+      "kuwait",
+      "kyrgyzstan",
+      "latvia",
+      "lebanon",
+      "lesotho",
+      "liberia",
+      "libya",
+      "liechtenstein",
+      "lithuania",
+      "luxembourg",
+      "madagascar",
+      "malawi",
+      "malaysia",
+      "maldives",
+      "mali",
+      "malta",
+      "mauritania",
+      "mauritius",
+      "mexico",
+      "moldova",
+      "monaco",
+      "mongolia",
+      "montenegro",
+      "morocco",
+      "mozambique",
+      "myanmar",
+      "namibia",
+      "nepal",
+      "netherlands",
+      "new zealand",
+      "nicaragua",
+      "niger",
+      "nigeria",
+      "north korea",
+      "north macedonia",
+      "norway",
+      "oman",
+      "pakistan",
+      "panama",
+      "papua new guinea",
+      "paraguay",
+      "peru",
+      "philippines",
+      "poland",
+      "portugal",
+      "qatar",
+      "romania",
+      "russia",
+      "rwanda",
+      "saudi arabia",
+      "senegal",
+      "serbia",
+      "singapore",
+      "slovakia",
+      "slovenia",
+      "somalia",
+      "south africa",
+      "south korea",
+      "south sudan",
+      "spain",
+      "sri lanka",
+      "sudan",
+      "sweden",
+      "switzerland",
+      "syria",
+      "taiwan",
+      "tajikistan",
+      "tanzania",
+      "thailand",
+      "togo",
+      "trinidad and tobago",
+      "tunisia",
+      "turkey",
+      "turkmenistan",
+      "uganda",
+      "ukraine",
+      "united arab emirates",
+      "united kingdom",
+      "united states",
+      "uruguay",
+      "uzbekistan",
+      "venezuela",
+      "vietnam",
+      "yemen",
+      "zambia",
+      "zimbabwe"
+     ],
+     "description": "Boost search results from a specific country. This will prioritize content from the selected country in the search results. Available only if topic is general.",
+     "default": ""
+    }
+   },
+   "required": [
+    "query"
+   ]
+  },
+  "domain": "search",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ },
+ {
+  "function": "search",
+  "description": "Perform a web search query",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "query": {
+     "type": "string",
+     "description": "Search query"
+    },
+    "num": {
+     "type": "number",
+     "description": "Number of results (1-10)",
+     "minimum": 1,
+     "maximum": 10
+    }
+   },
+   "required": [
+    "query",
+    "num"
+   ]
+  },
+  "domain": "search",
+  "kind": "read",
+  "source": "MCPToolBench++"
+ }
+]
