@@ -19,6 +19,7 @@
 
   <br>
 
+  [![arXiv](https://img.shields.io/badge/arXiv-2609.33443-b31b1b.svg?logo=arxiv)](https://arxiv.org/abs/2609.33443)
   [![Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-context--spanning--7b-yellow)](https://huggingface.co/mindlogicinc/context-spanning-7b)
 
 </div>
