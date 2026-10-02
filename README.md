@@ -58,6 +58,19 @@ A full-duplex speech model calls an external backend while it keeps listening an
 model emits `<ret>`, the recent user audio is transcribed, the backend returns reference, and that reference is written into the
 model's context stream as a masked *Context Span* block at whatever frame it arrives. 
 
+The whole span is read in a single KV prefill pass. The model runs at 12.5 Hz, so the prefill and one step of
+autoregressive decoding share an 80 ms frame slot; the table gives their combined wall clock against the span length.
+
+**Context Span processing latency.** `n` is the span length in frames, measured with the speech model on a dedicated
+NVIDIA RTX Pro 6000; `n = 0` means no span, the same as vanilla Moshi. P<sub>99</sub> is the 99th percentile.
+
+| n (frames) | 0 | 16 | 64 | 256 | 600 |
+|---|---:|---:|---:|---:|---:|
+| Latency (ms) | 34.7 ± 0.4 | 56.1 ± 0.2 | 57.5 ± 0.2 | 62.0 ± 0.3 | 86.1 ± 0.3 |
+| P<sub>99</sub> (ms) | 35.2 | 56.3 | 57.7 | 62.3 | 86.3 |
+
+The latency grows sub-linearly with the span length.
+
 
 ## Released Weights
 
